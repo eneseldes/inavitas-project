@@ -1,0 +1,17 @@
+{
+  "name": "@edas/access-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@edas/contracts": "*",
+    "@edas/shared": "*"
+  }
+}

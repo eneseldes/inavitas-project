@@ -1,0 +1,26 @@
+{
+  "name": "inavitas-staj",
+  "version": "1.0.0",
+  "description": "Elektrik dağıtımı kesinti & iş emri yönetim modülü",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/web"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/contracts && npm run build -w packages/shared && npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "topics": "./scripts/create-topics.sh"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.7",
+    "typescript": "^7.0.2"
+  }
+}
