@@ -5,10 +5,10 @@
  */
 export const TOPICS = {
   OUTAGE_CREATED: 'outage.created',
-  OUTAGE_RESOLVED: 'outage.resolved',
+  OUTAGE_ENERGIZED: 'outage.energized',
   OUTAGE_LINKED: 'outage.linked',
   WORK_ORDER_CREATED: 'work-order.created',
-  WORK_ORDER_COMPLETED: 'work-order.completed',
+  WORK_ORDER_DONE: 'work-order.done',
   WORK_ORDER_LINKED: 'work-order.linked',
 } as const;
 

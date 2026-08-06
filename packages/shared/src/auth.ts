@@ -135,3 +135,30 @@ export function userFromHeaders(req: Request): AuthenticatedUser | undefined {
     permissions: split(req.header('x-user-permissions')),
   };
 }
+
+/**
+ * `X-User-*` header'larından kimliği kurup `req.user`a yazan middleware.
+ *
+ * outage-service ve work-order-service bunu kullanır: access-service'in
+ * aksine kendi JWT'lerini doğrulamazlar, gateway'in doğruladığı kimliğe
+ * (ve doğruladıktan sonra eklediği header'lara) güvenirler.
+ *
+ * ⚠️ Faz 3'te gateway devreye girene kadar bu header'ları dışarıdan gelen
+ * spoofed header'lardan ayıran hiçbir şey yok — o yüzden bu dönemde
+ * servisleri doğrudan (gateway'siz) test ederken header'ları elle sen
+ * ekliyorsun (bkz. docs/04-KURULUM.md test notları). Üretimde bu header'lar
+ * yalnızca gateway'in eklediği, dışarıdan gelenler silindiği için güvenlidir.
+ */
+export function authenticateFromHeaders() {
+  return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
+    const user = userFromHeaders(req);
+
+    if (!user) {
+      next(new UnauthenticatedError());
+      return;
+    }
+
+    req.user = user;
+    next();
+  };
+}

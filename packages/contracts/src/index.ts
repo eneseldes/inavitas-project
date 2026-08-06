@@ -1,13 +1,13 @@
 import type { z } from 'zod';
 import {
   OutageCreatedEvent,
+  OutageEnergizedEvent,
   OutageLinkedEvent,
-  OutageResolvedEvent,
 } from './outage.events.ts';
 import { TOPICS, type Topic } from './topics.ts';
 import {
-  WorkOrderCompletedEvent,
   WorkOrderCreatedEvent,
+  WorkOrderDoneEvent,
   WorkOrderLinkedEvent,
 } from './work-order.events.ts';
 
@@ -22,10 +22,10 @@ export * from './work-order.events.ts';
  */
 export const EVENT_SCHEMAS = {
   [TOPICS.OUTAGE_CREATED]: OutageCreatedEvent,
-  [TOPICS.OUTAGE_RESOLVED]: OutageResolvedEvent,
+  [TOPICS.OUTAGE_ENERGIZED]: OutageEnergizedEvent,
   [TOPICS.OUTAGE_LINKED]: OutageLinkedEvent,
   [TOPICS.WORK_ORDER_CREATED]: WorkOrderCreatedEvent,
-  [TOPICS.WORK_ORDER_COMPLETED]: WorkOrderCompletedEvent,
+  [TOPICS.WORK_ORDER_DONE]: WorkOrderDoneEvent,
   [TOPICS.WORK_ORDER_LINKED]: WorkOrderLinkedEvent,
 } as const;
 

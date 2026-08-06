@@ -10,14 +10,14 @@
     "apps/web"
   ],
   "scripts": {
-    "dev": "concurrently -n access -c magenta \"npm run dev -w services/access-service\"",
+    "dev": "concurrently -n access,outage,workorder -c magenta,green,yellow \"npm run dev -w services/access-service\" \"npm run dev -w services/outage-service\" \"npm run dev -w services/work-order-service\"",
     "build": "npm run build -w packages/contracts && npm run build -w packages/shared && npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
-    "db:migrate": "npm run db:migrate -w services/access-service",
+    "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service",
     "db:seed": "npm run db:seed -w services/access-service",
     "topics": "./scripts/create-topics.sh"
   },
