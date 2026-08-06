@@ -1,0 +1,26 @@
+@use '../../styles/variables' as v;
+
+.readOnlyRow {
+  display: flex;
+  justify-content: space-between;
+  padding: v.$space-2 0;
+  border-bottom: 1px solid v.$color-hairline;
+  font-size: 0.8125rem;
+
+  &:first-child {
+    padding-top: 0;
+  }
+}
+
+.readOnlyLabel {
+  color: v.$color-ink-soft;
+}
+
+.readOnlyValue {
+  color: v.$color-ink;
+  font-weight: 500;
+}
+
+.readOnlyBlock {
+  margin-bottom: v.$space-4;
+}

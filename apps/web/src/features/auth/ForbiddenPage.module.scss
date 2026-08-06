@@ -1,0 +1,49 @@
+@use '../../styles/variables' as v;
+
+.page {
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: v.$space-3;
+  text-align: center;
+  padding: v.$space-4;
+}
+
+.iconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: v.$radius-full;
+  background: v.$color-red-50;
+  color: v.$color-red-600;
+  font-size: 1.5rem;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.message {
+  max-width: 24rem;
+  font-size: 0.875rem;
+  color: v.$color-ink-soft;
+}
+
+.backLink {
+  margin-top: v.$space-2;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: v.$color-brand-500;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

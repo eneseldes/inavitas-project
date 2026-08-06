@@ -1,0 +1,46 @@
+@use '../../styles/variables' as v;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-4;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.relatedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: v.$radius-lg;
+  border: 1px solid v.$color-brand-100;
+  background: v.$color-brand-50;
+  padding: v.$space-3 v.$space-4;
+  font-size: 0.875rem;
+}
+
+.relatedDismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: v.$radius-full;
+  color: v.$color-ink-soft;
+
+  &:hover {
+    background: v.$color-brand-100;
+    color: v.$color-ink;
+  }
+}

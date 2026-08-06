@@ -1,0 +1,124 @@
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
+
+// Dış kapsayıcı — ARTIK kart değil, sadece toolbar/tablo/footer'ı dikey
+// sıralayan şeffaf bir kolon. Kart görünümü SADECE tabloda (.tableCard).
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-3;
+}
+
+// Toolbar tablonun İÇİNDE değil — üstünde, kendi şeffaf satırında durur.
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: v.$space-2;
+}
+
+// Kart görünümü YALNIZCA burada: tablo yalnızca başlık + veri satırlarını içerir.
+.tableCard {
+  @include m.card;
+  overflow: hidden;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.thContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-1;
+}
+
+.sortTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: v.$space-1;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+
+  &:hover {
+    color: v.$color-ink;
+  }
+}
+
+.sortIcon {
+  color: v.$color-brand-500;
+}
+
+// `td.emptyState`: `.table td { text-align: left }` global kuralı element+
+// sınıf birleşimi olduğu için tek başına bir sınıftan (`.emptyState`) daha
+// spesifik — `text-align: center` bu yüzden hiç uygulanmıyordu.
+//
+// ⚠️ `display: flex`i DOĞRUDAN `<td>`ye VERME: bir tablo hücresi `colSpan`
+// ile tüm satırı kaplasa bile, `display`i `table-cell`den `flex`e
+// çevirdiğin an tarayıcı onu artık tablo genişlik algoritmasının bir
+// parçası saymaz — hücre satırın tamamına değil, İÇERİĞİNİN genişliğine
+// küçülür (bu yüzden "veri yok" yazısı ilk sütunun hizasında kalıyordu).
+// Çözüm: `<td>` normal table-cell olarak kalsın (colSpan doğru şekilde
+// tüm satırı kaplar), ortalama işini İÇİNDEKİ blok div (`.emptyStateInner`)
+// yapsın — blok elemanlar varsayılan olarak kapsayıcısının TAM genişliğini
+// doldurur, `align-items: center` de bu genişlik içinde ikonu/metni ortalar.
+td.emptyState {
+  padding: v.$space-6 v.$space-4;
+  color: v.$color-ink-soft;
+}
+
+.emptyStateInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.emptyIcon {
+  font-size: 1.5rem;
+  color: v.$color-slate-300;
+  margin-bottom: v.$space-2;
+}
+
+td.loadingState {
+  padding: v.$space-6 v.$space-4;
+  text-align: center;
+  color: v.$color-ink-soft;
+}
+
+// Footer tablonun İÇİNDE değil — altında, kendi şeffaf satırında durur.
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-3;
+  font-size: 0.8125rem;
+  color: v.$color-ink-soft;
+}
+
+.pageSizeGroup {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+}
+
+.pageSizeSelect {
+  width: auto;
+  height: 1.75rem;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
+}
+
+.pagerCurrent {
+  padding: 0 v.$space-2;
+  color: v.$color-ink;
+}

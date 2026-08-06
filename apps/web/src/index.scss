@@ -1,0 +1,355 @@
+// Global stil sayfası — TÜM projenin ortak yapıları burada.
+//
+// Kural: bir sınıf birden fazla component'te kullanılıyorsa (buton, input,
+// kart, rozet, tablo...) burada yaşar. Yalnızca TEK bir component'e özgü
+// layout, o component'in yanındaki `*.module.scss` dosyasına gider.
+@use 'styles/variables' as v;
+@use 'styles/mixins' as m;
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: v.$color-bg;
+  color: v.$color-ink;
+  font-family:
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-feature-settings: 'tnum';
+  -webkit-font-smoothing: antialiased;
+}
+
+// Tüm tıklanabilir öğelerde imleç pointer olsun — tarayıcı varsayılanı
+// <button>'a pointer VERMEZ (yalnızca <a href> ve <select> alır), bu yüzden
+// burada elle açıkça belirtiyoruz.
+button:not(:disabled),
+[role='button'],
+.clickable,
+a,
+select,
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+// Tarayıcı varsayılan <button> stilini (kenarlık, arkaplan, font) SIFIRLA.
+// Bunu yapmazsak her yeni "çıplak" buton (`.trigger` gibi kendi border'ını
+// tanımlamayan) UA stylesheet'inin çirkin "2px outset" kenarlığını miras
+// alır — az önce filtre ikonunda görülen tam olarak buydu.
+button {
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+}
+
+// --- Butonlar -----------------------------------------------------------
+
+.btn {
+  @include m.clickable;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: v.$space-1;
+  height: v.$control-height;
+  padding: 0 v.$space-3;
+  font-size: v.$control-font-size;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: v.$control-radius;
+  white-space: nowrap;
+  @include m.focus-ring;
+}
+
+.btn--primary {
+  background: v.$color-brand-500;
+  color: v.$color-white;
+
+  &:hover:not(:disabled) {
+    background: v.$color-brand-600;
+  }
+}
+
+.btn--ghost {
+  background: transparent;
+  color: v.$color-ink-soft;
+
+  &:hover:not(:disabled) {
+    background: v.$color-slate-100;
+    color: v.$color-ink;
+  }
+}
+
+.btn--outline {
+  background: v.$color-white;
+  border-color: v.$color-hairline;
+  color: v.$color-ink-soft;
+
+  &:hover:not(:disabled) {
+    background: v.$color-slate-100;
+    color: v.$color-ink;
+  }
+}
+
+// İkon-only kare buton (yenile, filtre, düzenle...).
+.icon-btn {
+  @include m.clickable;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: v.$control-height;
+  height: v.$control-height;
+  padding: 0;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$control-radius;
+  background: v.$color-white;
+  color: v.$color-ink-soft;
+  @include m.focus-ring;
+
+  &:hover:not(:disabled) {
+    background: v.$color-slate-100;
+    color: v.$color-ink;
+  }
+
+  &.icon-btn--active {
+    background: v.$color-brand-50;
+    border-color: v.$color-brand-400;
+    color: v.$color-brand-500;
+  }
+}
+
+.icon-btn--sm {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+// --- Form kontrolleri -----------------------------------------------------
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+  margin-bottom: v.$space-3;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.field__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: v.$color-ink;
+}
+
+.field__hint {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: v.$color-ink-soft;
+}
+
+.field__error {
+  font-size: 0.75rem;
+  color: v.$color-red-600;
+}
+
+// STANDART input/select — tüm formlarda (login, oluşturma/güncelleme
+// modalları, sütun filtreleri) AYNI boyut/padding.
+.input,
+.select {
+  @include m.control-base;
+  width: 100%;
+}
+
+// İkonlu input (login formundaki e-posta/parola gibi) — yükseklik/padding-y
+// AYNI kalır, yalnızca sol boşluk ikon için genişler.
+.input--icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .input {
+    padding-left: 1.875rem;
+  }
+
+  svg {
+    position: absolute;
+    left: v.$control-padding-x;
+    color: v.$color-ink-soft;
+    pointer-events: none;
+    font-size: 0.9em;
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: v.$space-2;
+  padding-top: v.$space-1;
+}
+
+.form-error-banner {
+  border-radius: v.$radius-md;
+  background: v.$color-red-50;
+  color: v.$color-red-700;
+  padding: v.$space-2 v.$space-3;
+  font-size: 0.8125rem;
+  margin-bottom: v.$space-3;
+}
+
+// --- Kart / yüzey -----------------------------------------------------
+
+.card {
+  @include m.card;
+}
+
+// --- Rozet (durum pill'leri) --------------------------------------------
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: v.$radius-full;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge--gray {
+  background: v.$color-slate-100;
+  color: v.$color-slate-700;
+}
+.badge--blue {
+  background: v.$color-blue-50;
+  color: v.$color-blue-700;
+}
+.badge--cyan {
+  background: v.$color-cyan-50;
+  color: v.$color-cyan-700;
+}
+.badge--green {
+  background: v.$color-green-50;
+  color: v.$color-green-700;
+}
+.badge--red {
+  background: v.$color-red-50;
+  color: v.$color-red-700;
+}
+
+// --- Bağlantı (tıklanabilir metin) --------------------------------------
+
+.link {
+  @include m.clickable;
+  display: inline-flex;
+  align-items: center;
+  gap: v.$space-1;
+  color: v.$color-brand-500;
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// --- Tablo — sütun ayrımı çizgilerle ------------------------------------
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+
+  th,
+  td {
+    padding: v.$space-2 v.$space-3;
+    text-align: left;
+    border-right: 1px solid v.$color-hairline;
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+
+  thead th {
+    background: v.$color-slate-100;
+    color: v.$color-ink-soft;
+    font-weight: 500;
+    font-size: 0.75rem;
+    border-bottom: 1px solid v.$color-hairline;
+    user-select: none;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid v.$color-hairline;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+.text-muted {
+  color: v.$color-ink-soft;
+}
+
+// Grid'lerin "İşlemler" sütunu: güncelleme butonu + geçiş select'i yan yana.
+.actions-cell {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+}
+
+// Kilitli kayıt (ör. arşivlenmiş kesinti) — düzenleme/geçiş kontrolü yerine gösterilir.
+.locked-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: v.$space-1;
+  color: v.$color-ink-soft;
+  font-size: 0.75rem;
+}
+
+// Sütun filtre select'i (küçük boy) — kolon içi "Durum Değiştir" gibi
+// yerlerde standart .select ile aynı yükseklik/padding, sadece dar.
+.select--compact {
+  width: auto;
+  height: 1.75rem;
+  padding: 0 v.$space-2;
+  font-size: 0.75rem;
+}
+
+.font-mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

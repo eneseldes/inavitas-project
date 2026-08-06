@@ -1,0 +1,64 @@
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
+
+.page {
+  display: flex;
+  min-height: 100svh;
+  align-items: center;
+  justify-content: center;
+  padding: v.$space-4;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 24rem;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: v.$space-8;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto v.$space-3;
+  border-radius: v.$radius-xl;
+  background: v.$color-brand-500;
+  color: v.$color-white;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.subtitle {
+  margin-top: v.$space-1;
+  font-size: 0.875rem;
+  color: v.$color-ink-soft;
+}
+
+.form {
+  @include m.card;
+  padding: v.$space-5;
+}
+
+.submit {
+  width: 100%;
+  margin-top: v.$space-2;
+}
+
+.seedHint {
+  margin-top: v.$space-6;
+  text-align: center;
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+}

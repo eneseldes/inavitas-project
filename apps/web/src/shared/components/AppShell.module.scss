@@ -1,0 +1,129 @@
+@use '../../styles/variables' as v;
+
+.shell {
+  display: flex;
+  min-height: 100svh;
+  background: v.$color-bg;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: v.$space-1;
+  width: v.$sidebar-width;
+  padding: v.$space-4 0;
+  background: v.$color-brand-900;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: v.$space-4;
+  border-radius: v.$radius-md;
+  background: v.$color-brand-500;
+  color: v.$color-white;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+  flex: 1;
+}
+
+// Sidebar ikonuna gelince yanında isim kutucuğu belirir.
+.navItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: v.$radius-lg;
+  font-size: 1.125rem;
+  color: v.$color-brand-100;
+  text-decoration: none;
+  transition: background-color v.$transition-fast;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+
+    .navItem__label {
+      opacity: 1;
+      transform: translate(0, -50%);
+      pointer-events: auto;
+    }
+  }
+}
+
+.navItemActive {
+  background: v.$color-brand-500;
+  color: v.$color-white;
+}
+
+// nav öğesi bir <button> olduğunda (çıkış) tarayıcı varsayılan kenarlığını/
+// arkaplanını sıfırlıyoruz — görsel olarak diğer nav ikonlarıyla birebir aynı.
+.navItemButton {
+  border: none;
+  background: none;
+  font: inherit;
+}
+
+.navItem__label {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + v.$space-2);
+  transform: translate(-4px, -50%);
+  z-index: v.$z-popover;
+  padding: v.$space-1 v.$space-3;
+  border-radius: v.$radius-md;
+  background: v.$color-ink;
+  color: v.$color-white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: v.$shadow-md;
+  transition:
+    opacity v.$transition-base,
+    transform v.$transition-base;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: v.$space-3 v.$space-6;
+  background: v.$color-white;
+  border-bottom: 1px solid v.$color-hairline;
+}
+
+.headerUser {
+  font-size: 0.875rem;
+  color: v.$color-ink-soft;
+}
+
+.headerUserName {
+  font-weight: 500;
+  color: v.$color-ink;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: v.$space-6;
+}

@@ -1,0 +1,63 @@
+@use 'variables' as v;
+
+// Tüm tıklanabilir öğelerde ORTAK: imleç + geçiş. Buton/link/select gibi
+// etkileşimli her yerde bunu çağır — "pointer unutuldu" sınıfı bug'ları
+// tek yerden engellenir.
+@mixin clickable {
+  cursor: pointer;
+  transition:
+    background-color v.$transition-fast,
+    border-color v.$transition-fast,
+    color v.$transition-fast,
+    opacity v.$transition-fast,
+    box-shadow v.$transition-fast;
+
+  &:disabled,
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+@mixin focus-ring {
+  &:focus-visible {
+    outline: none;
+    border-color: v.$color-brand-400;
+    box-shadow: 0 0 0 2px v.$color-brand-100;
+  }
+}
+
+// Standart form kontrolü (input/select) — İSTENEN tutarlılık burada yaşıyor:
+// tüm input/select'ler AYNI yükseklik/padding/font-size'ı bu mixin'den alır.
+@mixin control-base {
+  height: v.$control-height;
+  padding: 0 v.$control-padding-x;
+  font-size: v.$control-font-size;
+  font-family: inherit;
+  color: v.$color-ink;
+  background: v.$color-white;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$control-radius;
+  transition:
+    border-color v.$transition-fast,
+    box-shadow v.$transition-fast;
+
+  &::placeholder {
+    color: v.$color-slate-300;
+  }
+
+  @include focus-ring;
+}
+
+@mixin card {
+  background: v.$color-white;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-lg;
+  box-shadow: v.$shadow-sm;
+}
+
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

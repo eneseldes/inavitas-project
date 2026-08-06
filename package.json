@@ -10,7 +10,7 @@
     "apps/web"
   ],
   "scripts": {
-    "dev": "concurrently -n access,outage,workorder -c magenta,green,yellow \"npm run dev -w services/access-service\" \"npm run dev -w services/outage-service\" \"npm run dev -w services/work-order-service\"",
+    "dev": "concurrently -n access,outage,workorder,gw,web -c magenta,green,yellow,cyan,blue \"npm run dev -w services/access-service\" \"npm run dev -w services/outage-service\" \"npm run dev -w services/work-order-service\" \"npm run dev -w services/gateway\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w packages/contracts && npm run build -w packages/shared && npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",

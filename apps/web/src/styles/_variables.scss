@@ -1,0 +1,67 @@
+// Tasarım token'ları — tüm SCSS dosyaları bunu `@use` eder.
+// Ortak/paylaşılan her değer BURADA yaşar; component dosyalarında ham renk/
+// boşluk değeri YAZILMAZ, hep bu değişkenler üzerinden gidilir.
+
+// --- Renkler — ekran görüntüsündeki koyu petrol/teal sidebar + temiz beyaz içerik paleti ---
+$color-brand-50: #eef6f6;
+$color-brand-100: #d7e9ea;
+$color-brand-400: #2f8f96;
+$color-brand-500: #1f6b72;
+$color-brand-600: #185459;
+$color-brand-900: #0f2f34;
+
+$color-ink: #22303f;
+$color-ink-soft: #5b6b7c;
+$color-hairline: #e4e8ec;
+$color-bg: #f8fafc;
+$color-white: #ffffff;
+
+$color-red-50: #fef2f2;
+$color-red-100: #fee2e2;
+$color-red-600: #dc2626;
+$color-red-700: #b91c1c;
+$color-blue-50: #eff6ff;
+$color-blue-700: #1d4ed8;
+$color-cyan-50: #ecfeff;
+$color-cyan-700: #0e7490;
+$color-green-50: #f0fdf4;
+$color-green-700: #15803d;
+$color-slate-100: #f1f5f9;
+$color-slate-300: #cbd5e1;
+$color-slate-700: #334155;
+
+// --- Boşluk skalası (4px birim) ---
+$space-1: 0.25rem; // 4
+$space-2: 0.5rem; // 8
+$space-3: 0.75rem; // 12
+$space-4: 1rem; // 16
+$space-5: 1.25rem; // 20
+$space-6: 1.5rem; // 24
+$space-8: 2rem; // 32
+
+// --- Standart form kontrol boyutları — Input'lar arası tutarsızlığı bu üç
+// değişken çözüyor: hepsi AYNI yükseklik/padding/font-size'ı paylaşır.
+$control-height: 2rem; // 32px — input/select/button ortak yüksekliği
+$control-padding-x: 0.625rem;
+$control-font-size: 0.8125rem;
+$control-radius: 0.375rem;
+
+$radius-sm: 0.375rem;
+$radius-md: 0.5rem;
+$radius-lg: 0.75rem;
+$radius-xl: 1rem;
+$radius-full: 9999px;
+
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
+// --- Geçişler — tüm etkileşimli öğeler bunu kullanır, elle "transition: ..."
+// tekrarlanmaz (bkz. mixins.scss transition-base).
+$transition-fast: 120ms ease;
+$transition-base: 180ms ease;
+
+$sidebar-width: 4rem;
+$z-popover: 40;
+$z-modal: 50;
+$z-toast: 100;

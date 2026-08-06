@@ -1,0 +1,44 @@
+@use '../../styles/variables' as v;
+
+.stack {
+  position: fixed;
+  right: v.$space-4;
+  bottom: v.$space-4;
+  z-index: v.$z-toast;
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  border-radius: v.$radius-md;
+  padding: v.$space-3 v.$space-4;
+  font-size: 0.875rem;
+  color: v.$color-white;
+  box-shadow: v.$shadow-lg;
+  animation: slide-in v.$transition-base;
+}
+
+.toast--success {
+  background: v.$color-brand-500;
+}
+
+.toast--error {
+  background: v.$color-red-600;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

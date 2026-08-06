@@ -1,5 +1,5 @@
 import type { PaginationQuery, SortOrder } from '@edas/shared';
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { outages } from '../db/schema.ts';
 import type { OutageStatus } from '../domain/state-machine.ts';
@@ -49,7 +49,10 @@ function buildConditions(filters: OutageFilters): SQL[] {
       filters.status.length === 1 ? eq(outages.status, filters.status[0]!) : inArray(outages.status, filters.status),
     );
   }
-  if (filters.gisId) conditions.push(eq(outages.gisId, filters.gisId));
+  // Önek eşleşmesi ('a%' — "a ile başlayan"), tam eşleşme DEĞİL. Kullanıcı
+  // arama kutusuna kesicinin ID'sinin başını yazıp geri kalanını görmek
+  // ister; `eq()` bunu saçma şekilde reddediyordu.
+  if (filters.gisId) conditions.push(ilike(outages.gisId, `${filters.gisId}%`));
   if (filters.startedAtFrom) conditions.push(gte(outages.startedAt, filters.startedAtFrom));
   if (filters.startedAtTo) conditions.push(lt(outages.startedAt, filters.startedAtTo));
   if (filters.createdAtFrom) conditions.push(gte(outages.createdAt, filters.createdAtFrom));

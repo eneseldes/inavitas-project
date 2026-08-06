@@ -1,5 +1,5 @@
 import type { PaginationQuery, SortOrder } from '@edas/shared';
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { workOrders } from '../db/schema.ts';
 import type { WorkOrderStatus } from '../domain/state-machine.ts';
@@ -49,7 +49,8 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
     );
   }
   if (filters.type) conditions.push(eq(workOrders.type, filters.type));
-  if (filters.gisId) conditions.push(eq(workOrders.gisId, filters.gisId));
+  // Önek eşleşmesi ('a%') — bkz. outage-service/src/repository/outage.repository.ts için aynı gerekçe.
+  if (filters.gisId) conditions.push(ilike(workOrders.gisId, `${filters.gisId}%`));
   if (filters.createdAtFrom) conditions.push(gte(workOrders.createdAt, filters.createdAtFrom));
   if (filters.createdAtTo) conditions.push(lt(workOrders.createdAt, filters.createdAtTo));
   if (filters.hasOutage === true) conditions.push(isNotNull(workOrders.outageId));
