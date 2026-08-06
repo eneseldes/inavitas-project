@@ -3,8 +3,6 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      # Bu, uygulama kullanıcısı DEĞİL — yalnızca init script'inin
-      # veritabanı/kullanıcı oluşturmak için kullandığı superuser.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres_root_pw
       POSTGRES_DB: postgres
@@ -30,7 +28,7 @@ services:
       retries: 10
 
   kafka:
-    image: apache/kafka:3.9.0        # KRaft modu — Zookeeper yok, tek container
+    image: apache/kafka:3.9.0
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -43,11 +41,11 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topic'ler bilinçli oluşturulsun
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_NUM_PARTITIONS: 3
-      KAFKA_LOG_RETENTION_HOURS: 168             # 7 gün
+      KAFKA_LOG_RETENTION_HOURS: 168
     ports:
-      - "19092:19092"   # host'tan erişim (uygulama kodu buraya bağlanır)
+      - "19092:19092"
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
       interval: 15s
@@ -55,7 +53,7 @@ services:
       retries: 10
       start_period: 30s
 
-  kafka-ui:                 # opsiyonel ama çok işine yarar
+  kafka-ui:
     image: ghcr.io/kafbat/kafka-ui:latest
     environment:
       KAFKA_CLUSTERS_0_NAME: local
@@ -67,7 +65,5 @@ services:
         condition: service_healthy
 
 volumes:
-  accessdata:
-  outagedata:
-  workorderdata:
+  pgdata:
   redisdata:

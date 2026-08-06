@@ -10,17 +10,24 @@
     "apps/web"
   ],
   "scripts": {
+    "dev": "concurrently -n access -c magenta \"npm run dev -w services/access-service\"",
     "build": "npm run build -w packages/contracts && npm run build -w packages/shared && npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w services/access-service",
+    "db:seed": "npm run db:seed -w services/access-service",
     "topics": "./scripts/create-topics.sh"
   },
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "concurrently": "^10.0.4",
+    "dotenv-cli": "^11.0.0",
     "tsx": "^4.23.7",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
