@@ -1,7 +1,7 @@
 import { clsx } from 'clsx';
 import styles from './LiveIndicator.module.scss';
 
-/** SSE bağlantı durumunu gösteren küçük rozet — Faz 5'in canlı güncellemesini görünür kılar. */
+/** Canlı veri akışının (SSE) bağlantı durumunu gösteren rozet bileşeni. */
 export function LiveIndicator({ connected }: { connected: boolean }) {
   return (
     <span

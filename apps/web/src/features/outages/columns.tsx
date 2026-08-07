@@ -12,21 +12,14 @@ function formatDate(value: string | null): string {
 }
 
 /**
- * UI'dan seçilebilecek durum geçişleri — outage-service/src/domain/state-machine.ts'in
- * TAM YANSIMASI DEĞİL, bilinçli olarak DAR bir alt kümesi:
+ * Kullanıcı arayüzünden doğrudan seçilebilen kesinti durum geçişleri:
  *
- * - STARTED'dan ENERGIZED'a geçiş burada YOK. Kesintinin enerji verildi
- *   durumuna geçmesi iş emri tarafından belirlenecek (Faz 4'te
- *   `work-order.done` Kafka event'i, bkz. SRS 1.6 "Durumlar arası çapraz
- *   kural") — kullanıcı bunu elle zorlamamalı.
- * - ARCHIVED ve CANCELLED tamamen KİLİTLİ: bu durumdaki bir kesintide ne
- *   düzenleme ne de başka bir geçiş yapılabilir (bkz. isLocked/actions kolonu).
+ * - STARTED durumundaki kesintilerin enerji verildi (ENERGIZED) durumuna geçişi
+ *   tamamlanan iş emirleri üzerinden otomatik olarak yönetilir.
+ * - ARCHIVED ve CANCELLED durumundaki kesintiler kilitlidir, durum değişikliği yapılamaz.
  *
- * Backend state machine hâlâ nihai otorite — burası yalnızca kullanıcıya
- * hangi seçeneklerin ANLAMLI olduğunu gösteriyor.
- *
- * `export`: OutageHistoryDialog bu listeyi kullanıyor,
- * iki kopya tutmuyoruz (bkz. work-orders/columns.tsx NEXT_STATUSES).
+ * Servis tarafındaki durum makinesi esas otoritedir; bu tablo arayüzde sunulan
+ * geçerli işlem seçeneklerini tanımlar.
  */
 export const USER_SELECTABLE_NEXT_STATUSES: Record<OutageStatus, OutageStatus[]> = {
   STARTED: ['CANCELLED'],

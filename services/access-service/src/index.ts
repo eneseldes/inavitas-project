@@ -4,7 +4,7 @@ import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
 import { disconnectRedis } from './redis.ts';
 
-const logger = createLogger({
+const logger = await createLogger({
   service: 'access-service',
   level: config.LOG_LEVEL,
   pretty: isDevelopment(config.NODE_ENV),

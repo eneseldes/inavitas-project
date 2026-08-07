@@ -19,9 +19,8 @@ export interface RefreshTokenStore {
 const KEY_PREFIX = 'refresh:';
 
 /**
- * Redis tabanlı refresh token deposu (03-YOL-HARITASI Faz 5 adım 1).
- * Süre dolumu Redis'in `EX` mekanizmasıyla yönetilir — ayrı bir temizleme
- * (cleanup) işine gerek kalmaz.
+ * Redis tabanlı yenileme belirteci (refresh token) deposu.
+ * Belirteç geçerlilik süreleri Redis TTL (`EX`) mekanizması ile yönetilir.
  */
 export class RedisRefreshTokenStore implements RefreshTokenStore {
   async save(jti: string, record: RefreshRecord): Promise<void> {

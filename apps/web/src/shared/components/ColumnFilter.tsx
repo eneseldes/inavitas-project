@@ -30,14 +30,8 @@ const POPOVER_WIDTH = 224;
 const VIEWPORT_MARGIN = 8;
 
 /**
- * Sütun başlığının sağındaki filtre ikonu — tıklanınca metin ya da çoklu
- * seçim paneli açan ortak component.
- *
- * Panel `createPortal` ile `document.body`ye render ediliyor ve
- * `position: fixed` + JS ile hesaplanan koordinatlarla konumlanıyor.
- * Tablo yatayda kayabilsin diye `.tableWrap`te `overflow-x: auto` var;
- * panel tablo DOM'unun içinde kalsaydı bu overflow sınırını asla aşamaz,
- * geniş sütunlarda kırpılırdı. Portal bu kısıtlamayı komple ortadan kaldırıyor.
+ * Sütun başlığında filtreleme paneli açan ortak bileşen.
+ * Taşma (overflow) sorunlarını önlemek için panel `createPortal` ile gövdeye (`body`) yerleştirilir.
  */
 export function ColumnFilter(props: ColumnFilterProps) {
   const [isOpen, setOpen] = useState(false);

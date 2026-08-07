@@ -12,9 +12,7 @@ function formatDate(value: string): string {
 }
 
 /**
- * work-order-service/src/domain/state-machine.ts'in UI yansıması — bkz.
- * outages/columns.tsx için aynı gerekçe. `export`: EditWorkOrderDialog aynı
- * listeyi kullanıyor, iki kopya tutmuyoruz.
+ * Kullanıcı arayüzünde seçilebilecek sonraki iş emri durumları.
  */
 export const NEXT_STATUSES: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   STARTED: ['ASSIGNED', 'CANCELLED'],

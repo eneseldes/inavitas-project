@@ -8,8 +8,9 @@ import {
   type AuthedRequest,
 } from '@inavitas/shared';
 import type { Response } from 'express';
+import { db } from '../../db.ts';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
-import { publishOutageCreated, publishOutageEnergizedIfNeeded } from '../../kafka/producer.ts';
+import { enqueueOutageCreatedTx, enqueueOutageEnergizedIfNeededTx } from '../../kafka/producer.ts';
 import { notifyOutageChanged } from '../../realtime.ts';
 import * as outageRepository from '../../repository/outage.repository.ts';
 import { SORTABLE_FIELDS, type OutageFilters } from '../../repository/outage.repository.ts';
@@ -52,22 +53,29 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   const body = CreateOutageBody.parse(req.body);
 
   const status: OutageStatus = body.endedAt ? 'ENERGIZED' : (body.status ?? 'STARTED');
+  const user = req.user;
 
-  const row = await outageRepository.create(
-    {
-      gisId: body.gisId,
-      startedAt: new Date(body.startedAt),
-      endedAt: body.endedAt ? new Date(body.endedAt) : null,
-      status,
-      origin: 'USER',
-      createdBy: req.user.email,
-    },
-    req.correlationId,
-  );
+  // Kesinti kaydı ve outbox bildirimi aynı transaction içinde yazılır.
+  const row = await db.transaction(async (tx) => {
+    const created = await outageRepository.createTx(
+      tx,
+      {
+        gisId: body.gisId,
+        startedAt: new Date(body.startedAt),
+        endedAt: body.endedAt ? new Date(body.endedAt) : null,
+        status,
+        origin: 'USER',
+        createdBy: user.email,
+      },
+      req.correlationId,
+    );
+
+    await enqueueOutageCreatedTx(tx, created, req.correlationId!, user.email);
+    return created;
+  });
 
   req.log?.info({ outageId: row.id, gisId: row.gisId, status: row.status }, 'kesinti oluşturuldu');
 
-  await publishOutageCreated(row, req.correlationId!, req.user.email, req.log);
   await notifyOutageChanged(row, req.log);
 
   res.status(201).json(toOutageDto(row));
@@ -75,6 +83,7 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
 
 export async function patch(req: AuthedRequest, res: Response): Promise<void> {
   if (!req.user) throw new UnauthenticatedError();
+  const user = req.user;
 
   const id = req.params.id as string;
   const body = PatchOutageBody.parse(req.body);
@@ -90,20 +99,35 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
-  const updated = await outageRepository.updateWithVersion(
-    current.id,
-    body.version,
-    {
-      status: nextStatus,
-      endedAt: body.endedAt ? new Date(body.endedAt) : current.endedAt,
-    },
-    {
-      fromStatus: current.status,
-      actor: req.user.email,
-      origin: 'USER',
-      correlationId: req.correlationId,
-    },
-  );
+  const updated = await db.transaction(async (tx) => {
+    const row = await outageRepository.updateWithVersionTx(
+      tx,
+      current.id,
+      body.version,
+      {
+        status: nextStatus,
+        endedAt: body.endedAt ? new Date(body.endedAt) : current.endedAt,
+      },
+      {
+        fromStatus: current.status,
+        actor: user.email,
+        origin: 'USER',
+        correlationId: req.correlationId,
+      },
+    );
+
+    if (!row) return null;
+
+    if (nextStatus !== current.status) {
+      await enqueueOutageEnergizedIfNeededTx(tx, current.status, row, {
+        origin: 'USER',
+        actor: user.email,
+        correlationId: req.correlationId!,
+      });
+    }
+
+    return row;
+  });
 
   if (!updated) {
     throw new ConflictError('Kayıt başka bir istekle güncellenmiş (version uyuşmazlığı)', [
@@ -113,13 +137,6 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
   if (nextStatus !== current.status) {
     req.log?.info({ outageId: updated.id, from: current.status, to: nextStatus }, 'kesinti durumu değişti');
-
-    await publishOutageEnergizedIfNeeded(
-      current.status,
-      updated,
-      { origin: 'USER', actor: req.user.email, correlationId: req.correlationId! },
-      req.log,
-    );
   }
 
   await notifyOutageChanged(updated, req.log);

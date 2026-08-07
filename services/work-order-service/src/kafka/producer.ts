@@ -5,8 +5,8 @@ import {
   type WorkOrderCreatedPayload,
   type WorkOrderDonePayload,
 } from '@inavitas/contracts';
-import type { Logger } from '@inavitas/shared';
-import { getProducer } from '../kafka.ts';
+import type { Tx } from '../db.ts';
+import { enqueueTx } from '../repository/outbox.repository.ts';
 import type { WorkOrderRow } from '../repository/work-order.repository.ts';
 
 export interface PublishOptions {
@@ -16,8 +16,10 @@ export interface PublishOptions {
   causedBy?: Pick<RawEventEnvelope, 'eventId' | 'depth'>;
 }
 
-/** Kullanıcı tarafından yeni iş emri oluşturulduğunda 'work-order.created' event'ini yayınlar. */
-export async function publishWorkOrderCreated(row: WorkOrderRow, correlationId: string, actor: string, log: Logger): Promise<void> {
+/**
+ * Yeni iş emri oluşturulduğunda 'work-order.created' olayını outbox tablosuna yazar.
+ */
+export async function enqueueWorkOrderCreatedTx(tx: Tx, row: WorkOrderRow, correlationId: string, actor: string): Promise<void> {
   const payload: WorkOrderCreatedPayload = {
     workOrderId: row.id,
     gisId: row.gisId,
@@ -34,15 +36,11 @@ export async function publishWorkOrderCreated(row: WorkOrderRow, correlationId: 
     correlationId,
   });
 
-  try {
-    await getProducer().publish(TOPICS.WORK_ORDER_CREATED, row.gisId, envelope);
-  } catch (err) {
-    log.error({ err, workOrderId: row.id }, 'work-order.created yayınlanamadı');
-  }
+  await enqueueTx(tx, TOPICS.WORK_ORDER_CREATED, row.gisId, envelope);
 }
 
-/** İş emri DONE durumuna geldiğinde 'work-order.done' event'ini yayınlar. */
-export async function publishWorkOrderDone(row: WorkOrderRow, correlationId: string, actor: string, log: Logger): Promise<void> {
+/** İş emri DONE durumuna geldiğinde 'work-order.done' event'ini outbox'a yazar. */
+export async function enqueueWorkOrderDoneTx(tx: Tx, row: WorkOrderRow, correlationId: string, actor: string): Promise<void> {
   const payload: WorkOrderDonePayload = {
     workOrderId: row.id,
     gisId: row.gisId,
@@ -59,20 +57,16 @@ export async function publishWorkOrderDone(row: WorkOrderRow, correlationId: str
     correlationId,
   });
 
-  try {
-    await getProducer().publish(TOPICS.WORK_ORDER_DONE, row.gisId, envelope);
-  } catch (err) {
-    log.error({ err, workOrderId: row.id }, 'work-order.done yayınlanamadı');
-  }
+  await enqueueTx(tx, TOPICS.WORK_ORDER_DONE, row.gisId, envelope);
 }
 
-/** İş emrine bir kesinti bağlandığında 'work-order.linked' event'ini yayınlar. */
-export async function publishWorkOrderLinked(
+/** İş emrine bir kesinti bağlandığında 'work-order.linked' event'ini outbox'a yazar. */
+export async function enqueueWorkOrderLinkedTx(
+  tx: Tx,
   workOrderId: string,
   gisId: string,
   outageId: string,
   opts: PublishOptions,
-  log: Logger,
 ): Promise<void> {
   const envelope = createEnvelope({
     eventType: TOPICS.WORK_ORDER_LINKED,
@@ -83,9 +77,5 @@ export async function publishWorkOrderLinked(
     causedBy: opts.causedBy,
   });
 
-  try {
-    await getProducer().publish(TOPICS.WORK_ORDER_LINKED, gisId, envelope);
-  } catch (err) {
-    log.error({ err, workOrderId, outageId }, 'work-order.linked yayınlanamadı');
-  }
+  await enqueueTx(tx, TOPICS.WORK_ORDER_LINKED, gisId, envelope);
 }

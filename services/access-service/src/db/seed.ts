@@ -6,14 +6,10 @@ import { hashPassword } from '../domain/password.ts';
 import { permissions, roles, rolePermissions, userRoles, users } from './schema.ts';
 
 /**
- * Geliştirme verisi (yol haritası Faz 1, adım 2).
+ * Veritabanı başlangıç verilerini (seed) hazırlar.
  *
- * `onConflictDoUpdate` kullanıyoruz: seed birden çok kez çalıştırılabilir
- * olmalı, ikinci çalıştırmada "unique constraint" hatası vermemeli.
- *
- * Bu dosya kendi bağlantı havuzunu kuruyor (src/db.ts'i kullanmıyor): seed
- * bir CLI script'i, uygulamanın config/logger zincirini ayağa kaldırmasına
- * gerek yok.
+ * Yeniden çalıştırılabilir yapıdadır (`onConflictDoUpdate`). CLI betiği olarak
+ * çalıştığından kendi veritabanı bağlantı havuzunu kullanır.
  */
 
 const connectionString = process.env.ACCESS_DATABASE_URL;

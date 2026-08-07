@@ -4,10 +4,8 @@ import type { Request, Response } from 'express';
 const HEARTBEAT_MS = 30_000;
 
 /**
- * Bir Redis kanalını dinleyip mesajları o an bağlı tüm SSE istemcilerine
- * dağıtan küçük bir hub. Her SSE bağlantısı için ayrı bir Redis aboneliği
- * açmak yerine TEK abonelik üzerinden fan-out yapılır (03-YOL-HARITASI Faz 5
- * adım 3: "gateway: SUBSCRIBE ui:outage, açık SSE bağlantılarına yaz").
+ * Redis pub/sub kanalını dinleyip mesajları bağlı tüm SSE istemcilerine tek bir
+ * abonelik üzerinden dağıtan (fan-out) hub sınıfı.
  */
 export class SseHub {
   private readonly clients = new Set<Response>();

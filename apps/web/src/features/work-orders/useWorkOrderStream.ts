@@ -7,8 +7,8 @@ const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 const RECONNECT_DELAY_MS = 3_000;
 
 /**
- * Gateway'in Redis pub/sub'dan SSE'ye çevirdiği iş emri kanalını dinler ve
- * mesaj geldiğinde ilgili sorguları invalidate eder (03-YOL-HARITASI Faz 5 adım 4).
+ * Gateway üzerindeki iş emri canlı yayın kanalını (SSE) dinler. Yeni bir mesaj
+ * geldiğinde istemci önbelleğindeki iş emri sorgularını günceller.
  */
 export function useWorkOrderStream(): boolean {
   const queryClient = useQueryClient();

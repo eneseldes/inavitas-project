@@ -1,5 +1,4 @@
 import pino, { type Logger } from 'pino';
-import pinoPretty from 'pino-pretty';
 
 export type { Logger };
 
@@ -26,11 +25,15 @@ export interface LoggerOptions {
   pretty?: boolean;
 }
 
-/** Servisler için yapılandırılmış Pino logger örneği oluşturur. */
-export function createLogger({ service, level = 'info', pretty = false }: LoggerOptions): Logger {
+/**
+ * Servisler için yapılandırılmış Pino logger örneği oluşturur.
+ * Konsol ve dosya çıktılarını (multistream) ve hassas veri gizlemeyi (redact) yönetir.
+ */
+export async function createLogger({ service, level = 'info', pretty = false }: LoggerOptions): Promise<Logger> {
   const fileStream = pino.destination({ dest: `logs/${service}.log`, mkdir: true });
-  const consoleStream = pretty
-    ? pinoPretty({ colorize: true, translateTime: 'HH:MM:ss.l', ignore: 'pid,hostname' })
+
+  const consoleStream: pino.DestinationStream | NodeJS.WriteStream = pretty
+    ? (await import('pino-pretty')).default({ colorize: true, translateTime: 'HH:MM:ss.l', ignore: 'pid,hostname' })
     : process.stdout;
 
   return pino(

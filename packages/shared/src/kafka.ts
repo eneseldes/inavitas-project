@@ -2,7 +2,7 @@ import { Kafka, logLevel, type EachMessagePayload } from 'kafkajs';
 import { isRetryable } from './errors.ts';
 import type { Logger } from './logger.ts';
 
-export type { Kafka } from 'kafkajs';
+export type { Admin, Kafka } from 'kafkajs';
 
 export interface KafkaConnectionOptions {
   clientId: string;

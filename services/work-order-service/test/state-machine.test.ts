@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canTransition, WORK_ORDER_STATUSES, type WorkOrderStatus } from '../src/domain/state-machine.ts';
 
-describe('canTransition (work order) — SRS 1.6', () => {
+describe('canTransition (work order)', () => {
   it('STARTED → ASSIGNED izinli', () => {
     expect(canTransition('STARTED', 'ASSIGNED')).toBe(true);
   });

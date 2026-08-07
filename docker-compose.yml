@@ -64,6 +64,107 @@ services:
       kafka:
         condition: service_healthy
 
+  # --- Uygulama Servisleri ---------------------------------------------------
+  # Dört servis tek bir imajı (kök `Dockerfile`) paylaşır; `command:` ile hangi
+  # servisin dist çıktısının çalıştırılacağı belirlenir. Yalnızca gateway dış ağa (host)
+  # açıktır; alt servisler doğrudan dışarıya açılmaz.
+
+  access-service:
+    image: inavitas-backend:latest
+    build: .
+    command: ["node", "services/access-service/dist/index.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      ACCESS_SERVICE_PORT: "3001"
+      ACCESS_APP_DATABASE_URL: postgresql://access_app:access_app_pw@postgres:5432/access_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  outage-service:
+    image: inavitas-backend:latest
+    build: .
+    command: ["node", "services/outage-service/dist/index.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      OUTAGE_SERVICE_PORT: "3002"
+      OUTAGE_APP_DATABASE_URL: postgresql://outage_app:outage_app_pw@postgres:5432/outage_db
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-inavitas}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3002/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  work-order-service:
+    image: inavitas-backend:latest
+    build: .
+    command: ["node", "services/work-order-service/dist/index.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      WORK_ORDER_SERVICE_PORT: "3003"
+      WORK_ORDER_APP_DATABASE_URL: postgresql://work_order_app:work_order_app_pw@postgres:5432/work_order_db
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-inavitas}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3003/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  gateway:
+    image: inavitas-backend:latest
+    build: .
+    command: ["node", "services/gateway/dist/index.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      GATEWAY_PORT: "8080"
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://redis:6379
+      ACCESS_SERVICE_HOST: access-service
+      OUTAGE_SERVICE_HOST: outage-service
+      WORK_ORDER_SERVICE_HOST: work-order-service
+      CORS_ORIGIN: http://localhost:5173
+    ports: ["8080:8080"]
+    depends_on:
+      redis: { condition: service_healthy }
+      access-service: { condition: service_healthy }
+      outage-service: { condition: service_healthy }
+      work-order-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   loki:
     image: grafana/loki:3.3.0
     command: -config.file=/etc/loki/loki-config.yml

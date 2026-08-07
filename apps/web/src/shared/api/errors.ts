@@ -1,6 +1,6 @@
 import type { ApiErrorBody } from '../../types/api.ts';
 
-/** Backend'in standart hata gövdesini (SRS 1.7) JS Error'a çevirir. */
+/** Backend servislerinden gelen standart hata gövdesini ApiError nesnesine dönüştürür. */
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;

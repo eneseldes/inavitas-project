@@ -61,14 +61,10 @@ function headerLabel(header: unknown): string {
 }
 
 /**
- * İki grid de (kesinti/iş emri) bu bileşeni kullanır — 02-MIMARI 2.9:
- * "İki ayrı grid komponenti yazma, sadece kolon tanımı ve API çağrısı farklı."
+ * Ortak tablo bileşeni. Kesinti ve iş emri listeleri için kullanılır.
  *
- * Sayfalama/sıralama TAMAMEN sunucu taraflıdır (`manualPagination`/
- * `manualSorting`): TanStack Table burada yalnızca satır/kolon render'ı
- * için kullanılıyor, kendi state'ini tutmuyor. Filtreler de aynı şekilde
- * sunucu taraflı — her sütunun başlığındaki filtre ikonu kendi popover'ını
- * açar, uygulanan değer üst bileşenin query state'ine yazılır.
+ * Sayfalama, sıralama ve filtreleme işlemleri sunucu taraflıdır (`manualPagination`/`manualSorting`).
+ * Sütun başlıklarındaki filtreler uygulandıkça parametreler üst bileşene iletilir.
  */
 export function DataGrid<T>({
   columns,

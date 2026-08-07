@@ -1,7 +1,9 @@
-import { asyncHandler, authenticateFromHeaders, PERMISSIONS, requirePermission, type AuthedRequest } from '@inavitas/shared';
+import { asyncHandler, authenticateFromHeaders, PERMISSIONS, requirePermission, runReadinessChecks, type AuthedRequest } from '@inavitas/shared';
 import { sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db.ts';
+import { getAdmin } from '../kafka.ts';
+import { redis } from '../redis.ts';
 import * as outageController from './controllers/outage.controller.ts';
 
 export function buildRouter(): Router {
@@ -15,8 +17,13 @@ export function buildRouter(): Router {
   router.get(
     '/ready',
     asyncHandler(async (_req, res) => {
-      await db.execute(sql`SELECT 1`);
-      res.json({ status: 'ready' });
+      const { ready, checks } = await runReadinessChecks({
+        db: () => db.execute(sql`SELECT 1`),
+        redis: () => redis.ping(),
+        kafka: () => getAdmin().listTopics(),
+      });
+
+      res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'degraded', checks });
     }),
   );
 

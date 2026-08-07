@@ -2,7 +2,7 @@ import type { Logger } from '@inavitas/shared';
 import { redis } from './redis.ts';
 import type { WorkOrderRow } from './repository/work-order.repository.ts';
 
-/** Gateway'in SSE'ye çevirdiği canlı arayüz kanalı (03-YOL-HARITASI Faz 5 adım 3). */
+/** Gateway canlı arayüz bildirim kanalı. */
 const CHANNEL = 'ui:work-order';
 
 /**

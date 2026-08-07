@@ -31,11 +31,8 @@ function rawFetch(path: string, options: RequestOptions): Promise<Response> {
 }
 
 /**
- * Aynı anda birden çok istek 401 alırsa TEK bir refresh çalışsın diye
- * promise paylaşılıyor (03-YOL-HARITASI Faz 3, `shared/api/client.ts` notu)
- * — yoksa refresh token rotation'da yarış koşulu oluşur: iki istek eş
- * zamanlı refresh dener, biri diğerinin ürettiği (artık eskimiş) refresh
- * token'ı kullanmaya çalışır ve kullanıcı oturumdan atılır.
+ * Eşzamanlı 401 hatalarında tek bir yenileme (refresh) isteği yapılmasını sağlar.
+ * Yarış koşullarını (race condition) ve gereksiz belirteç iptallerini engeller.
  */
 let refreshPromise: Promise<void> | null = null;
 

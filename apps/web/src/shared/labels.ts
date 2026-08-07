@@ -25,7 +25,7 @@ export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   CANCELLED: 'İptal Edildi',
 };
 
-/** SRS 1.5 — work_order_db `wo_type` enum'ındaki Türkçe açıklamalarla birebir aynı. */
+/** İş emri türü enum değerlerinin Türkçe karşılıkları. */
 export const WORK_ORDER_TYPE_LABELS: Record<WorkOrderType, string> = {
   BASIC_WORK: 'Temel İş',
   LIGHTING_WORK_ORDER: 'Aydınlatma İş Emri',

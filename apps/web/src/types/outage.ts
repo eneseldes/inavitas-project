@@ -1,4 +1,4 @@
-/** outage-service/src/domain/state-machine.ts ile birebir aynı liste — SRS 1.6. */
+/** Geçerli kesinti durumları listesi. */
 export const OUTAGE_STATUSES = ['STARTED', 'ENERGIZED', 'ARCHIVED', 'CANCELLED'] as const;
 export type OutageStatus = (typeof OUTAGE_STATUSES)[number];
 

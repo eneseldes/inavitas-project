@@ -5,8 +5,7 @@ const WINDOW_SECONDS = 60;
 const MAX_ATTEMPTS = 10;
 
 /**
- * Login uç noktası için IP başına sabit pencereli (fixed window) hız sınırlama
- * (03-YOL-HARITASI Faz 5 adım 2): dakikada 10 deneme.
+ * Giriş (login) uç noktası için IP bazlı hız sınırlaması (rate limiting) uygular (dakikada 10 deneme).
  */
 export function loginRateLimiter(redis: Redis) {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {

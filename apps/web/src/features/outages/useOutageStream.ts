@@ -7,13 +7,11 @@ const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
 const RECONNECT_DELAY_MS = 3_000;
 
 /**
- * Gateway'in Redis pub/sub'dan SSE'ye çevirdiği kesinti kanalını dinler ve
- * mesaj geldiğinde ilgili sorguları invalidate eder — kullanıcı artık elle
- * yenilemek zorunda değil (03-YOL-HARITASI Faz 5 adım 4).
+ * Gateway üzerindeki kesinti canlı yayın kanalını (SSE) dinler. Yeni bir mesaj
+ * geldiğinde istemci önbelleğindeki kesinti sorgularını günceller.
  *
- * `EventSource` özel header gönderemediği için token query param'dan geçirilir;
- * bağlantı koparsa (ör. access token 15 dk sonra süresi dolduysa) güncel
- * token'la yeniden bağlanmayı dener.
+ * `EventSource` özel HTTP başlığı desteklemediğinden erişim belirteci adres
+ * parametresi olarak iletilir. Bağlantı kesildiğinde güncel belirteç ile yeniden denenir.
  */
 export function useOutageStream(): boolean {
   const queryClient = useQueryClient();

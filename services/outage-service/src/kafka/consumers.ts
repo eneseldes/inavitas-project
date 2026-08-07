@@ -17,7 +17,7 @@ import { markProcessed } from '../repository/idempotency.repository.ts';
 import { createTx, linkWorkOrderTx, updateWithVersionTx } from '../repository/outage.repository.ts';
 import { redis } from '../redis.ts';
 import { notifyOutageChanged } from '../realtime.ts';
-import { publishOutageEnergizedIfNeeded, publishOutageLinked } from './producer.ts';
+import { enqueueOutageEnergizedIfNeededTx, enqueueOutageLinkedTx } from './producer.ts';
 
 /**
  * 'work-order.created' event'i işleyicisi: Kullanıcı kaynaklı bir iş emri oluştuğunda otomatik sistem kesintisi oluşturur.
@@ -36,7 +36,7 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
     const processed = await markProcessed(tx, envelope.eventId, TOPICS.WORK_ORDER_CREATED);
     if (!processed) return null;
 
-    return createTx(
+    const row = await createTx(
       tx,
       {
         gisId: envelope.payload.gisId,
@@ -49,6 +49,15 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
       },
       envelope.correlationId,
     );
+
+    await enqueueOutageLinkedTx(tx, row.id, row.gisId, envelope.payload.workOrderId, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    return row;
   });
 
   if (!created) {
@@ -62,14 +71,6 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
   );
 
   await notifyOutageChanged(created, log);
-
-  await publishOutageLinked(
-    created.id,
-    created.gisId,
-    envelope.payload.workOrderId,
-    { origin: 'SYSTEM', actor: SYSTEM_ACTOR, correlationId: envelope.correlationId, causedBy: envelope },
-    log,
-  );
 }
 
 /**
@@ -124,8 +125,18 @@ export async function handleWorkOrderDone(envelope: WorkOrderDoneEvent, log: Log
       { status: 'ENERGIZED', endedAt: current.endedAt ?? now },
       { fromStatus: current.status, actor: SYSTEM_ACTOR, origin: 'SYSTEM', correlationId: envelope.correlationId },
     );
+    if (!updated) return null;
 
-    return updated ? { previousStatus: current.status, row: updated } : null;
+    // Fonksiyon kendi içinde no-op koruması yapıyor (durum zaten ENERGIZED'sa
+    // yazmıyor); bu yüzden burada koşulsuz çağırmak güvenli.
+    await enqueueOutageEnergizedIfNeededTx(tx, current.status, updated, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    return { previousStatus: current.status, row: updated };
   });
 
   if (!result) {
@@ -141,13 +152,6 @@ export async function handleWorkOrderDone(envelope: WorkOrderDoneEvent, log: Log
   log.info({ outageId: result.row.id, workOrderId: envelope.payload.workOrderId }, 'iş emri tamamlandı, kesinti otomatik ENERGIZED yapıldı');
 
   await notifyOutageChanged(result.row, log);
-
-  await publishOutageEnergizedIfNeeded(
-    result.previousStatus,
-    result.row,
-    { origin: 'SYSTEM', actor: SYSTEM_ACTOR, correlationId: envelope.correlationId, causedBy: envelope },
-    log,
-  );
 }
 
 const VALIDATORS = {
@@ -177,8 +181,7 @@ export function createOutageEventHandler(logger: Logger): EventHandler {
 
     const log = withCorrelation(logger, envelope.correlationId, { eventId: envelope.eventId, eventType: envelope.eventType });
 
-    // Postgres'teki `processed_events` kontrolüne ek, hızlı bir Redis ön filtresi
-    // (03-YOL-HARITASI Faz 5 adım 5) — asıl garanti hâlâ transaction içindeki tabloda.
+    // Postgres veri tabanındaki idempotency kontrolüne ek olarak Redis ön filtresi kullanılır.
     if (!(await markSeenOnce(redis, envelope.eventId))) {
       log.debug({ eventId: envelope.eventId }, 'redis ön filtresi: muhtemelen zaten işlenmiş, atlanıyor');
       return;

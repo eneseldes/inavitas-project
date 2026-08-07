@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canTransition, OUTAGE_STATUSES, type OutageStatus } from '../src/domain/state-machine.ts';
 
-describe('canTransition (outage) — SRS 1.6', () => {
+describe('canTransition (outage)', () => {
   it('STARTED → ENERGIZED izinli', () => {
     expect(canTransition('STARTED', 'ENERGIZED')).toBe(true);
   });

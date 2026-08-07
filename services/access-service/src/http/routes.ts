@@ -1,8 +1,9 @@
-import { asyncHandler, PERMISSIONS, requirePermission, type AuthedRequest } from '@inavitas/shared';
+import { asyncHandler, PERMISSIONS, requirePermission, runReadinessChecks, type AuthedRequest } from '@inavitas/shared';
 import { sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db.ts';
 import { users } from '../db/schema.ts';
+import { redis } from '../redis.ts';
 import * as authController from './controllers/auth.controller.ts';
 import { authenticate } from './authenticate.ts';
 
@@ -17,8 +18,12 @@ export function buildRouter(): Router {
   router.get(
     '/ready',
     asyncHandler(async (_req, res) => {
-      await db.execute(sql`SELECT 1`);
-      res.json({ status: 'ready' });
+      const { ready, checks } = await runReadinessChecks({
+        db: () => db.execute(sql`SELECT 1`),
+        redis: () => redis.ping(),
+      });
+
+      res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'degraded', checks });
     }),
   );
 

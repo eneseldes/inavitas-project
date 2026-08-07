@@ -1,15 +1,7 @@
 import type { AuthUser } from '../../types/auth.ts';
 
 /**
- * Token saklama — 02-MIMARI 2.9'daki üç seçenekten üçüncüsü (bellek +
- * `httpOnly` cookie) production için önerilir, ama access-service login
- * uç noktası refreshToken'ı gövdede JSON olarak döner (cookie olarak değil)
- * — `httpOnly` cookie'ye geçmek backend'de Set-Cookie desteği ister.
- *
- * Staj demosu için burada BİLİNÇLİ BASİTLEŞTİRME yapılıyor: hem access hem
- * refresh token `localStorage`da tutuluyor. Bunun bedeli XSS'e açık olması;
- * gerçek üretimde refresh token'ı hiç JS'in görmediği `httpOnly` cookie'ye
- * taşımak gerekir.
+ * Erişim ve yenileme belirteçlerini istemci tarafında yerel depolamada (localStorage) saklar.
  */
 const STORAGE_KEY = 'inavitas.auth';
 

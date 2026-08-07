@@ -8,8 +8,9 @@ import {
   type AuthedRequest,
 } from '@inavitas/shared';
 import type { Response } from 'express';
+import { db } from '../../db.ts';
 import { canTransition } from '../../domain/state-machine.ts';
-import { publishWorkOrderCreated, publishWorkOrderDone } from '../../kafka/producer.ts';
+import { enqueueWorkOrderCreatedTx, enqueueWorkOrderDoneTx } from '../../kafka/producer.ts';
 import { notifyWorkOrderChanged } from '../../realtime.ts';
 import * as workOrderRepository from '../../repository/work-order.repository.ts';
 import { SORTABLE_FIELDS, type WorkOrderFilters } from '../../repository/work-order.repository.ts';
@@ -47,23 +48,30 @@ export async function getById(req: AuthedRequest, res: Response): Promise<void> 
 
 export async function create(req: AuthedRequest, res: Response): Promise<void> {
   if (!req.user) throw new UnauthenticatedError();
+  const user = req.user;
 
   const body = CreateWorkOrderBody.parse(req.body);
 
-  const row = await workOrderRepository.create(
-    {
-      gisId: body.gisId,
-      type: body.type,
-      status: body.status ?? 'STARTED',
-      origin: 'USER',
-      createdBy: req.user.email,
-    },
-    req.correlationId,
-  );
+  // İş emri kaydı ve outbox bildirimi aynı transaction içinde yazılır.
+  const row = await db.transaction(async (tx) => {
+    const created = await workOrderRepository.createTx(
+      tx,
+      {
+        gisId: body.gisId,
+        type: body.type,
+        status: body.status ?? 'STARTED',
+        origin: 'USER',
+        createdBy: user.email,
+      },
+      req.correlationId,
+    );
+
+    await enqueueWorkOrderCreatedTx(tx, created, req.correlationId!, user.email);
+    return created;
+  });
 
   req.log?.info({ workOrderId: row.id, gisId: row.gisId, status: row.status }, 'iş emri oluşturuldu');
 
-  await publishWorkOrderCreated(row, req.correlationId!, req.user.email, req.log);
   await notifyWorkOrderChanged(row, req.log);
 
   res.status(201).json(toWorkOrderDto(row));
@@ -71,6 +79,7 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
 
 export async function patch(req: AuthedRequest, res: Response): Promise<void> {
   if (!req.user) throw new UnauthenticatedError();
+  const user = req.user;
 
   const id = req.params.id as string;
   const body = PatchWorkOrderBody.parse(req.body);
@@ -84,19 +93,30 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
-  const updated = await workOrderRepository.updateWithVersion(
-    current.id,
-    body.version,
-    {
-      status: body.status,
-    },
-    {
-      fromStatus: current.status,
-      actor: req.user.email,
-      origin: 'USER',
-      correlationId: req.correlationId,
-    },
-  );
+  const updated = await db.transaction(async (tx) => {
+    const row = await workOrderRepository.updateWithVersionTx(
+      tx,
+      current.id,
+      body.version,
+      {
+        status: body.status,
+      },
+      {
+        fromStatus: current.status,
+        actor: user.email,
+        origin: 'USER',
+        correlationId: req.correlationId,
+      },
+    );
+
+    if (!row) return null;
+
+    if (body.status !== current.status && row.status === 'DONE') {
+      await enqueueWorkOrderDoneTx(tx, row, req.correlationId!, user.email);
+    }
+
+    return row;
+  });
 
   if (!updated) {
     throw new ConflictError('Kayıt başka bir istekle güncellenmiş (version uyuşmazlığı)', [
@@ -106,10 +126,6 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
   if (body.status !== current.status) {
     req.log?.info({ workOrderId: updated.id, from: current.status, to: body.status }, 'iş emri durumu değişti');
-
-    if (updated.status === 'DONE') {
-      await publishWorkOrderDone(updated, req.correlationId!, req.user.email, req.log);
-    }
   }
 
   await notifyWorkOrderChanged(updated, req.log);

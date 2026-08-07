@@ -77,11 +77,6 @@ export async function createTx(tx: Tx, input: CreateOutageInput, correlationId?:
   return row!;
 }
 
-/** Yeni kesinti kaydı oluşturur. */
-export async function create(input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
-  return db.transaction((tx) => createTx(tx, input, correlationId));
-}
-
 /** Kesinti ID ile kayıt arar. */
 export async function findById(id: string): Promise<OutageRow | null> {
   const [row] = await db.select().from(outages).where(eq(outages.id, id));
@@ -137,15 +132,6 @@ export async function updateWithVersionTx(
   }
 
   return row;
-}
-
-export async function updateWithVersion(
-  id: string,
-  expectedVersion: number,
-  patch: { status?: OutageStatus; endedAt?: Date | null; workOrderId?: string | null },
-  meta: StatusChangeMeta,
-): Promise<OutageRow | null> {
-  return db.transaction((tx) => updateWithVersionTx(tx, id, expectedVersion, patch, meta));
 }
 
 /** Kesintiye iş emri bağlantısı atar (workOrderId günceller). */

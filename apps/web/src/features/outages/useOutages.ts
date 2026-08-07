@@ -4,10 +4,8 @@ import { createOutage, fetchOutage, fetchOutageHistory, fetchOutages, patchOutag
 export const OUTAGES_KEY = 'outages';
 
 /**
- * `placeholderData: keepPreviousData` — sayfa değişiminde tablo boşalmasın
- * (03-YOL-HARITASI Faz 3 adım 6). TanStack Query v5'te `keepPreviousData`
- * eski `keepPreviousData: true` seçeneğinin yerini alan `placeholderData`
- * yardımcı fonksiyonudur.
+ * Kesinti listesini getiren veri çekme kancası (hook).
+ * Sayfa ve filtre değişimlerinde görsel sıçramaları önlemek için `placeholderData: keepPreviousData` kullanılır.
  */
 export function useOutages(query: OutagesQuery) {
   return useQuery({

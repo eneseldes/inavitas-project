@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { index, integer, jsonb, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /** İş emri durumları veritabanı enum tipi. */
 export const woStatusEnum = pgEnum('wo_status', [
@@ -72,4 +72,22 @@ export const processedEvents = pgTable('processed_events', {
   topic: varchar('topic', { length: 128 }).notNull(),
   processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Transactional outbox tablosu. Veritabanı işlemleriyle aynı transaction içinde
+ * doldurulur ve olayların Kafka'ya güvenli şekilde aktarılmasını sağlar.
+ */
+export const outbox = pgTable(
+  'outbox',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    topic: varchar('topic', { length: 128 }).notNull(),
+    partitionKey: varchar('partition_key', { length: 64 }).notNull(),
+    payload: jsonb('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  (table) => [index('idx_outbox_pending').on(table.createdAt).where(sql`${table.publishedAt} IS NULL`)],
+);
 

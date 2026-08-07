@@ -77,11 +77,6 @@ export async function createTx(tx: Tx, input: CreateWorkOrderInput, correlationI
   return row!;
 }
 
-/** Yeni iş emri kaydı oluşturur. */
-export async function create(input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
-  return db.transaction((tx) => createTx(tx, input, correlationId));
-}
-
 /** İş emri ID ile kayıt arar. */
 export async function findById(id: string): Promise<WorkOrderRow | null> {
   const [row] = await db.select().from(workOrders).where(eq(workOrders.id, id));
@@ -137,16 +132,6 @@ export async function updateWithVersionTx(
   }
 
   return row;
-}
-
-/** Optimistic locking kontrolü ile iş emrini günceller. */
-export async function updateWithVersion(
-  id: string,
-  expectedVersion: number,
-  patch: { status?: WorkOrderStatus; outageId?: string | null },
-  meta: StatusChangeMeta,
-): Promise<WorkOrderRow | null> {
-  return db.transaction((tx) => updateWithVersionTx(tx, id, expectedVersion, patch, meta));
 }
 
 /** İş emrine kesinti bağlantısı atar (outageId günceller). */

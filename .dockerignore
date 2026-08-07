@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+.git
+.env
+.env.local
+*.log
+logs
+.DS_Store
+apps/web/node_modules

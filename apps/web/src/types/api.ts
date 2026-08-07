@@ -1,4 +1,4 @@
-/** Tüm liste uçlarının döndürdüğü sabit zarf (SRS 1.7). */
+/** Tüm liste uç noktalarının döndürdüğü standart zarf nesnesi. */
 export interface PageResult<T> {
   items: T[];
   page: number;
@@ -7,7 +7,7 @@ export interface PageResult<T> {
   totalPages: number;
 }
 
-/** Standart hata gövdesi (SRS 1.7). */
+/** Standart API hata yanıtı gövdesi. */
 export interface ApiErrorBody {
   error: {
     code: string;

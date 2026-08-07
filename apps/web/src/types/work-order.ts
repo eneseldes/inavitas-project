@@ -1,8 +1,8 @@
-/** work-order-service/src/domain/state-machine.ts ile birebir aynı liste — SRS 1.6. */
+/** Geçerli iş emri durumları listesi. */
 export const WORK_ORDER_STATUSES = ['STARTED', 'ASSIGNED', 'IN_PROGRESS', 'ENERGIZED', 'DONE', 'CANCELLED'] as const;
 export type WorkOrderStatus = (typeof WORK_ORDER_STATUSES)[number];
 
-/** SRS 1.5 — work_order_db wo_type enum'ı ile birebir aynı liste. */
+/** Geçerli iş emri türleri listesi. */
 export const WORK_ORDER_TYPES = [
   'BASIC_WORK',
   'LIGHTING_WORK_ORDER',

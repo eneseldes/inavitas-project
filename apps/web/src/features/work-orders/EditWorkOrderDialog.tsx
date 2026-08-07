@@ -17,13 +17,10 @@ interface EditWorkOrderDialogProps {
 }
 
 /**
- * İş emri güncelleme modalı — İşlemler sütunundaki kalem ikonuyla açılır.
+ * İş emri güncelleme penceresi.
  *
- * Backend PATCH /work-orders/:id yalnızca `status` kabul ediyor (bkz.
- * work-order-service/src/http/schemas.ts PatchWorkOrderBody — gisId/type
- * patchlenemez). Bu yüzden modal, sütundaki hızlı geçiş select'iyle AYNI
- * işlemi yapıyor ama kaydın tüm bağlamını (tip, kaynak, oluşturulma) göstererek
- * — hızlı tek tık yerine bilinçli/bağlamlı bir değişiklik için.
+ * Güncelleme servisi yalnızca durum bilgisini kabul eder; bu pencere kaydın
+ * diğer detaylarını da görüntüleyerek bilinçli durum değişikliği yapılmasını sağlar.
  */
 export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogProps) {
   const patchWorkOrder = usePatchWorkOrder();

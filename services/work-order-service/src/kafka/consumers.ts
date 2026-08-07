@@ -17,7 +17,7 @@ import { markProcessed } from '../repository/idempotency.repository.ts';
 import { createTx, linkOutageTx, updateWithVersionTx } from '../repository/work-order.repository.ts';
 import { redis } from '../redis.ts';
 import { notifyWorkOrderChanged } from '../realtime.ts';
-import { publishWorkOrderLinked } from './producer.ts';
+import { enqueueWorkOrderLinkedTx } from './producer.ts';
 
 /**
  * 'outage.created' event'i işleyicisi: Kullanıcı kaynaklı bir kesinti açıldığında otomatik sistem iş emri oluşturur.
@@ -36,7 +36,7 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
     const processed = await markProcessed(tx, envelope.eventId, TOPICS.OUTAGE_CREATED);
     if (!processed) return null;
 
-    return createTx(
+    const row = await createTx(
       tx,
       {
         gisId: envelope.payload.gisId,
@@ -48,6 +48,15 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
       },
       envelope.correlationId,
     );
+
+    await enqueueWorkOrderLinkedTx(tx, row.id, row.gisId, envelope.payload.outageId, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    return row;
   });
 
   if (!created) {
@@ -61,14 +70,6 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
   );
 
   await notifyWorkOrderChanged(created, log);
-
-  await publishWorkOrderLinked(
-    created.id,
-    created.gisId,
-    envelope.payload.outageId,
-    { origin: 'SYSTEM', actor: SYSTEM_ACTOR, correlationId: envelope.correlationId, causedBy: envelope },
-    log,
-  );
 }
 
 /**
@@ -166,8 +167,7 @@ export function createWorkOrderEventHandler(logger: Logger): EventHandler {
 
     const log = withCorrelation(logger, envelope.correlationId, { eventId: envelope.eventId, eventType: envelope.eventType });
 
-    // Postgres'teki `processed_events` kontrolüne ek, hızlı bir Redis ön filtresi
-    // (03-YOL-HARITASI Faz 5 adım 5) — asıl garanti hâlâ transaction içindeki tabloda.
+    // Postgres veri tabanındaki idempotency kontrolüne ek olarak Redis ön filtresi kullanılır.
     if (!(await markSeenOnce(redis, envelope.eventId))) {
       log.debug({ eventId: envelope.eventId }, 'redis ön filtresi: muhtemelen zaten işlenmiş, atlanıyor');
       return;

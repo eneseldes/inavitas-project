@@ -78,7 +78,7 @@ describe('requireAnyPermission', () => {
 });
 
 describe('ROLE_PERMISSIONS', () => {
-  it('SRS 1.3 tablosuyla birebir aynı', () => {
+  it('rol ve izin tanımları beklenen matrisle eşleşir', () => {
     expect(ROLE_PERMISSIONS[ROLES.ADMIN]).toEqual([
       'outage:read',
       'outage:write',
@@ -91,7 +91,7 @@ describe('ROLE_PERMISSIONS', () => {
   });
 
   it('operatör rolleri karşı alanın iznine sahip değil', () => {
-    // Bu, SRS 1.3'ün "sadece kendi ekranı" kuralının test karşılığı.
+    // Operatörlerin yalnızca yetkili oldukları alanların izinlerine sahip olduğunu doğrular.
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.WORKORDER_WRITE);
     expect(ROLE_PERMISSIONS[ROLES.WORK_ORDER_OPERATOR]).not.toContain(PERMISSIONS.OUTAGE_WRITE);
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.USER_MANAGE);

@@ -3,7 +3,7 @@ import { OUTAGE_STATUS_LABELS, WORK_ORDER_STATUS_LABELS } from '../labels.ts';
 import type { OutageStatus } from '../../types/outage.ts';
 import type { WorkOrderStatus } from '../../types/work-order.ts';
 
-/** Durum → renk eşlemesi — 03-YOL-HARITASI Faz 3 adım 8 ile birebir aynı. */
+/** Kayıt durumuna karşılık gelen renk sınıfı eşlemesi. */
 const COLORS: Record<OutageStatus | WorkOrderStatus, string> = {
   STARTED: 'badge--gray',
   ASSIGNED: 'badge--blue',

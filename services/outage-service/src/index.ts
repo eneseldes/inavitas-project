@@ -4,9 +4,10 @@ import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
 import { connectKafka, disconnectKafka, startOutageConsumer } from './kafka.ts';
 import { createOutageEventHandler } from './kafka/consumers.ts';
+import { startOutboxPoller, type OutboxPollerHandle } from './kafka/outbox-poller.ts';
 import { disconnectRedis } from './redis.ts';
 
-const logger = createLogger({
+const logger = await createLogger({
   service: 'outage-service',
   level: config.LOG_LEVEL,
   pretty: isDevelopment(config.NODE_ENV),
@@ -21,6 +22,8 @@ await connectKafka();
 await startOutageConsumer(createOutageEventHandler(logger), logger);
 logger.info('Kafka consumer ayakta (work-order.created, work-order.linked, work-order.done)');
 
+const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
+
 /** Servisi güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
@@ -31,6 +34,7 @@ async function shutdown(signal: string): Promise<void> {
       process.exit(1);
     }
 
+    outboxPoller.stop();
     await disconnectKafka();
     await disconnectDb();
     await disconnectRedis();

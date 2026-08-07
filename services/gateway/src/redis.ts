@@ -5,9 +5,8 @@ import { config } from './config.ts';
 export const redis: Redis = createRedisClient(config.REDIS_URL);
 
 /**
- * Pub/sub aboneliği için AYRI bir bağlantı (03-YOL-HARITASI Faz 5 tuzağı):
- * `subscribe` moduna giren bir bağlantı başka komut kabul etmez, bu yüzden
- * aynı client hem `INCR` hem `SUBSCRIBE` için kullanılamaz.
+ * Pub/Sub aboneliği için ayrılmış Redis bağlantısı.
+ * `SUBSCRIBE` moduna giren bağlantılar genel komut kabul etmediğinden ayrı bağlantı kullanılır.
  */
 export const redisSubscriber: Redis = redis.duplicate();
 

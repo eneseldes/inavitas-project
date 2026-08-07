@@ -1,4 +1,4 @@
-import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@inavitas/shared';
+import { asyncHandler, correlationMiddleware, errorHandler, httpLogger, notFoundHandler, runReadinessChecks, type Logger } from '@inavitas/shared';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { loginRateLimiter } from './auth/rate-limit.ts';
@@ -25,6 +25,14 @@ export function createApp(logger: Logger): Express {
     res.json({ status: 'ok', service: 'gateway' });
   });
 
+  app.get(
+    '/ready',
+    asyncHandler(async (_req, res) => {
+      const { ready, checks } = await runReadinessChecks({ redis: () => redis.ping() });
+      res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'degraded', checks });
+    }),
+  );
+
   // Sahte header temizleme ve kimlik doğrulama kontrolleri
   app.use(stripSpoofedHeaders());
   app.post('/api/auth/login', loginRateLimiter(redis));
@@ -37,8 +45,7 @@ export function createApp(logger: Logger): Express {
     requireAuth()(req, res, next);
   });
 
-  // Canlı arayüz akışları (SSE) — Redis pub/sub'dan gelen mesajları doğrudan
-  // gateway dağıtır, downstream servislere proxy edilmez (Faz 5 adım 3-4).
+  // Canlı arayüz akışları (SSE): Redis pub/sub'dan gelen mesajlar doğrudan gateway tarafından dağıtılır.
   const sseHubs = createSseHubs(redisSubscriber);
   app.get('/api/outages/stream', (req, res) => sseHubs.outage.handle(req, res));
   app.get('/api/work-orders/stream', (req, res) => sseHubs.workOrder.handle(req, res));

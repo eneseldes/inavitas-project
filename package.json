@@ -17,13 +17,16 @@
     "test:watch": "vitest",
     "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service",
     "db:seed": "npm run db:seed -w services/access-service",
-    "topics": "./scripts/create-topics.sh"
+    "topics": "./scripts/create-topics.sh",
+    "reconcile": "dotenv -e .env -- tsx scripts/reconcile.ts"
   },
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.4",
     "concurrently": "^10.0.4",
     "dotenv-cli": "^11.0.0",
+    "pg": "^8.22.0",
     "tsx": "^4.23.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
