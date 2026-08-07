@@ -1,4 +1,4 @@
-import { asyncHandler, authenticateFromHeaders, PERMISSIONS, requirePermission, type AuthedRequest } from '@edas/shared';
+import { asyncHandler, authenticateFromHeaders, PERMISSIONS, requirePermission, type AuthedRequest } from '@inavitas/shared';
 import { sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db.ts';

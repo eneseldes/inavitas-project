@@ -6,7 +6,7 @@ import {
   toPageResult,
   UnauthenticatedError,
   type AuthedRequest,
-} from '@edas/shared';
+} from '@inavitas/shared';
 import type { Response } from 'express';
 import { canTransition } from '../../domain/state-machine.ts';
 import * as workOrderRepository from '../../repository/work-order.repository.ts';

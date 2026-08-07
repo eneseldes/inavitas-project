@@ -7,93 +7,266 @@
 }
 
 .sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: v.$space-1;
-  width: v.$sidebar-width;
-  padding: v.$space-4 0;
-  background: v.$color-brand-900;
+  width: v.$sidebar-collapsed-width;
+  padding: v.$space-4 0.5rem;
+  background: v.$color-white;
+  border-right: 1px solid v.$color-hairline;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+  transition: width 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+  user-select: none;
+  overflow: visible; /* Butonun dışarı taşan kısmının kesilmemesi için */
 }
 
-.logo {
+.sidebarExpanded {
+  width: v.$sidebar-expanded-width;
+}
+
+.brandHeader {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 2.25rem;
+  gap: 0.75rem;
   height: 2.25rem;
-  margin-bottom: v.$space-4;
+  padding: 0 0.375rem;
+  margin-bottom: v.$space-6;
+  width: 100%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.brandLogo {
+  width: 2rem;
+  height: 2rem;
+  object-fit: contain;
   border-radius: v.$radius-md;
-  background: v.$color-brand-500;
-  color: v.$color-white;
-  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.brandTitle {
+  font-size: 1.125rem;
   font-weight: 700;
+  letter-spacing: -0.02em;
+  color: v.$color-brand-600;
+  white-space: nowrap;
+  opacity: 0;
+  max-width: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  overflow: hidden;
+  transition:
+    opacity 160ms ease,
+    max-width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  .sidebarExpanded & {
+    opacity: 1;
+    max-width: 160px;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: v.$space-1;
+  gap: v.$space-2;
   flex: 1;
+  width: 100%;
 }
 
-// Sidebar ikonuna gelince yanında isim kutucuğu belirir.
 .navItem {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 2.75rem;
+  gap: 0.75rem;
   height: 2.75rem;
-  border-radius: v.$radius-lg;
-  font-size: 1.125rem;
-  color: v.$color-brand-100;
+  padding: 0 0.75rem;
+  border-radius: v.$radius-md;
+  color: v.$color-ink-soft;
   text-decoration: none;
-  transition: background-color v.$transition-fast;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  width: 100%;
+  transition:
+    background-color v.$transition-fast,
+    color v.$transition-fast;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-
-    .navItem__label {
-      opacity: 1;
-      transform: translate(0, -50%);
-      pointer-events: auto;
-    }
+    background: v.$color-brand-50;
+    color: v.$color-brand-600;
   }
 }
 
-.navItemActive {
-  background: v.$color-brand-500;
-  color: v.$color-white;
+.navIcon {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
 }
 
-// nav öğesi bir <button> olduğunda (çıkış) tarayıcı varsayılan kenarlığını/
-// arkaplanını sıfırlıyoruz — görsel olarak diğer nav ikonlarıyla birebir aynı.
-.navItemButton {
-  border: none;
-  background: none;
-  font: inherit;
-}
-
-.navItem__label {
-  position: absolute;
-  top: 50%;
-  left: calc(100% + v.$space-2);
-  transform: translate(-4px, -50%);
-  z-index: v.$z-popover;
-  padding: v.$space-1 v.$space-3;
-  border-radius: v.$radius-md;
-  background: v.$color-ink;
-  color: v.$color-white;
-  font-size: 0.75rem;
-  font-weight: 500;
+.navLabel {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   opacity: 0;
+  max-width: 0;
+  transform: translateX(-6px);
   pointer-events: none;
-  box-shadow: v.$shadow-md;
   transition:
-    opacity v.$transition-base,
-    transform v.$transition-base;
+    opacity 160ms ease,
+    max-width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  .sidebarExpanded & {
+    opacity: 1;
+    max-width: 160px;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
+/* Ferah pastel yeşil zemin + sol kenar vurucu çizgi */
+.navItemActive {
+  background: v.$color-brand-50;
+  color: v.$color-brand-600;
+  font-weight: 600;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 18%;
+    bottom: 18%;
+    width: 3px;
+    background: v.$color-brand-500;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .navIcon {
+    color: v.$color-brand-500;
+  }
+}
+
+.sidebarFooter {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+  margin-top: auto;
+  padding-top: v.$space-3;
+  width: 100%;
+  border-top: 1px solid v.$color-hairline;
+  flex-shrink: 0;
+}
+
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 2.75rem;
+  padding: 0 0.375rem;
+  border-radius: v.$radius-md;
+  overflow: hidden;
+  width: 100%;
+}
+
+.avatarBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: v.$radius-full;
+  background: v.$color-brand-100;
+  color: v.$color-brand-600;
+  border: 1px solid v.$color-brand-200;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  max-width: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    max-width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  .sidebarExpanded & {
+    opacity: 1;
+    max-width: 160px;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+}
+
+.userName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.userRole {
+  font-size: 0.6875rem;
+  color: v.$color-ink-soft;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.logoutButton {
+  cursor: pointer;
+  color: v.$color-ink-soft;
+
+  &:hover {
+    background: v.$color-red-50;
+    color: v.$color-red-600;
+  }
+}
+
+.toggleBtn {
+  position: absolute;
+  right: -0.75rem;
+  bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: v.$radius-full;
+  background: v.$color-white;
+  color: v.$color-ink-soft;
+  border: 1px solid v.$color-hairline;
+  box-shadow: v.$shadow-sm;
+  cursor: pointer;
+  z-index: 20;
+  transition:
+    background-color v.$transition-fast,
+    border-color v.$transition-fast,
+    color v.$transition-fast,
+    transform v.$transition-fast;
+
+  &:hover {
+    background: v.$color-brand-50;
+    color: v.$color-brand-600;
+    border-color: v.$color-brand-200;
+    transform: scale(1.1);
+  }
 }
 
 .content {
@@ -103,27 +276,14 @@
   flex-direction: column;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: v.$space-3 v.$space-6;
-  background: v.$color-white;
-  border-bottom: 1px solid v.$color-hairline;
-}
-
-.headerUser {
-  font-size: 0.875rem;
-  color: v.$color-ink-soft;
-}
-
-.headerUserName {
-  font-weight: 500;
-  color: v.$color-ink;
-}
-
 .main {
   flex: 1;
   min-width: 0;
   padding: v.$space-6;
 }
+
+
+
+
+
+

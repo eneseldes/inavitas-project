@@ -1,4 +1,4 @@
-import { baseEnvSchema, loadConfig } from '@edas/shared';
+import { baseEnvSchema, loadConfig } from '@inavitas/shared';
 import { z } from 'zod';
 
 /**

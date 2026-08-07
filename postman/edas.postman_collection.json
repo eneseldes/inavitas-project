@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "EDAS — Kesinti & İş Emri (Faz 0-3)",
+    "name": "INAVITAS — Kesinti & İş Emri (Faz 0-3)",
     "description": "Gateway (:8080) tek giriş noktası. Önce 'Auth' klasöründen bir login isteği çalıştır — accessToken/userId/userPermissions collection değişkenlerini otomatik doldurur. Sonraki tüm istekler gateway üzerinden gider ve Authorization: Bearer header'ı otomatik eklenir; gateway JWT'yi merkezi doğrulayıp X-User-* header'larını downstream servislere kendisi ekler.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -49,7 +49,7 @@
             "method": "POST",
             "auth": { "type": "noauth" },
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@edas.com\",\n  \"password\": \"Admin123!\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@inavitas.com\",\n  \"password\": \"Admin123!\"\n}" },
             "url": { "raw": "{{gatewayUrl}}/api/auth/login", "host": ["{{gatewayUrl}}"], "path": ["api", "auth", "login"] }
           }
         },
@@ -74,7 +74,7 @@
             "method": "POST",
             "auth": { "type": "noauth" },
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"kesinti@edas.com\",\n  \"password\": \"Kesinti123!\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"kesinti@inavitas.com\",\n  \"password\": \"Kesinti123!\"\n}" },
             "url": { "raw": "{{gatewayUrl}}/api/auth/login", "host": ["{{gatewayUrl}}"], "path": ["api", "auth", "login"] }
           }
         },
@@ -99,7 +99,7 @@
             "method": "POST",
             "auth": { "type": "noauth" },
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"isemri@edas.com\",\n  \"password\": \"IsEmri123!\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"isemri@inavitas.com\",\n  \"password\": \"IsEmri123!\"\n}" },
             "url": { "raw": "{{gatewayUrl}}/api/auth/login", "host": ["{{gatewayUrl}}"], "path": ["api", "auth", "login"] }
           }
         },
@@ -167,7 +167,7 @@
               { "key": "X-User-Id", "value": "fake-admin-id" },
               { "key": "X-User-Permissions", "value": "user:manage" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"kesinti@edas.com\",\n  \"password\": \"Kesinti123!\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"kesinti@inavitas.com\",\n  \"password\": \"Kesinti123!\"\n}" },
             "url": { "raw": "{{gatewayUrl}}/api/auth/login", "host": ["{{gatewayUrl}}"], "path": ["api", "auth", "login"] }
           }
         }

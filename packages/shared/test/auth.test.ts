@@ -119,7 +119,7 @@ describe('userFromHeaders', () => {
     const user = userFromHeaders(
       req({
         'x-user-id': 'u1',
-        'x-user-email': 'admin@edas.com',
+        'x-user-email': 'admin@inavitas.com',
         'x-user-roles': 'ADMIN',
         'x-user-permissions': 'outage:read, user:manage',
       }),
@@ -127,7 +127,7 @@ describe('userFromHeaders', () => {
 
     expect(user).toEqual({
       id: 'u1',
-      email: 'admin@edas.com',
+      email: 'admin@inavitas.com',
       roles: ['ADMIN'],
       permissions: ['outage:read', 'user:manage'],
     });

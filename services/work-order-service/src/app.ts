@@ -1,4 +1,4 @@
-import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@edas/shared';
+import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@inavitas/shared';
 import express, { type Express } from 'express';
 import { buildRouter } from './http/routes.ts';
 

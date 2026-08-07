@@ -1,10 +1,10 @@
-import type { ComponentType } from 'react';
-import { FiClipboard, FiLogOut, FiZap } from 'react-icons/fi';
+import { useState, type ComponentType } from 'react';
+import { FiChevronLeft, FiChevronRight, FiFileText, FiLogOut, FiZap } from 'react-icons/fi';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../features/auth/useAuth.tsx';
+import { formatRoles } from '../labels.ts';
 import styles from './AppShell.module.scss';
-import { QuickStatusWidget } from './QuickStatusWidget.tsx';
 
 interface NavItem {
   to: string;
@@ -15,57 +15,84 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/outages', label: 'Kesintiler', icon: FiZap, permission: 'outage:read' },
-  { to: '/work-orders', label: 'İş Emirleri', icon: FiClipboard, permission: 'workorder:read' },
+  { to: '/work-orders', label: 'İş Emirleri', icon: FiFileText, permission: 'workorder:read' },
 ];
 
 /**
- * FR-5.2: yetkisi olmayan ekranın menü öğesi gösterilmez. Bu yalnızca UX —
- * asıl koruma ProtectedRoute + backend'in requirePermission'ı.
+ * FR-5.2: yetkisi olmayan ekranın menü öğesi gösterilmez.
  */
 export function AppShell() {
   const { user, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate('/login', { replace: true });
   };
 
+  const initial = user?.fullName?.charAt(0).toUpperCase() || 'E';
+  const rolesText = formatRoles(user?.roles);
+
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.logo}>E</div>
+      <aside className={clsx(styles.sidebar, isExpanded && styles.sidebarExpanded)}>
+        <div className={styles.brandHeader}>
+          <img src="/inv-logo-small.png" alt="inavitas logo" className={styles.brandLogo} />
+          <span className={styles.brandTitle}>inavitas</span>
+        </div>
 
         <nav className={styles.nav}>
           {NAV_ITEMS.filter((item) => hasPermission(item.permission)).map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => clsx(styles.navItem, isActive && styles.navItemActive)}>
-              <item.icon />
-              <span className={styles.navItem__label}>{item.label}</span>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => clsx(styles.navItem, isActive && styles.navItemActive)}
+            >
+              <item.icon className={styles.navIcon} />
+              <span className={styles.navLabel}>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <button type="button" onClick={handleLogout} className={clsx(styles.navItem, styles.navItemButton)}>
-          <FiLogOut />
-          <span className={styles.navItem__label}>Çıkış yap</span>
+        <div className={styles.sidebarFooter}>
+          <div className={styles.userProfile} title={user?.fullName}>
+            <div className={styles.avatarBadge}>{initial}</div>
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>{user?.fullName || user?.email}</span>
+              <span className={styles.userRole}>{rolesText}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={clsx(styles.navItem, styles.logoutButton)}
+            title="Çıkış yap"
+          >
+            <FiLogOut className={styles.navIcon} />
+            <span className={styles.navLabel}>Çıkış yap</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          className={styles.toggleBtn}
+          aria-label={isExpanded ? 'Menüyü daralt' : 'Menüyü genişlet'}
+          title={isExpanded ? 'Menüyü daralt' : 'Menüyü genişlet'}
+        >
+          {isExpanded ? <FiChevronLeft /> : <FiChevronRight />}
         </button>
       </aside>
 
       <div className={styles.content}>
-        <header className={styles.header}>
-          <div className={styles.headerUser}>
-            <span className={styles.headerUserName}>{user?.fullName}</span>
-            <span> · </span>
-            {user?.roles.join(', ')}
-          </div>
-        </header>
-
         <main className={styles.main}>
           <Outlet />
         </main>
       </div>
-
-      <QuickStatusWidget />
     </div>
   );
 }
+
+

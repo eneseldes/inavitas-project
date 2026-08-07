@@ -6,7 +6,7 @@ import {
   toPageResult,
   UnauthenticatedError,
   type AuthedRequest,
-} from '@edas/shared';
+} from '@inavitas/shared';
 import type { Response } from 'express';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
 import * as outageRepository from '../../repository/outage.repository.ts';

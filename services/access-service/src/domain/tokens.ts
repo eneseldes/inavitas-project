@@ -1,4 +1,4 @@
-import type { AuthenticatedUser } from '@edas/shared';
+import type { AuthenticatedUser } from '@inavitas/shared';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.ts';
 

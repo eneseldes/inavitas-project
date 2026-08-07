@@ -11,7 +11,7 @@ import type { AuthUser } from '../../types/auth.ts';
  * gerçek üretimde refresh token'ı hiç JS'in görmediği `httpOnly` cookie'ye
  * taşımak gerekir.
  */
-const STORAGE_KEY = 'edas.auth';
+const STORAGE_KEY = 'inavitas.auth';
 
 interface StoredAuth {
   accessToken: string;

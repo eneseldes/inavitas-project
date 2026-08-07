@@ -1,4 +1,4 @@
-import { ROLE_PERMISSIONS, ROLES, type Role } from '@edas/shared';
+import { ROLE_PERMISSIONS, ROLES, type Role } from '@inavitas/shared';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
@@ -34,9 +34,9 @@ const ROLE_NAMES: Record<Role, string> = {
 
 /** Test kullanıcıları — SADECE geliştirme içindir. */
 const SEED_USERS = [
-  { email: 'admin@edas.com', password: 'Admin123!', fullName: 'Sistem Yöneticisi', role: ROLES.ADMIN },
-  { email: 'kesinti@edas.com', password: 'Kesinti123!', fullName: 'Kesinti Operatörü', role: ROLES.OUTAGE_OPERATOR },
-  { email: 'isemri@edas.com', password: 'IsEmri123!', fullName: 'Saha Personeli', role: ROLES.WORK_ORDER_OPERATOR },
+  { email: 'admin@inavitas.com', password: 'Admin123!', fullName: 'Ahmet Yılmaz', role: ROLES.ADMIN },
+  { email: 'kesinti@inavitas.com', password: 'Kesinti123!', fullName: 'Mehmet Demir', role: ROLES.OUTAGE_OPERATOR },
+  { email: 'isemri@inavitas.com', password: 'IsEmri123!', fullName: 'Ayşe Kaya', role: ROLES.WORK_ORDER_OPERATOR },
 ] as const;
 
 async function main(): Promise<void> {

@@ -1,5 +1,5 @@
 {
-  "name": "@edas/work-order-service",
+  "name": "@inavitas/work-order-service",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "db:studio": "dotenv -e ../../.env -- drizzle-kit studio"
   },
   "dependencies": {
-    "@edas/contracts": "*",
-    "@edas/shared": "*",
+    "@inavitas/contracts": "*",
+    "@inavitas/shared": "*",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "pg": "^8.22.0",

@@ -1,4 +1,4 @@
-import type { PaginationQuery, SortOrder } from '@edas/shared';
+import type { PaginationQuery, SortOrder } from '@inavitas/shared';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { outages, outageStatusHistory } from '../db/schema.ts';

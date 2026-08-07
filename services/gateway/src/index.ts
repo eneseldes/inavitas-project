@@ -1,4 +1,4 @@
-import { createLogger, isDevelopment } from '@edas/shared';
+import { createLogger, isDevelopment } from '@inavitas/shared';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 

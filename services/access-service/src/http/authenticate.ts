@@ -1,4 +1,4 @@
-import { UnauthenticatedError, type AuthedRequest } from '@edas/shared';
+import { UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
 import type { NextFunction, Response } from 'express';
 import { toAuthenticatedUser, verifyAccessToken } from '../domain/tokens.ts';
 

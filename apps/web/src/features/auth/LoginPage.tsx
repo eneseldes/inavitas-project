@@ -6,10 +6,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import styles from './LoginPage.module.scss';
+import { ParticleCanvas } from './ParticleCanvas.tsx';
 import { useAuth } from './useAuth.tsx';
 
 const LoginFormSchema = z.object({
-  email: z.email('Geçerli bir e-posta adresi girin'),
+  email: z.string().email('Geçerli bir e-posta adresi girin'),
   password: z.string().min(1, 'Parola zorunlu'),
 });
 type LoginFormValues = z.infer<typeof LoginFormSchema>;
@@ -46,50 +47,79 @@ export function LoginPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.wrap}>
-        <div className={styles.header}>
-          <div className={styles.logo}>E</div>
-          <h1 className={styles.title}>EDAS Kesinti &amp; İş Emri</h1>
-          <p className={styles.subtitle}>Devam etmek için giriş yapın</p>
+      {/* Sol Taraf: Hareketli Noktalar Animasyonu + Sola Dayalı Tek Satır Başlık */}
+      <div className={styles.heroSection}>
+        <ParticleCanvas className={styles.particleCanvas} />
+        <div className={styles.heroContent}>
+          <h1 className={styles.heroTitle}>
+            enerjinizi <span className={styles.heroBrand}>inavitas</span> ile yönetin
+          </h1>
         </div>
+      </div>
 
-        <form onSubmit={onSubmit} noValidate className={styles.form}>
-          {formError && (
-            <div role="alert" className="form-error-banner">
-              {formError}
-            </div>
-          )}
-
-          <div className="field">
-            <label htmlFor="email" className="field__label">
-              E-posta
-            </label>
-            <div className="input--icon-wrap">
-              <FiMail />
-              <input id="email" type="email" autoComplete="username" placeholder="admin@edas.com" className="input" {...register('email')} />
-            </div>
-            {errors.email && <p className="field__error">{errors.email.message}</p>}
+      {/* Sağ Taraf: Tek Parça Glassmorphic Giriş Paneli */}
+      <div className={styles.loginSection}>
+        <div className={styles.formWrap}>
+          <div className={styles.brandHeader}>
+            <img src="/inv-logo.svg" alt="inavitas" className={styles.brandLogo} />
           </div>
 
-          <div className="field">
-            <label htmlFor="password" className="field__label">
-              Parola
-            </label>
-            <div className="input--icon-wrap">
-              <FiLock />
-              <input id="password" type="password" autoComplete="current-password" placeholder="••••••••" className="input" {...register('password')} />
+          <form onSubmit={onSubmit} noValidate className={styles.form}>
+            {formError && (
+              <div role="alert" className="form-error-banner">
+                {formError}
+              </div>
+            )}
+
+            <div className="field">
+              <label htmlFor="email" className="field__label">
+                E-posta Adresi
+              </label>
+              <div className="input--icon-wrap">
+                <FiMail />
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  placeholder="admin@inavitas.com"
+                  className="input"
+                  {...register('email')}
+                />
+              </div>
+              {errors.email && <p className="field__error">{errors.email.message}</p>}
             </div>
-            {errors.password && <p className="field__error">{errors.password.message}</p>}
-          </div>
 
-          <button type="submit" disabled={isSubmitting} className={`btn btn--primary ${styles.submit}`}>
-            <FiLogIn />
-            {isSubmitting ? 'Giriş yapılıyor…' : 'Giriş yap'}
-          </button>
-        </form>
+            <div className="field">
+              <label htmlFor="password" className="field__label">
+                Parola
+              </label>
+              <div className="input--icon-wrap">
+                <FiLock />
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  className="input"
+                  {...register('password')}
+                />
+              </div>
+              {errors.password && <p className="field__error">{errors.password.message}</p>}
+            </div>
 
-        <p className={styles.seedHint}>admin@edas.com / Admin123! · kesinti@edas.com / Kesinti123! · isemri@edas.com / IsEmri123!</p>
+            <button type="submit" disabled={isSubmitting} className={`btn btn--primary ${styles.submit}`}>
+              <FiLogIn />
+              {isSubmitting ? 'Giriş yapılıyor…' : 'Giriş Yap'}
+            </button>
+          </form>
+
+          <p className={styles.seedHint}>
+            admin@inavitas.com / Admin123! · kesinti@inavitas.com / Kesinti123! · isemri@inavitas.com / IsEmri123!
+          </p>
+        </div>
       </div>
     </div>
   );
 }
+
+

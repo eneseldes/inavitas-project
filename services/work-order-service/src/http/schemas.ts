@@ -1,4 +1,4 @@
-import { PaginationQuery } from '@edas/shared';
+import { PaginationQuery } from '@inavitas/shared';
 import { z } from 'zod';
 import { WORK_ORDER_STATUSES } from '../domain/state-machine.ts';
 

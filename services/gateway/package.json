@@ -1,5 +1,5 @@
 {
-  "name": "@edas/gateway",
+  "name": "@inavitas/gateway",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@edas/contracts": "*",
-    "@edas/shared": "*",
+    "@inavitas/contracts": "*",
+    "@inavitas/shared": "*",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "http-proxy-middleware": "^3.0.5",

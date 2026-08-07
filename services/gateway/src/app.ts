@@ -1,4 +1,4 @@
-import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@edas/shared';
+import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@inavitas/shared';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { requireAuth, stripSpoofedHeaders } from './auth/middleware.ts';

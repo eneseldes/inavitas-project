@@ -1,4 +1,4 @@
-import type { AuthedRequest } from '@edas/shared';
+import type { AuthedRequest } from '@inavitas/shared';
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware, type Options } from 'http-proxy-middleware';
 

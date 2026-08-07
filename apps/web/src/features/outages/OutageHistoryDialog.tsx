@@ -1,7 +1,7 @@
 import { FiArrowRight, FiEdit2, FiLock } from 'react-icons/fi';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
-import { ORIGIN_LABELS } from '../../shared/labels.ts';
+import { ORIGIN_LABELS, formatActorName } from '../../shared/labels.ts';
 import type { Outage } from '../../types/outage.ts';
 import { isLocked } from './columns.tsx';
 import styles from './OutageHistoryDialog.module.scss';
@@ -69,7 +69,7 @@ export function OutageHistoryDialog({ outage, onClose, onEdit }: { outage: Outag
                     <td>
                       <StatusBadge status={entry.toStatus} />
                     </td>
-                    <td>{entry.actor === 'SYSTEM' ? 'Sistem' : entry.actor}</td>
+                    <td>{formatActorName(entry.actor)}</td>
                     <td>{ORIGIN_LABELS[entry.origin]}</td>
                   </tr>
                 ))

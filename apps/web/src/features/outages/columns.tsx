@@ -25,7 +25,7 @@ function formatDate(value: string | null): string {
  * Backend state machine hâlâ nihai otorite — burası yalnızca kullanıcıya
  * hangi seçeneklerin ANLAMLI olduğunu gösteriyor.
  *
- * `export`: QuickStatusWidget ve OutageHistoryDialog aynı listeyi kullanıyor,
+ * `export`: OutageHistoryDialog bu listeyi kullanıyor,
  * iki kopya tutmuyoruz (bkz. work-orders/columns.tsx NEXT_STATUSES).
  */
 export const USER_SELECTABLE_NEXT_STATUSES: Record<OutageStatus, OutageStatus[]> = {

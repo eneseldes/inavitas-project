@@ -1,4 +1,4 @@
-import { UnauthenticatedError, type AuthedRequest } from '@edas/shared';
+import { UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
 import type { Response } from 'express';
 import * as authService from '../../services/auth.service.ts';
 import { LoginBody, RefreshBody } from '../schemas.ts';

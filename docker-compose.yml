@@ -83,7 +83,7 @@ services:
     command: -config.file=/etc/promtail/promtail-config.yml
     volumes:
       - ./observability/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
-      - ./logs:/var/log/edas:ro
+      - ./logs:/var/log/inavitas:ro
       - promtailpositions:/tmp
     depends_on:
       loki:

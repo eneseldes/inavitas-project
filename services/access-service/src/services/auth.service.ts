@@ -2,7 +2,7 @@ import {
   AppError,
   UnauthenticatedError,
   type AuthenticatedUser,
-} from '@edas/shared';
+} from '@inavitas/shared';
 import { randomUUID } from 'node:crypto';
 import { isLocked, lockRemainingSeconds, registerFailure, resetLock } from '../domain/lockout.ts';
 import { verifyPassword, wastePasswordCompareTime } from '../domain/password.ts';
