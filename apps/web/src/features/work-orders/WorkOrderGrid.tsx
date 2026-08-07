@@ -4,19 +4,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
-import { useToast } from '../../shared/components/Toast.tsx';
-import { ApiError } from '../../shared/api/errors.ts';
 import type { SortDirection } from '../../types/api.ts';
 import type { WorkOrder, WorkOrderStatus, WorkOrderType } from '../../types/work-order.ts';
 import { CreateWorkOrderDialog } from './CreateWorkOrderDialog.tsx';
 import { EditWorkOrderDialog } from './EditWorkOrderDialog.tsx';
+import { WorkOrderHistoryDialog } from './WorkOrderHistoryDialog.tsx';
 import { buildWorkOrderColumns } from './columns.tsx';
 import styles from './WorkOrderGrid.module.scss';
-import { usePatchWorkOrder, useWorkOrder, useWorkOrders } from './useWorkOrders.ts';
+import { useWorkOrder, useWorkOrders } from './useWorkOrders.ts';
 
 export function WorkOrderGrid() {
   const { hasPermission } = useAuth();
-  const { show } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -26,6 +24,7 @@ export function WorkOrderGrid() {
   const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({ gisId: '', status: [], type: [] });
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<WorkOrder | null>(null);
+  const [historyWorkOrder, setHistoryWorkOrder] = useState<WorkOrder | null>(null);
 
   const handleFilterChange = (field: string, value: FilterValue) => {
     setFilterValues((prev) => ({ ...prev, [field]: value }));
@@ -49,26 +48,13 @@ export function WorkOrderGrid() {
   );
 
   const { data, isLoading, isFetching, refetch } = useWorkOrders(query);
-  const patchWorkOrder = usePatchWorkOrder();
 
   const relatedId = searchParams.get('relatedWorkOrderId') ?? undefined;
   const { data: relatedWorkOrder } = useWorkOrder(relatedId);
 
   const columns = useMemo(
-    () =>
-      buildWorkOrderColumns(
-        (outageId) => navigate(`/outages?relatedOutageId=${outageId}`),
-        async (workOrder, nextStatus) => {
-          try {
-            await patchWorkOrder.mutateAsync({ id: workOrder.id, status: nextStatus, version: workOrder.version });
-            show('success', `İş emri ${nextStatus} durumuna geçti`);
-          } catch (err) {
-            show('error', err instanceof ApiError ? err.message : 'Durum güncellenemedi');
-          }
-        },
-        (workOrder) => setEditingWorkOrder(workOrder),
-      ),
-    [patchWorkOrder, show, navigate],
+    () => buildWorkOrderColumns((outageId) => navigate(`/outages?relatedOutageId=${outageId}`)),
+    [navigate],
   );
 
   return (
@@ -121,6 +107,7 @@ export function WorkOrderGrid() {
         onFilterChange={handleFilterChange}
         isLoading={isLoading}
         isFetching={isFetching}
+        onRowClick={(workOrder) => setHistoryWorkOrder(workOrder)}
         emptyMessage="İş emri kaydı yok"
         toolbarActions={
           hasPermission('workorder:write') && (
@@ -133,6 +120,17 @@ export function WorkOrderGrid() {
 
       {isCreateOpen && <CreateWorkOrderDialog onClose={() => setCreateOpen(false)} />}
       {editingWorkOrder && <EditWorkOrderDialog workOrder={editingWorkOrder} onClose={() => setEditingWorkOrder(null)} />}
+      {historyWorkOrder && (
+        <WorkOrderHistoryDialog
+          workOrder={historyWorkOrder}
+          onClose={() => setHistoryWorkOrder(null)}
+          onEdit={() => {
+            setHistoryWorkOrder(null);
+            setEditingWorkOrder(historyWorkOrder);
+          }}
+        />
+      )}
     </div>
   );
 }
+

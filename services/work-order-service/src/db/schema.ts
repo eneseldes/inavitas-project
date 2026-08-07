@@ -39,7 +39,7 @@ export const workOrders = pgTable(
     gisId: varchar('gis_id', { length: 64 }).notNull(),
     outageId: uuid('outage_id'), // başka DB'ye referans, FK YOK
     origin: recordOriginEnum('origin').notNull().default('USER'),
-    createdBy: varchar('created_by', { length: 64 }).notNull(),
+    createdBy: varchar('created_by', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
     version: integer('version').notNull().default(0),
   },
   (table) => [
@@ -49,3 +49,23 @@ export const workOrders = pgTable(
     index('idx_wo_outage').on(table.outageId).where(sql`${table.outageId} IS NOT NULL`),
   ],
 );
+
+export const workOrderStatusHistory = pgTable(
+  'work_order_status_history',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    workOrderId: uuid('work_order_id')
+      .notNull()
+      .references(() => workOrders.id, { onDelete: 'cascade' }),
+    fromStatus: woStatusEnum('from_status'), // NULL = ilk oluşturma
+    toStatus: woStatusEnum('to_status').notNull(),
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+    actor: varchar('actor', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
+    origin: recordOriginEnum('origin').notNull(),
+    correlationId: varchar('correlation_id', { length: 64 }),
+  },
+  (table) => [
+    index('idx_wo_history_wo_id').on(table.workOrderId, table.changedAt.desc()),
+  ],
+);
+

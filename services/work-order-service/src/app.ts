@@ -1,4 +1,4 @@
-import { correlationMiddleware, errorHandler, notFoundHandler, type Logger } from '@edas/shared';
+import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@edas/shared';
 import express, { type Express } from 'express';
 import { buildRouter } from './http/routes.ts';
 
@@ -9,6 +9,8 @@ export function createApp(logger: Logger): Express {
   app.set('trust proxy', true);
 
   app.use(correlationMiddleware());
+  app.use(httpLogger(logger));
+
   app.use(express.json({ limit: '100kb' }));
 
   app.use(buildRouter());
@@ -18,3 +20,4 @@ export function createApp(logger: Logger): Express {
 
   return app;
 }
+

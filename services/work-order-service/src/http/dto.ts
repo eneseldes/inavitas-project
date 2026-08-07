@@ -1,4 +1,4 @@
-import type { WorkOrderRow } from '../repository/work-order.repository.ts';
+import type { WorkOrderRow, WorkOrderStatusHistoryRow } from '../repository/work-order.repository.ts';
 
 /** DB satırını API response şekline çevirir. */
 export function toWorkOrderDto(row: WorkOrderRow) {
@@ -15,3 +15,15 @@ export function toWorkOrderDto(row: WorkOrderRow) {
     version: row.version,
   };
 }
+
+export function toWorkOrderHistoryDto(row: WorkOrderStatusHistoryRow) {
+  return {
+    id: row.id,
+    changedAt: row.changedAt.toISOString(),
+    fromStatus: row.fromStatus,
+    toStatus: row.toStatus,
+    actor: row.actor,
+    origin: row.origin,
+  };
+}
+

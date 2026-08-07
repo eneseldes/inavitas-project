@@ -32,7 +32,7 @@ export const outages = pgTable(
     workOrderId: uuid('work_order_id'), // başka DB'ye referans, FK YOK
     gisId: varchar('gis_id', { length: 64 }).notNull(),
     origin: recordOriginEnum('origin').notNull().default('USER'),
-    createdBy: varchar('created_by', { length: 64 }).notNull(), // user id veya 'SYSTEM'
+    createdBy: varchar('created_by', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
     version: integer('version').notNull().default(0), // optimistic locking
   },
   (table) => [
@@ -47,3 +47,23 @@ export const outages = pgTable(
     check('chk_ended_after_started', sql`${table.endedAt} IS NULL OR ${table.endedAt} >= ${table.startedAt}`),
   ],
 );
+
+export const outageStatusHistory = pgTable(
+  'outage_status_history',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    outageId: uuid('outage_id')
+      .notNull()
+      .references(() => outages.id, { onDelete: 'cascade' }),
+    fromStatus: outageStatusEnum('from_status'), // NULL = ilk oluşturma
+    toStatus: outageStatusEnum('to_status').notNull(),
+    changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+    actor: varchar('actor', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
+    origin: recordOriginEnum('origin').notNull(),
+    correlationId: varchar('correlation_id', { length: 64 }),
+  },
+  (table) => [
+    index('idx_outage_history_outage_id').on(table.outageId, table.changedAt.desc()),
+  ],
+);
+

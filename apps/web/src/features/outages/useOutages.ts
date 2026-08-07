@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createOutage, fetchOutage, fetchOutages, patchOutage, type OutagesQuery } from './api.ts';
+import { createOutage, fetchOutage, fetchOutageHistory, fetchOutages, patchOutage, type OutagesQuery } from './api.ts';
 
 const OUTAGES_KEY = 'outages';
 
@@ -25,6 +25,14 @@ export function useOutage(id: string | undefined) {
   });
 }
 
+export function useOutageHistory(id: string | undefined) {
+  return useQuery({
+    queryKey: [OUTAGES_KEY, 'history', id],
+    queryFn: () => fetchOutageHistory(id!),
+    enabled: id !== undefined,
+  });
+}
+
 export function useCreateOutage() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -40,3 +48,4 @@ export function usePatchOutage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [OUTAGES_KEY] }),
   });
 }
+

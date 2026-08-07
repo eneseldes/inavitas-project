@@ -1,6 +1,6 @@
 import { apiFetch } from '../../shared/api/client.ts';
 import type { PageResult, SortDirection } from '../../types/api.ts';
-import type { CreateWorkOrderInput, WorkOrder, WorkOrderFilters, WorkOrderStatus } from '../../types/work-order.ts';
+import type { CreateWorkOrderInput, WorkOrder, WorkOrderFilters, WorkOrderHistoryEntry, WorkOrderStatus } from '../../types/work-order.ts';
 
 export interface WorkOrdersQuery {
   page: number;
@@ -39,3 +39,8 @@ export function createWorkOrder(input: CreateWorkOrderInput): Promise<WorkOrder>
 export function patchWorkOrder(id: string, body: { status: WorkOrderStatus; version: number }): Promise<WorkOrder> {
   return apiFetch(`/api/work-orders/${id}`, { method: 'PATCH', body });
 }
+
+export function fetchWorkOrderHistory(id: string): Promise<{ items: WorkOrderHistoryEntry[] }> {
+  return apiFetch(`/api/work-orders/${id}/history`);
+}
+

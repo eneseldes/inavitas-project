@@ -75,6 +75,12 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
     <Modal title="Kesintiyi Güncelle" onClose={onClose}>
       <div className={styles.readOnlyBlock}>
         <div className={styles.readOnlyRow}>
+          <span className={styles.readOnlyLabel}>ID</span>
+          <span className={`${styles.readOnlyValue} font-mono`} title={outage.id}>
+            {outage.id.slice(0, 8)}
+          </span>
+        </div>
+        <div className={styles.readOnlyRow}>
           <span className={styles.readOnlyLabel}>GIS ID</span>
           <span className={`${styles.readOnlyValue} font-mono`}>{outage.gisId}</span>
         </div>

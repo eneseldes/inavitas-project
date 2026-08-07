@@ -36,3 +36,13 @@ export interface CreateWorkOrderInput {
   gisId: string;
   type: WorkOrderType;
 }
+
+export interface WorkOrderHistoryEntry {
+  id: string;
+  changedAt: string;
+  fromStatus: WorkOrderStatus | null;
+  toStatus: WorkOrderStatus;
+  actor: string;
+  origin: 'USER' | 'SYSTEM';
+}
+

@@ -54,6 +54,12 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
     <Modal title="İş Emrini Güncelle" onClose={onClose}>
       <div className={styles.readOnlyBlock}>
         <div className={styles.readOnlyRow}>
+          <span className={styles.readOnlyLabel}>ID</span>
+          <span className={`${styles.readOnlyValue} font-mono`} title={workOrder.id}>
+            {workOrder.id.slice(0, 8)}
+          </span>
+        </div>
+        <div className={styles.readOnlyRow}>
           <span className={styles.readOnlyLabel}>GIS ID</span>
           <span className={`${styles.readOnlyValue} font-mono`}>{workOrder.gisId}</span>
         </div>

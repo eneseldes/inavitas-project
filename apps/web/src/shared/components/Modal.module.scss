@@ -15,6 +15,9 @@
 .panel {
   width: 100%;
   max-width: 26rem;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   background: v.$color-white;
   border-radius: v.$radius-lg;
   box-shadow: v.$shadow-lg;
@@ -22,11 +25,23 @@
   animation: pop-in v.$transition-base;
 }
 
+// Geniş içerikli modallar (ör. geçmiş tablosu) — tablo yatayda sıkışmasın diye.
+.panel--lg {
+  max-width: 52rem;
+}
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
   margin-bottom: v.$space-3;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
 }
 
 .title {
@@ -34,6 +49,19 @@
   font-weight: 600;
   color: v.$color-ink;
   margin: 0;
+}
+
+// İçerik `.panel`in `max-height`ini aşarsa burada dikeyde kaydırılır —
+// modal viewport dışına taşmaz. `scrollbar-gutter: stable`: dikey scrollbar
+// alanı İÇERİK OLSUN OLMASIN her zaman ayrılır — aksi halde scrollbar
+// yalnızca satır sayısı yeterince fazla olduğunda belirir, o an genişliği
+// birkaç piksel çalar ve zaten dar olan tablo yatayda da kaymaya başlar
+// (ör. iş emri geçmişi kesinti geçmişinden fazla satıra sahip olduğunda).
+.body {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-gutter: stable;
 }
 
 @keyframes fade-in {

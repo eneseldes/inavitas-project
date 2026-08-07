@@ -11,7 +11,7 @@ import type { Response } from 'express';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
 import * as outageRepository from '../../repository/outage.repository.ts';
 import { SORTABLE_FIELDS, type OutageFilters } from '../../repository/outage.repository.ts';
-import { toOutageDto } from '../dto.ts';
+import { toOutageDto, toOutageHistoryDto } from '../dto.ts';
 import { CreateOutageBody, ListOutagesQuery, PatchOutageBody } from '../schemas.ts';
 
 /**
@@ -57,19 +57,26 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   // FR-2.6: endedAt set edildiğinde durum otomatik ENERGIZED olur.
   const status: OutageStatus = body.endedAt ? 'ENERGIZED' : (body.status ?? 'STARTED');
 
-  const row = await outageRepository.create({
-    gisId: body.gisId,
-    startedAt: new Date(body.startedAt),
-    endedAt: body.endedAt ? new Date(body.endedAt) : null,
-    status,
-    origin: 'USER',
-    createdBy: req.user.id,
-  });
+  const row = await outageRepository.create(
+    {
+      gisId: body.gisId,
+      startedAt: new Date(body.startedAt),
+      endedAt: body.endedAt ? new Date(body.endedAt) : null,
+      status,
+      origin: 'USER',
+      createdBy: req.user.email,
+    },
+    req.correlationId,
+  );
+
+  req.log?.info({ outageId: row.id, gisId: row.gisId, status: row.status }, 'kesinti oluşturuldu');
 
   res.status(201).json(toOutageDto(row));
 }
 
 export async function patch(req: AuthedRequest, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthenticatedError();
+
   const id = req.params.id as string;
   const body = PatchOutageBody.parse(req.body);
   const current = await outageRepository.findById(id);
@@ -85,10 +92,20 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
-  const updated = await outageRepository.updateWithVersion(current.id, body.version, {
-    status: nextStatus,
-    endedAt: body.endedAt ? new Date(body.endedAt) : current.endedAt,
-  });
+  const updated = await outageRepository.updateWithVersion(
+    current.id,
+    body.version,
+    {
+      status: nextStatus,
+      endedAt: body.endedAt ? new Date(body.endedAt) : current.endedAt,
+    },
+    {
+      fromStatus: current.status,
+      actor: req.user.email,
+      origin: 'USER',
+      correlationId: req.correlationId,
+    },
+  );
 
   if (!updated) {
     throw new ConflictError('Kayıt başka bir istekle güncellenmiş (version uyuşmazlığı)', [
@@ -96,5 +113,19 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
+  if (nextStatus !== current.status) {
+    req.log?.info({ outageId: updated.id, from: current.status, to: nextStatus }, 'kesinti durumu değişti');
+  }
+
   res.json(toOutageDto(updated));
 }
+
+export async function getHistory(req: AuthedRequest, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const current = await outageRepository.findById(id);
+  if (!current) throw new NotFoundError('Kesinti', id);
+
+  const rows = await outageRepository.getHistory(id);
+  res.json({ items: rows.map(toOutageHistoryDto) });
+}
+

@@ -4,6 +4,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../features/auth/useAuth.tsx';
 import styles from './AppShell.module.scss';
+import { QuickStatusWidget } from './QuickStatusWidget.tsx';
 
 interface NavItem {
   to: string;
@@ -63,6 +64,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      <QuickStatusWidget />
     </div>
   );
 }

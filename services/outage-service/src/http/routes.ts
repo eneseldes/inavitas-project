@@ -31,11 +31,17 @@ export function buildRouter(): Router {
     requirePermission(PERMISSIONS.OUTAGE_READ),
     asyncHandler<AuthedRequest>(outageController.getById),
   );
+  router.get(
+    '/outages/:id/history',
+    requirePermission(PERMISSIONS.OUTAGE_READ),
+    asyncHandler<AuthedRequest>(outageController.getHistory),
+  );
   router.post(
     '/outages',
     requirePermission(PERMISSIONS.OUTAGE_WRITE),
     asyncHandler<AuthedRequest>(outageController.create),
   );
+
   router.patch(
     '/outages/:id',
     requirePermission(PERMISSIONS.OUTAGE_WRITE),

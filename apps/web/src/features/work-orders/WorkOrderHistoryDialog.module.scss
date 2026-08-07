@@ -1,0 +1,19 @@
+@use '../../styles/variables' as v;
+
+.tableWrap {
+  min-width: 34rem;
+  overflow-x: auto;
+}
+
+.arrowCol {
+  width: 2rem;
+}
+
+.arrowIcon {
+  color: v.$color-ink-soft;
+}
+
+.emptyCell {
+  text-align: center;
+  padding: v.$space-4;
+}

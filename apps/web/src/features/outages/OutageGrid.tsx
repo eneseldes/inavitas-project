@@ -4,19 +4,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
-import { useToast } from '../../shared/components/Toast.tsx';
-import { ApiError } from '../../shared/api/errors.ts';
 import type { SortDirection } from '../../types/api.ts';
 import type { Outage, OutageStatus } from '../../types/outage.ts';
 import { CreateOutageDialog } from './CreateOutageDialog.tsx';
 import { EditOutageDialog } from './EditOutageDialog.tsx';
+import { OutageHistoryDialog } from './OutageHistoryDialog.tsx';
 import { buildOutageColumns } from './columns.tsx';
 import styles from './OutageGrid.module.scss';
-import { useOutage, useOutages, usePatchOutage } from './useOutages.ts';
+import { useOutage, useOutages } from './useOutages.ts';
 
 export function OutageGrid() {
   const { hasPermission } = useAuth();
-  const { show } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -26,6 +24,7 @@ export function OutageGrid() {
   const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({ gisId: '', status: [] });
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [editingOutage, setEditingOutage] = useState<Outage | null>(null);
+  const [historyOutage, setHistoryOutage] = useState<Outage | null>(null);
 
   const handleFilterChange = (field: string, value: FilterValue) => {
     setFilterValues((prev) => ({ ...prev, [field]: value }));
@@ -46,27 +45,14 @@ export function OutageGrid() {
   );
 
   const { data, isLoading, isFetching, refetch } = useOutages(query);
-  const patchOutage = usePatchOutage();
 
   // FR-5.7: karşı ekrandan tıklanan ilişkili kayıt burada highlight edilir.
   const relatedId = searchParams.get('relatedOutageId') ?? undefined;
   const { data: relatedOutage } = useOutage(relatedId);
 
   const columns = useMemo(
-    () =>
-      buildOutageColumns(
-        (workOrderId) => navigate(`/work-orders?relatedWorkOrderId=${workOrderId}`),
-        async (outage, nextStatus) => {
-          try {
-            await patchOutage.mutateAsync({ id: outage.id, status: nextStatus, version: outage.version });
-            show('success', `Kesinti ${nextStatus} durumuna geçti`);
-          } catch (err) {
-            show('error', err instanceof ApiError ? err.message : 'Durum güncellenemedi');
-          }
-        },
-        (outage) => setEditingOutage(outage),
-      ),
-    [patchOutage, show, navigate],
+    () => buildOutageColumns((workOrderId) => navigate(`/work-orders?relatedWorkOrderId=${workOrderId}`)),
+    [navigate],
   );
 
   return (
@@ -119,6 +105,7 @@ export function OutageGrid() {
         onFilterChange={handleFilterChange}
         isLoading={isLoading}
         isFetching={isFetching}
+        onRowClick={(outage) => setHistoryOutage(outage)}
         emptyMessage="Kesinti kaydı yok"
         toolbarActions={
           hasPermission('outage:write') && (
@@ -131,6 +118,17 @@ export function OutageGrid() {
 
       {isCreateOpen && <CreateOutageDialog onClose={() => setCreateOpen(false)} />}
       {editingOutage && <EditOutageDialog outage={editingOutage} onClose={() => setEditingOutage(null)} />}
+      {historyOutage && (
+        <OutageHistoryDialog
+          outage={historyOutage}
+          onClose={() => setHistoryOutage(null)}
+          onEdit={() => {
+            setHistoryOutage(null);
+            setEditingOutage(historyOutage);
+          }}
+        />
+      )}
     </div>
   );
 }
+

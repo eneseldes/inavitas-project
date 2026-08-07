@@ -11,7 +11,7 @@ import type { Response } from 'express';
 import { canTransition } from '../../domain/state-machine.ts';
 import * as workOrderRepository from '../../repository/work-order.repository.ts';
 import { SORTABLE_FIELDS, type WorkOrderFilters } from '../../repository/work-order.repository.ts';
-import { toWorkOrderDto } from '../dto.ts';
+import { toWorkOrderDto, toWorkOrderHistoryDto } from '../dto.ts';
 import { CreateWorkOrderBody, ListWorkOrdersQuery, PatchWorkOrderBody } from '../schemas.ts';
 
 /**
@@ -53,18 +53,25 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
 
   const body = CreateWorkOrderBody.parse(req.body);
 
-  const row = await workOrderRepository.create({
-    gisId: body.gisId,
-    type: body.type,
-    status: body.status ?? 'STARTED',
-    origin: 'USER',
-    createdBy: req.user.id,
-  });
+  const row = await workOrderRepository.create(
+    {
+      gisId: body.gisId,
+      type: body.type,
+      status: body.status ?? 'STARTED',
+      origin: 'USER',
+      createdBy: req.user.email,
+    },
+    req.correlationId,
+  );
+
+  req.log?.info({ workOrderId: row.id, gisId: row.gisId, status: row.status }, 'iş emri oluşturuldu');
 
   res.status(201).json(toWorkOrderDto(row));
 }
 
 export async function patch(req: AuthedRequest, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthenticatedError();
+
   const id = req.params.id as string;
   const body = PatchWorkOrderBody.parse(req.body);
   const current = await workOrderRepository.findById(id);
@@ -77,9 +84,19 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
-  const updated = await workOrderRepository.updateWithVersion(current.id, body.version, {
-    status: body.status,
-  });
+  const updated = await workOrderRepository.updateWithVersion(
+    current.id,
+    body.version,
+    {
+      status: body.status,
+    },
+    {
+      fromStatus: current.status,
+      actor: req.user.email,
+      origin: 'USER',
+      correlationId: req.correlationId,
+    },
+  );
 
   if (!updated) {
     throw new ConflictError('Kayıt başka bir istekle güncellenmiş (version uyuşmazlığı)', [
@@ -87,5 +104,19 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
+  if (body.status !== current.status) {
+    req.log?.info({ workOrderId: updated.id, from: current.status, to: body.status }, 'iş emri durumu değişti');
+  }
+
   res.json(toWorkOrderDto(updated));
 }
+
+export async function getHistory(req: AuthedRequest, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const current = await workOrderRepository.findById(id);
+  if (!current) throw new NotFoundError('İş emri', id);
+
+  const rows = await workOrderRepository.getHistory(id);
+  res.json({ items: rows.map(toWorkOrderHistoryDto) });
+}
+

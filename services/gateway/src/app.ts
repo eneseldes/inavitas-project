@@ -1,4 +1,4 @@
-import { correlationMiddleware, errorHandler, notFoundHandler, type Logger } from '@edas/shared';
+import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@edas/shared';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import { requireAuth, stripSpoofedHeaders } from './auth/middleware.ts';
@@ -21,6 +21,7 @@ export function createApp(logger: Logger): Express {
 
   app.use(cors({ origin: config.CORS_ORIGIN, credentials: true }));
   app.use(correlationMiddleware());
+  app.use(httpLogger(logger));
 
   // ⚠️ express.json() BİLEREK YOK. Burada gövdeyi parse edip tüketirsek,
   // http-proxy-middleware downstream'e boş/bozuk bir body iletir — klasik

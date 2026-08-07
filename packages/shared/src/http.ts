@@ -6,12 +6,27 @@
  */
 
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
+import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
 import type { AuthedRequest } from './auth.ts';
 import { AppError, ValidationError, toErrorResponse, type ErrorDetail } from './errors.ts';
 import { newCorrelationId, withCorrelation, type Logger } from './logger.ts';
 
 export const CORRELATION_HEADER = 'x-correlation-id';
+
+/**
+ * pino-http `req.log` alanını kendi `declare module 'http'` genişletmesiyle
+ * ekliyor, ama bu genişletme yalnızca pino-http'i DOĞRUDAN import eden
+ * dosyanın derleme kapsamına giriyor. `httpLogger`ı burada tek yerden
+ * kurduğumuz için tüketici servisler artık pino-http'i import etmiyor —
+ * genişletmeyi burada kendimiz açıkça tanımlıyoruz ki `req.log` her yerde
+ * tip güvenli kalsın.
+ */
+declare module 'http' {
+  interface IncomingMessage {
+    log: Logger;
+  }
+}
 
 /**
  * İsteğe correlationId iliştirir ve cevap header'ında geri yollar.
@@ -28,6 +43,43 @@ export function correlationMiddleware(): RequestHandler {
     res.setHeader(CORRELATION_HEADER, correlationId);
     next();
   };
+}
+
+/**
+ * Ortak istek/cevap logger'ı.
+ *
+ * pino-http'nin varsayılanı her istekte tüm header'ları ve `req`/`res`
+ * nesnelerini dökerek konsolu kullanılmaz hale getiriyordu. Bunun yerine
+ * `method url statusCode` özetleyen TEK satır basıyoruz; bu bilgi zaten
+ * mesajın içinde olduğu için ayrıca `req`/`res` alanı da BASMIYORUZ —
+ * aksi halde aynı bilginin iki kopyası tutulmuş olurdu. correlationId
+ * `customProps` ile her logda zaten var.
+ *
+ * Başarılı (2xx/3xx) istekler `debug` seviyesinde: her sayfa açılışında/
+ * listeleme isteğinde tekrar eden access-log satırları varsayılan `info`
+ * görünümünü boğuyordu, asıl önemli olan iş olayları (örn. "kesinti
+ * durumu değişti") ve hatalar kayboluyordu. 4xx/5xx `warn`/`error`'da
+ * kalır, LOG_LEVEL=debug ile tüm trafik istendiğinde geri açılabilir.
+ */
+export function httpLogger(logger: Logger): RequestHandler {
+  return (pinoHttp as any)({
+    logger,
+    genReqId: (req: AuthedRequest) => req.correlationId,
+    customProps: (req: AuthedRequest) => ({ correlationId: req.correlationId }),
+    autoLogging: { ignore: (req: Request) => req.url === '/health' || req.url === '/ready' },
+    customLogLevel: (_req: Request, res: Response, err?: Error) => {
+      if (err || res.statusCode >= 500) return 'error';
+      if (res.statusCode >= 400) return 'warn';
+      return 'debug';
+    },
+    customSuccessMessage: (req: Request, res: Response) => `${req.method} ${req.url} -> ${res.statusCode}`,
+    customErrorMessage: (req: Request, res: Response, err: Error) =>
+      `${req.method} ${req.url} -> ${res.statusCode} (${err.message})`,
+    serializers: {
+      req: () => undefined,
+      res: () => undefined,
+    },
+  });
 }
 
 /** Route handler'lardaki async hataları Express'e taşır. */

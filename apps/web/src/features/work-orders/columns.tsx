@@ -1,6 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { FiEdit2, FiLink } from 'react-icons/fi';
-import { clsx } from 'clsx';
+import { FiLink } from 'react-icons/fi';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { ORIGIN_LABELS, WORK_ORDER_STATUS_LABELS, WORK_ORDER_TYPE_LABELS } from '../../shared/labels.ts';
@@ -29,12 +28,21 @@ export const NEXT_STATUSES: Record<WorkOrderStatus, WorkOrderStatus[]> = {
 const STATUS_FILTER_OPTIONS = WORK_ORDER_STATUSES.map((status) => ({ value: status, label: WORK_ORDER_STATUS_LABELS[status] }));
 const TYPE_FILTER_OPTIONS = WORK_ORDER_TYPES.map((type) => ({ value: type, label: WORK_ORDER_TYPE_LABELS[type] }));
 
-export function buildWorkOrderColumns(
-  onOpenOutage: (outageId: string) => void,
-  onChangeStatus: (workOrder: WorkOrder, nextStatus: WorkOrderStatus) => void,
-  onEdit: (workOrder: WorkOrder) => void,
-): ColumnDef<WorkOrder>[] {
+export function buildWorkOrderColumns(onOpenOutage: (outageId: string) => void): ColumnDef<WorkOrder>[] {
   return [
+    {
+      id: 'id',
+      header: 'ID',
+      accessorFn: (row) => row.id,
+      cell: (ctx) => {
+        const id = ctx.getValue<string>();
+        return (
+          <span className="font-mono" title={id}>
+            {id.slice(0, 8)}
+          </span>
+        );
+      },
+    },
     {
       id: 'createdAt',
       header: 'Oluşturulma',
@@ -90,45 +98,18 @@ export function buildWorkOrderColumns(
         const outageId = ctx.getValue<string | null>();
         if (!outageId) return <span className="text-muted">—</span>;
         return (
-          <button type="button" onClick={() => onOpenOutage(outageId)} className="link" title="Kesinti ekranında aç">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenOutage(outageId);
+            }}
+            className="link"
+            title="Kesinti ekranında aç"
+          >
             <FiLink />
             {outageId.slice(0, 8)}
           </button>
-        );
-      },
-    },
-    {
-      id: 'actions',
-      header: 'İşlemler',
-      cell: (ctx) => {
-        const workOrder = ctx.row.original;
-        const options = NEXT_STATUSES[workOrder.status];
-
-        return (
-          <div className="actions-cell">
-            <button type="button" onClick={() => onEdit(workOrder)} className="icon-btn icon-btn--sm" title="İş emrini güncelle">
-              <FiEdit2 />
-            </button>
-            {options.length > 0 && (
-              <select
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) onChangeStatus(workOrder, e.target.value as WorkOrderStatus);
-                  e.target.value = '';
-                }}
-                className={clsx('select', 'select--compact')}
-              >
-                <option value="" disabled>
-                  Geçiş seç…
-                </option>
-                {options.map((status) => (
-                  <option key={status} value={status}>
-                    → {WORK_ORDER_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
         );
       },
     },

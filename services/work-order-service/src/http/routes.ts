@@ -34,11 +34,17 @@ export function buildRouter(): Router {
     requirePermission(PERMISSIONS.WORKORDER_READ),
     asyncHandler<AuthedRequest>(workOrderController.getById),
   );
+  router.get(
+    '/work-orders/:id/history',
+    requirePermission(PERMISSIONS.WORKORDER_READ),
+    asyncHandler<AuthedRequest>(workOrderController.getHistory),
+  );
   router.post(
     '/work-orders',
     requirePermission(PERMISSIONS.WORKORDER_WRITE),
     asyncHandler<AuthedRequest>(workOrderController.create),
   );
+
   router.patch(
     '/work-orders/:id',
     requirePermission(PERMISSIONS.WORKORDER_WRITE),

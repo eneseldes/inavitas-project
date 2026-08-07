@@ -1,11 +1,12 @@
 import type { PaginationQuery, SortOrder } from '@edas/shared';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
-import { workOrders } from '../db/schema.ts';
+import { workOrders, workOrderStatusHistory } from '../db/schema.ts';
 import type { WorkOrderStatus } from '../domain/state-machine.ts';
 
 /** Drizzle'ı yalnızca bu katman bilir; controller/service düz nesnelerle çalışır. */
 export type WorkOrderRow = typeof workOrders.$inferSelect;
+export type WorkOrderStatusHistoryRow = typeof workOrderStatusHistory.$inferSelect;
 export type WorkOrderType = WorkOrderRow['type'];
 
 export interface WorkOrderFilters {
@@ -24,6 +25,13 @@ export interface CreateWorkOrderInput {
   origin: 'USER' | 'SYSTEM';
   createdBy: string;
   outageId?: string | null;
+}
+
+export interface StatusChangeMeta {
+  fromStatus: WorkOrderStatus;
+  actor: string;
+  origin: 'USER' | 'SYSTEM';
+  correlationId?: string;
 }
 
 /** GET /work-orders sıralama alanları için izin listesi. */
@@ -59,9 +67,19 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
   return conditions;
 }
 
-export async function create(input: CreateWorkOrderInput): Promise<WorkOrderRow> {
-  const [row] = await db.insert(workOrders).values(input).returning();
-  return row!;
+export async function create(input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(workOrders).values(input).returning();
+    await tx.insert(workOrderStatusHistory).values({
+      workOrderId: row!.id,
+      fromStatus: null,
+      toStatus: row!.status,
+      actor: input.createdBy,
+      origin: input.origin,
+      correlationId,
+    });
+    return row!;
+  });
 }
 
 export async function findById(id: string): Promise<WorkOrderRow | null> {
@@ -94,12 +112,37 @@ export async function updateWithVersion(
   id: string,
   expectedVersion: number,
   patch: { status?: WorkOrderStatus; outageId?: string | null },
+  meta: StatusChangeMeta,
 ): Promise<WorkOrderRow | null> {
-  const [row] = await db
-    .update(workOrders)
-    .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
-    .where(and(eq(workOrders.id, id), eq(workOrders.version, expectedVersion)))
-    .returning();
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(workOrders)
+      .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
+      .where(and(eq(workOrders.id, id), eq(workOrders.version, expectedVersion)))
+      .returning();
 
-  return row ?? null;
+    if (!row) return null;
+
+    if (patch.status && patch.status !== meta.fromStatus) {
+      await tx.insert(workOrderStatusHistory).values({
+        workOrderId: id,
+        fromStatus: meta.fromStatus,
+        toStatus: patch.status,
+        actor: meta.actor,
+        origin: meta.origin,
+        correlationId: meta.correlationId,
+      });
+    }
+
+    return row;
+  });
 }
+
+export async function getHistory(workOrderId: string): Promise<WorkOrderStatusHistoryRow[]> {
+  return db
+    .select()
+    .from(workOrderStatusHistory)
+    .where(eq(workOrderStatusHistory.workOrderId, workOrderId))
+    .orderBy(desc(workOrderStatusHistory.changedAt));
+}
+

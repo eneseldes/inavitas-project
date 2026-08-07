@@ -1,6 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { FiEdit2, FiLink, FiLock } from 'react-icons/fi';
-import { clsx } from 'clsx';
+import { FiLink } from 'react-icons/fi';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { OUTAGE_STATUS_LABELS, ORIGIN_LABELS } from '../../shared/labels.ts';
@@ -25,8 +24,11 @@ function formatDate(value: string | null): string {
  *
  * Backend state machine hâlâ nihai otorite — burası yalnızca kullanıcıya
  * hangi seçeneklerin ANLAMLI olduğunu gösteriyor.
+ *
+ * `export`: QuickStatusWidget ve OutageHistoryDialog aynı listeyi kullanıyor,
+ * iki kopya tutmuyoruz (bkz. work-orders/columns.tsx NEXT_STATUSES).
  */
-const USER_SELECTABLE_NEXT_STATUSES: Record<OutageStatus, OutageStatus[]> = {
+export const USER_SELECTABLE_NEXT_STATUSES: Record<OutageStatus, OutageStatus[]> = {
   STARTED: ['CANCELLED'],
   ENERGIZED: ['ARCHIVED', 'CANCELLED'],
   ARCHIVED: [],
@@ -34,18 +36,27 @@ const USER_SELECTABLE_NEXT_STATUSES: Record<OutageStatus, OutageStatus[]> = {
 };
 
 /** Arşivlenmiş/iptal edilmiş bir kesinti artık düzenlenemez, geçiş yapılamaz. */
-function isLocked(status: OutageStatus): boolean {
+export function isLocked(status: OutageStatus): boolean {
   return status === 'ARCHIVED' || status === 'CANCELLED';
 }
 
 const STATUS_FILTER_OPTIONS = OUTAGE_STATUSES.map((status) => ({ value: status, label: OUTAGE_STATUS_LABELS[status] }));
 
-export function buildOutageColumns(
-  onOpenWorkOrder: (workOrderId: string) => void,
-  onChangeStatus: (outage: Outage, nextStatus: OutageStatus) => void,
-  onEdit: (outage: Outage) => void,
-): ColumnDef<Outage>[] {
+export function buildOutageColumns(onOpenWorkOrder: (workOrderId: string) => void): ColumnDef<Outage>[] {
   return [
+    {
+      id: 'id',
+      header: 'ID',
+      accessorFn: (row) => row.id,
+      cell: (ctx) => {
+        const id = ctx.getValue<string>();
+        return (
+          <span className="font-mono" title={id}>
+            {id.slice(0, 8)}
+          </span>
+        );
+      },
+    },
     {
       id: 'createdAt',
       header: 'Oluşturulma',
@@ -110,55 +121,18 @@ export function buildOutageColumns(
         const workOrderId = ctx.getValue<string | null>();
         if (!workOrderId) return <span className="text-muted">—</span>;
         return (
-          <button type="button" onClick={() => onOpenWorkOrder(workOrderId)} className="link" title="İş emri ekranında aç">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenWorkOrder(workOrderId);
+            }}
+            className="link"
+            title="İş emri ekranında aç"
+          >
             <FiLink />
             {workOrderId.slice(0, 8)}
           </button>
-        );
-      },
-    },
-    {
-      id: 'actions',
-      header: 'İşlemler',
-      cell: (ctx) => {
-        const outage = ctx.row.original;
-
-        if (isLocked(outage.status)) {
-          return (
-            <span className="locked-cell" title="Arşivlenmiş/iptal edilmiş kesinti kilitlidir, düzenlenemez">
-              <FiLock />
-              Kilitli
-            </span>
-          );
-        }
-
-        const options = USER_SELECTABLE_NEXT_STATUSES[outage.status];
-
-        return (
-          <div className="actions-cell">
-            <button type="button" onClick={() => onEdit(outage)} className="icon-btn icon-btn--sm" title="Kesintiyi güncelle">
-              <FiEdit2 />
-            </button>
-            {options.length > 0 && (
-              <select
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) onChangeStatus(outage, e.target.value as OutageStatus);
-                  e.target.value = '';
-                }}
-                className={clsx('select', 'select--compact')}
-              >
-                <option value="" disabled>
-                  Geçiş seç…
-                </option>
-                {options.map((status) => (
-                  <option key={status} value={status}>
-                    → {OUTAGE_STATUS_LABELS[status]}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
         );
       },
     },

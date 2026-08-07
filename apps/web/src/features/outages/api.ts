@@ -1,6 +1,6 @@
 import { apiFetch } from '../../shared/api/client.ts';
 import type { PageResult, SortDirection } from '../../types/api.ts';
-import type { CreateOutageInput, Outage, OutageFilters, OutageStatus } from '../../types/outage.ts';
+import type { CreateOutageInput, Outage, OutageFilters, OutageHistoryEntry, OutageStatus } from '../../types/outage.ts';
 
 export interface OutagesQuery {
   page: number;
@@ -40,3 +40,8 @@ export function createOutage(input: CreateOutageInput): Promise<Outage> {
 export function patchOutage(id: string, body: { status?: OutageStatus; endedAt?: string; version: number }): Promise<Outage> {
   return apiFetch(`/api/outages/${id}`, { method: 'PATCH', body });
 }
+
+export function fetchOutageHistory(id: string): Promise<{ items: OutageHistoryEntry[] }> {
+  return apiFetch(`/api/outages/${id}/history`);
+}
+

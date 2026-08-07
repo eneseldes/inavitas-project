@@ -30,3 +30,13 @@ export interface CreateOutageInput {
   startedAt: string;
   endedAt?: string;
 }
+
+export interface OutageHistoryEntry {
+  id: string;
+  changedAt: string;
+  fromStatus: OutageStatus | null;
+  toStatus: OutageStatus;
+  actor: string;
+  origin: 'USER' | 'SYSTEM';
+}
+

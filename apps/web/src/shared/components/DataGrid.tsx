@@ -50,9 +50,11 @@ export interface DataGridProps<T> {
   isLoading?: boolean;
   toolbarActions?: ReactNode;
   emptyMessage?: string;
+  onRowClick?: (item: T) => void;
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+
 
 function headerLabel(header: unknown): string {
   return typeof header === 'string' ? header : '';
@@ -86,7 +88,9 @@ export function DataGrid<T>({
   isLoading,
   toolbarActions,
   emptyMessage = 'Kayıt bulunamadı',
+  onRowClick,
 }: DataGridProps<T>) {
+
   const table = useReactTable({
     data,
     columns,
@@ -180,12 +184,17 @@ export function DataGrid<T>({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  onClick={() => onRowClick?.(row.original)}
+                  className={clsx(onRowClick && 'clickable-row')}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                   ))}
                 </tr>
               ))
+
             )}
           </tbody>
         </table>

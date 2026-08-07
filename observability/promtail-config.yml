@@ -1,0 +1,42 @@
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: edas-services
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: edas
+          __path__: /var/log/edas/*.log
+
+    pipeline_stages:
+      # Pino tek satırlık JSON basar — createLogger()'daki `name: service`
+      # alanı buradan `service` etiketine dönüşüyor.
+      - json:
+          expressions:
+            level: level
+            name: name
+            correlationId: correlationId
+            outageId: outageId
+            workOrderId: workOrderId
+
+      # LABEL: yalnızca düşük kardinaliteli alanlar (servis adı, seviye)
+      - labels:
+          level:
+      - template:
+          source: name
+          template: '{{ .Value }}'
+      - labels:
+          service: name
+
+      # STRUCTURED METADATA (Loki 3.x): indekslenmez, sorgu anında | correlationId="..." ile filtrelenir
+      - structured_metadata:
+          correlationId:
+          outageId:
+          workOrderId:

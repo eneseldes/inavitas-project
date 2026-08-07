@@ -1,4 +1,5 @@
 import pino, { type Logger } from 'pino';
+import pinoPretty from 'pino-pretty';
 
 export type { Logger };
 
@@ -42,26 +43,28 @@ export interface LoggerOptions {
  * });
  */
 export function createLogger({ service, level = 'info', pretty = false }: LoggerOptions): Logger {
-  return pino({
-    name: service,
-    level,
-    redact: { paths: REDACTED_PATHS, censor: '[GIZLENDI]' },
-    // Varsayılan "time":1754... yerine okunabilir ISO damgası.
-    timestamp: pino.stdTimeFunctions.isoTime,
-    formatters: {
-      // Varsayılan {"level":30} yerine {"level":"info"} — grep'lemesi kolay.
-      level: (label) => ({ level: label }),
+  const fileStream = pino.destination({ dest: `logs/${service}.log`, mkdir: true });
+  const consoleStream = pretty
+    ? pinoPretty({ colorize: true, translateTime: 'HH:MM:ss.l', ignore: 'pid,hostname' })
+    : process.stdout;
+
+  return pino(
+    {
+      name: service,
+      level,
+      redact: { paths: REDACTED_PATHS, censor: '[GIZLENDI]' },
+      timestamp: pino.stdTimeFunctions.isoTime,
+      formatters: {
+        level: (label: string) => ({ level: label }),
+      },
     },
-    ...(pretty
-      ? {
-          transport: {
-            target: 'pino-pretty',
-            options: { colorize: true, translateTime: 'HH:MM:ss.l', ignore: 'pid,hostname' },
-          },
-        }
-      : {}),
-  });
+    pino.multistream([
+      { stream: fileStream, level },
+      { stream: consoleStream, level },
+    ]),
+  );
 }
+
 
 /**
  * Yeni bir correlation id üretir. Gateway her gelen istekte bir kez çağırır;

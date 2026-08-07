@@ -1,11 +1,12 @@
 import type { PaginationQuery, SortOrder } from '@edas/shared';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
-import { outages } from '../db/schema.ts';
+import { outages, outageStatusHistory } from '../db/schema.ts';
 import type { OutageStatus } from '../domain/state-machine.ts';
 
 /** Drizzle'ı yalnızca bu katman bilir; controller/service düz nesnelerle çalışır. */
 export type OutageRow = typeof outages.$inferSelect;
+export type OutageStatusHistoryRow = typeof outageStatusHistory.$inferSelect;
 
 export interface OutageFilters {
   status?: OutageStatus[];
@@ -25,6 +26,13 @@ export interface CreateOutageInput {
   origin: 'USER' | 'SYSTEM';
   createdBy: string;
   workOrderId?: string | null;
+}
+
+export interface StatusChangeMeta {
+  fromStatus: OutageStatus;
+  actor: string;
+  origin: 'USER' | 'SYSTEM';
+  correlationId?: string;
 }
 
 /** GET /outages sıralama alanları için izin listesi — SQL enjeksiyonuna açık serbest string yok. */
@@ -63,9 +71,19 @@ function buildConditions(filters: OutageFilters): SQL[] {
   return conditions;
 }
 
-export async function create(input: CreateOutageInput): Promise<OutageRow> {
-  const [row] = await db.insert(outages).values(input).returning();
-  return row!;
+export async function create(input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(outages).values(input).returning();
+    await tx.insert(outageStatusHistory).values({
+      outageId: row!.id,
+      fromStatus: null,
+      toStatus: row!.status,
+      actor: input.createdBy,
+      origin: input.origin,
+      correlationId,
+    });
+    return row!;
+  });
 }
 
 export async function findById(id: string): Promise<OutageRow | null> {
@@ -102,12 +120,37 @@ export async function updateWithVersion(
   id: string,
   expectedVersion: number,
   patch: { status?: OutageStatus; endedAt?: Date | null; workOrderId?: string | null },
+  meta: StatusChangeMeta,
 ): Promise<OutageRow | null> {
-  const [row] = await db
-    .update(outages)
-    .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
-    .where(and(eq(outages.id, id), eq(outages.version, expectedVersion)))
-    .returning();
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(outages)
+      .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
+      .where(and(eq(outages.id, id), eq(outages.version, expectedVersion)))
+      .returning();
 
-  return row ?? null;
+    if (!row) return null;
+
+    if (patch.status && patch.status !== meta.fromStatus) {
+      await tx.insert(outageStatusHistory).values({
+        outageId: id,
+        fromStatus: meta.fromStatus,
+        toStatus: patch.status,
+        actor: meta.actor,
+        origin: meta.origin,
+        correlationId: meta.correlationId,
+      });
+    }
+
+    return row;
+  });
 }
+
+export async function getHistory(outageId: string): Promise<OutageStatusHistoryRow[]> {
+  return db
+    .select()
+    .from(outageStatusHistory)
+    .where(eq(outageStatusHistory.outageId, outageId))
+    .orderBy(desc(outageStatusHistory.changedAt));
+}
+

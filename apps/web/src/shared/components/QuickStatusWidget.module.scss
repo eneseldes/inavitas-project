@@ -1,0 +1,124 @@
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
+
+// Sohbet botu tarzı sağ-alt köşe: küçük yuvarlak tetikleyici + üstünde açılan panel.
+.fab {
+  position: fixed;
+  right: v.$space-6;
+  bottom: v.$space-6;
+  z-index: v.$z-popover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: v.$radius-full;
+  background: v.$color-brand-500;
+  color: v.$color-white;
+  font-size: 1.125rem;
+  box-shadow: v.$shadow-lg;
+  @include m.clickable;
+
+  &:hover {
+    background: v.$color-brand-600;
+  }
+}
+
+.fabActive {
+  background: v.$color-brand-600;
+}
+
+.panel {
+  position: fixed;
+  right: v.$space-6;
+  bottom: calc(2.75rem + v.$space-6 + v.$space-2);
+  z-index: v.$z-popover;
+  width: 17rem;
+  padding: v.$space-3;
+  background: v.$color-white;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-lg;
+  box-shadow: v.$shadow-lg;
+  animation: pop v.$transition-fast;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: v.$space-3;
+}
+
+.title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.typeToggle {
+  display: flex;
+  gap: v.$space-1;
+  padding: 0.1875rem;
+  margin-bottom: v.$space-3;
+  background: v.$color-slate-100;
+  border-radius: v.$control-radius;
+}
+
+.typeButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: v.$space-1;
+  height: 1.75rem;
+  border-radius: calc(v.$control-radius - 0.125rem);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: v.$color-ink-soft;
+  @include m.clickable;
+
+  &:hover {
+    color: v.$color-ink;
+  }
+}
+
+.typeButtonActive {
+  background: v.$color-white;
+  color: v.$color-ink;
+  box-shadow: v.$shadow-sm;
+}
+
+.selection {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+  margin-bottom: v.$space-3;
+}
+
+.selectionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+}
+
+.selectionLabel {
+  color: v.$color-ink-soft;
+  font-size: 0.75rem;
+}
+
+.transitionSelect {
+  width: 100%;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

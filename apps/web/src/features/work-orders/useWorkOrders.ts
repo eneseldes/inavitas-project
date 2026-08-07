@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createWorkOrder, fetchWorkOrder, fetchWorkOrders, patchWorkOrder, type WorkOrdersQuery } from './api.ts';
+import { createWorkOrder, fetchWorkOrder, fetchWorkOrderHistory, fetchWorkOrders, patchWorkOrder, type WorkOrdersQuery } from './api.ts';
 
 const WORK_ORDERS_KEY = 'work-orders';
 
@@ -19,6 +19,14 @@ export function useWorkOrder(id: string | undefined) {
   });
 }
 
+export function useWorkOrderHistory(id: string | undefined) {
+  return useQuery({
+    queryKey: [WORK_ORDERS_KEY, 'history', id],
+    queryFn: () => fetchWorkOrderHistory(id!),
+    enabled: id !== undefined,
+  });
+}
+
 export function useCreateWorkOrder() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -34,3 +42,4 @@ export function usePatchWorkOrder() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [WORK_ORDERS_KEY] }),
   });
 }
+

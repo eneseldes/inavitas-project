@@ -282,6 +282,7 @@ button {
   td {
     padding: v.$space-2 v.$space-3;
     text-align: left;
+    white-space: nowrap;
     border-right: 1px solid v.$color-hairline;
 
     &:last-child {
@@ -300,22 +301,25 @@ button {
 
   tbody tr {
     border-bottom: 1px solid v.$color-hairline;
+    transition: background-color 0.15s ease;
 
     &:last-child {
       border-bottom: none;
     }
+
+    &.clickable-row {
+      cursor: pointer;
+
+      &:hover {
+        background-color: rgba(241, 245, 249, 0.4);
+      }
+    }
   }
 }
 
+
 .text-muted {
   color: v.$color-ink-soft;
-}
-
-// Grid'lerin "İşlemler" sütunu: güncelleme butonu + geçiş select'i yan yana.
-.actions-cell {
-  display: flex;
-  align-items: center;
-  gap: v.$space-2;
 }
 
 // Kilitli kayıt (ör. arşivlenmiş kesinti) — düzenleme/geçiş kontrolü yerine gösterilir.
