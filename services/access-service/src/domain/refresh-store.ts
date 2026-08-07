@@ -1,6 +1,7 @@
 /**
- * Aktif refresh token (jti) kaydı arayüzü ve bellek içi (in-memory) uygulaması.
+ * Aktif refresh token (jti) kaydı arayüzü ve Redis tabanlı uygulaması.
  */
+import { redis } from '../redis.ts';
 
 export interface RefreshRecord {
   userId: string;
@@ -15,35 +16,43 @@ export interface RefreshTokenStore {
   revokeAllForUser(userId: string): Promise<void>;
 }
 
-/** Bellek içi refresh token deposu. */
-export class InMemoryRefreshTokenStore implements RefreshTokenStore {
-  private readonly records = new Map<string, RefreshRecord>();
+const KEY_PREFIX = 'refresh:';
 
+/**
+ * Redis tabanlı refresh token deposu (03-YOL-HARITASI Faz 5 adım 1).
+ * Süre dolumu Redis'in `EX` mekanizmasıyla yönetilir — ayrı bir temizleme
+ * (cleanup) işine gerek kalmaz.
+ */
+export class RedisRefreshTokenStore implements RefreshTokenStore {
   async save(jti: string, record: RefreshRecord): Promise<void> {
-    this.records.set(jti, record);
+    const ttlSeconds = Math.max(1, Math.round((record.expiresAt.getTime() - Date.now()) / 1000));
+    await redis.set(KEY_PREFIX + jti, record.userId, 'EX', ttlSeconds);
   }
 
   async get(jti: string): Promise<RefreshRecord | undefined> {
-    const record = this.records.get(jti);
-    if (!record) return undefined;
+    const key = KEY_PREFIX + jti;
+    const [userId, ttl] = await Promise.all([redis.get(key), redis.ttl(key)]);
 
-    if (record.expiresAt.getTime() <= Date.now()) {
-      this.records.delete(jti);
-      return undefined;
-    }
+    if (!userId || ttl < 0) return undefined;
 
-    return record;
+    return { userId, expiresAt: new Date(Date.now() + ttl * 1000) };
   }
 
   async revoke(jti: string): Promise<void> {
-    this.records.delete(jti);
+    await redis.del(KEY_PREFIX + jti);
   }
 
   async revokeAllForUser(userId: string): Promise<void> {
-    for (const [jti, record] of this.records) {
-      if (record.userId === userId) this.records.delete(jti);
+    const stream = redis.scanStream({ match: `${KEY_PREFIX}*`, count: 100 });
+
+    for await (const keys of stream as AsyncIterable<string[]>) {
+      if (keys.length === 0) continue;
+
+      const values = await redis.mget(keys);
+      const toDelete = keys.filter((_, i) => values[i] === userId);
+      if (toDelete.length > 0) await redis.del(...toDelete);
     }
   }
 }
 
-export const refreshTokenStore: RefreshTokenStore = new InMemoryRefreshTokenStore();
+export const refreshTokenStore: RefreshTokenStore = new RedisRefreshTokenStore();

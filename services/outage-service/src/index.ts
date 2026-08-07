@@ -4,6 +4,7 @@ import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
 import { connectKafka, disconnectKafka, startOutageConsumer } from './kafka.ts';
 import { createOutageEventHandler } from './kafka/consumers.ts';
+import { disconnectRedis } from './redis.ts';
 
 const logger = createLogger({
   service: 'outage-service',
@@ -32,6 +33,7 @@ async function shutdown(signal: string): Promise<void> {
 
     await disconnectKafka();
     await disconnectDb();
+    await disconnectRedis();
     logger.info('kapanış tamam');
     process.exit(0);
   });

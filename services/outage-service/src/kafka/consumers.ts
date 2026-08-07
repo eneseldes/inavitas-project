@@ -7,7 +7,7 @@ import {
   type WorkOrderDoneEvent,
   type WorkOrderLinkedEvent,
 } from '@inavitas/contracts';
-import { ValidationError, withCorrelation, type EventHandler, type Logger } from '@inavitas/shared';
+import { markSeenOnce, ValidationError, withCorrelation, type EventHandler, type Logger } from '@inavitas/shared';
 import { eq } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import { db } from '../db.ts';
@@ -15,6 +15,8 @@ import { outages } from '../db/schema.ts';
 import { canTransition } from '../domain/state-machine.ts';
 import { markProcessed } from '../repository/idempotency.repository.ts';
 import { createTx, linkWorkOrderTx, updateWithVersionTx } from '../repository/outage.repository.ts';
+import { redis } from '../redis.ts';
+import { notifyOutageChanged } from '../realtime.ts';
 import { publishOutageEnergizedIfNeeded, publishOutageLinked } from './producer.ts';
 
 /**
@@ -59,6 +61,8 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
     'iş emrinden otomatik kesinti oluşturuldu',
   );
 
+  await notifyOutageChanged(created, log);
+
   await publishOutageLinked(
     created.id,
     created.gisId,
@@ -85,6 +89,8 @@ export async function handleWorkOrderLinked(envelope: WorkOrderLinkedEvent, log:
   }
 
   log.info({ outageId: updated.id, workOrderId: envelope.payload.workOrderId }, 'kesinti iş emrine bağlandı');
+
+  await notifyOutageChanged(updated, log);
 }
 
 /**
@@ -134,6 +140,8 @@ export async function handleWorkOrderDone(envelope: WorkOrderDoneEvent, log: Log
 
   log.info({ outageId: result.row.id, workOrderId: envelope.payload.workOrderId }, 'iş emri tamamlandı, kesinti otomatik ENERGIZED yapıldı');
 
+  await notifyOutageChanged(result.row, log);
+
   await publishOutageEnergizedIfNeeded(
     result.previousStatus,
     result.row,
@@ -168,6 +176,13 @@ export function createOutageEventHandler(logger: Logger): EventHandler {
     }
 
     const log = withCorrelation(logger, envelope.correlationId, { eventId: envelope.eventId, eventType: envelope.eventType });
+
+    // Postgres'teki `processed_events` kontrolüne ek, hızlı bir Redis ön filtresi
+    // (03-YOL-HARITASI Faz 5 adım 5) — asıl garanti hâlâ transaction içindeki tabloda.
+    if (!(await markSeenOnce(redis, envelope.eventId))) {
+      log.debug({ eventId: envelope.eventId }, 'redis ön filtresi: muhtemelen zaten işlenmiş, atlanıyor');
+      return;
+    }
 
     switch (topic) {
       case TOPICS.WORK_ORDER_CREATED:

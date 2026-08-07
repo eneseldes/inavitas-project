@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FiPlus, FiX } from 'react-icons/fi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx';
+import { LiveIndicator } from '../../shared/components/LiveIndicator.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
 import type { SortDirection } from '../../types/api.ts';
@@ -12,11 +13,13 @@ import { OutageHistoryDialog } from './OutageHistoryDialog.tsx';
 import { buildOutageColumns } from './columns.tsx';
 import styles from './OutageGrid.module.scss';
 import { useOutage, useOutages } from './useOutages.ts';
+import { useOutageStream } from './useOutageStream.ts';
 
 export function OutageGrid() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isLive = useOutageStream();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -59,6 +62,7 @@ export function OutageGrid() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <h1 className={styles.title}>Kesintiler</h1>
+        <LiveIndicator connected={isLive} />
       </div>
 
       {relatedId && (

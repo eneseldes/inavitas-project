@@ -1,10 +1,10 @@
-import { baseEnvSchema, loadConfig } from '@inavitas/shared';
+import { baseEnvSchema, loadConfig, redisEnvSchema } from '@inavitas/shared';
 import { z } from 'zod';
 
 /**
  * Kimlik doğrulama servisi (access-service) ortam değişkenleri şeması.
  */
-const envSchema = baseEnvSchema.extend({
+const envSchema = baseEnvSchema.merge(redisEnvSchema).extend({
   ACCESS_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
 
   /** Runtime veritabanı bağlantı adresi (DML erişimli kullanıcı). */

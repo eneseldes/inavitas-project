@@ -10,6 +10,7 @@ import {
 import type { Response } from 'express';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
 import { publishOutageCreated, publishOutageEnergizedIfNeeded } from '../../kafka/producer.ts';
+import { notifyOutageChanged } from '../../realtime.ts';
 import * as outageRepository from '../../repository/outage.repository.ts';
 import { SORTABLE_FIELDS, type OutageFilters } from '../../repository/outage.repository.ts';
 import { toOutageDto, toOutageHistoryDto } from '../dto.ts';
@@ -67,6 +68,7 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   req.log?.info({ outageId: row.id, gisId: row.gisId, status: row.status }, 'kesinti oluşturuldu');
 
   await publishOutageCreated(row, req.correlationId!, req.user.email, req.log);
+  await notifyOutageChanged(row, req.log);
 
   res.status(201).json(toOutageDto(row));
 }
@@ -119,6 +121,8 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
       req.log,
     );
   }
+
+  await notifyOutageChanged(updated, req.log);
 
   res.json(toOutageDto(updated));
 }

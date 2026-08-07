@@ -12,18 +12,30 @@ export function stripSpoofedHeaders() {
   };
 }
 
+/**
+ * SSE bağlantıları (tarayıcının `EventSource` API'si) özel header gönderemez;
+ * bu yüzden canlı akış (`/stream`) uç noktalarında token query param'dan da
+ * kabul edilir. Diğer tüm uç noktalarda yalnızca Authorization header geçerlidir.
+ */
+function tokenFromStreamQuery(req: Request): string | undefined {
+  if (!req.path.endsWith('/stream')) return undefined;
+  const token = req.query.access_token;
+  return typeof token === 'string' ? token : undefined;
+}
+
 /** `Authorization: Bearer <token>` başlığını doğrular ve kullanıcı kimliğini `req.user` alanına atar. */
 export function requireAuth() {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
     const header = req.header('authorization');
+    const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : tokenFromStreamQuery(req);
 
-    if (!header?.startsWith('Bearer ')) {
+    if (!token) {
       next(new UnauthenticatedError('Authorization header eksik veya hatalı biçimde'));
       return;
     }
 
     try {
-      const payload = verifyAccessToken(header.slice('Bearer '.length).trim());
+      const payload = verifyAccessToken(token);
       req.user = { id: payload.sub, email: payload.email, roles: payload.roles, permissions: payload.perms };
       next();
     } catch {

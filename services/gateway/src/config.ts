@@ -1,8 +1,8 @@
-import { baseEnvSchema, loadConfig } from '@inavitas/shared';
+import { baseEnvSchema, loadConfig, redisEnvSchema } from '@inavitas/shared';
 import { z } from 'zod';
 
 /** API Gateway servisi ortam değişkenleri şeması. */
-const envSchema = baseEnvSchema.extend({
+const envSchema = baseEnvSchema.merge(redisEnvSchema).extend({
   GATEWAY_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   JWT_SECRET: z.string().min(32, 'JWT_SECRET en az 32 karakter olmalı'),
 

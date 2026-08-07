@@ -10,6 +10,7 @@ import {
 import type { Response } from 'express';
 import { canTransition } from '../../domain/state-machine.ts';
 import { publishWorkOrderCreated, publishWorkOrderDone } from '../../kafka/producer.ts';
+import { notifyWorkOrderChanged } from '../../realtime.ts';
 import * as workOrderRepository from '../../repository/work-order.repository.ts';
 import { SORTABLE_FIELDS, type WorkOrderFilters } from '../../repository/work-order.repository.ts';
 import { toWorkOrderDto, toWorkOrderHistoryDto } from '../dto.ts';
@@ -63,6 +64,7 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   req.log?.info({ workOrderId: row.id, gisId: row.gisId, status: row.status }, 'iş emri oluşturuldu');
 
   await publishWorkOrderCreated(row, req.correlationId!, req.user.email, req.log);
+  await notifyWorkOrderChanged(row, req.log);
 
   res.status(201).json(toWorkOrderDto(row));
 }
@@ -109,6 +111,8 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
       await publishWorkOrderDone(updated, req.correlationId!, req.user.email, req.log);
     }
   }
+
+  await notifyWorkOrderChanged(updated, req.log);
 
   res.json(toWorkOrderDto(updated));
 }

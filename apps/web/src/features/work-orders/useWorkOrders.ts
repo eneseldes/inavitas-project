@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createWorkOrder, fetchWorkOrder, fetchWorkOrderHistory, fetchWorkOrders, patchWorkOrder, type WorkOrdersQuery } from './api.ts';
 
-const WORK_ORDERS_KEY = 'work-orders';
+export const WORK_ORDERS_KEY = 'work-orders';
 
 export function useWorkOrders(query: WorkOrdersQuery) {
   return useQuery({

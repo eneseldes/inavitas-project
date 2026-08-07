@@ -1,6 +1,7 @@
 import { createLogger, isDevelopment } from '@inavitas/shared';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
+import { disconnectRedis } from './redis.ts';
 
 const logger = createLogger({
   service: 'gateway',
@@ -17,11 +18,12 @@ const server = app.listen(config.GATEWAY_PORT, () => {
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
 
-  server.close((err) => {
+  server.close(async (err) => {
     if (err) {
       logger.error({ err }, 'sunucu kapatılamadı');
       process.exit(1);
     }
+    await disconnectRedis();
     logger.info('kapanış tamam');
     process.exit(0);
   });

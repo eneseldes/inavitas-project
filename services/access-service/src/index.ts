@@ -2,6 +2,7 @@ import { createLogger, isDevelopment } from '@inavitas/shared';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
+import { disconnectRedis } from './redis.ts';
 
 const logger = createLogger({
   service: 'access-service',
@@ -25,6 +26,7 @@ async function shutdown(signal: string): Promise<void> {
     }
 
     await disconnectDb();
+    await disconnectRedis();
     logger.info('kapanış tamam');
     process.exit(0);
   });

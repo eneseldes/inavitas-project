@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createOutage, fetchOutage, fetchOutageHistory, fetchOutages, patchOutage, type OutagesQuery } from './api.ts';
 
-const OUTAGES_KEY = 'outages';
+export const OUTAGES_KEY = 'outages';
 
 /**
  * `placeholderData: keepPreviousData` — sayfa değişiminde tablo boşalmasın

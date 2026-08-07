@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FiPlus, FiX } from 'react-icons/fi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx';
+import { LiveIndicator } from '../../shared/components/LiveIndicator.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
 import type { SortDirection } from '../../types/api.ts';
@@ -12,11 +13,13 @@ import { WorkOrderHistoryDialog } from './WorkOrderHistoryDialog.tsx';
 import { buildWorkOrderColumns } from './columns.tsx';
 import styles from './WorkOrderGrid.module.scss';
 import { useWorkOrder, useWorkOrders } from './useWorkOrders.ts';
+import { useWorkOrderStream } from './useWorkOrderStream.ts';
 
 export function WorkOrderGrid() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isLive = useWorkOrderStream();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -61,6 +64,7 @@ export function WorkOrderGrid() {
     <div className={styles.page}>
       <div className={styles.pageHeader}>
         <h1 className={styles.title}>İş Emirleri</h1>
+        <LiveIndicator connected={isLive} />
       </div>
 
       {relatedId && (
