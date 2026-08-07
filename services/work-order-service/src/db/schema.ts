@@ -69,3 +69,10 @@ export const workOrderStatusHistory = pgTable(
   ],
 );
 
+/** Kafka consumer idempotency tablosu — bkz. outage-service/src/db/schema.ts için aynı gerekçe. */
+export const processedEvents = pgTable('processed_events', {
+  eventId: uuid('event_id').primaryKey(),
+  topic: varchar('topic', { length: 128 }).notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+

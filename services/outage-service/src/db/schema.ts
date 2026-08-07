@@ -67,3 +67,18 @@ export const outageStatusHistory = pgTable(
   ],
 );
 
+/**
+ * Kafka consumer idempotency tablosu — SRS 1.5.
+ *
+ * `eventId` PK olduğu için aynı event iki kez işlenmeye çalışıldığında
+ * ikinci INSERT `onConflictDoNothing()` ile sessizce başarısız olur; bu
+ * kontrolü consumer'ın iş mantığıyla AYNI transaction'da yapmak zorunludur
+ * (bkz. 03-YOL-HARITASI Faz 4 tuzakları) — aksi halde INSERT ile iş mantığı
+ * arasında çökme penceresi kalır ve aynı event iki kez işlenebilir.
+ */
+export const processedEvents = pgTable('processed_events', {
+  eventId: uuid('event_id').primaryKey(),
+  topic: varchar('topic', { length: 128 }).notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+

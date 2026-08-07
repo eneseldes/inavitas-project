@@ -1,6 +1,6 @@
 import type { PaginationQuery, SortOrder } from '@inavitas/shared';
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
-import { db } from '../db.ts';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, sql, type SQL } from 'drizzle-orm';
+import { db, type Tx } from '../db.ts';
 import { workOrders, workOrderStatusHistory } from '../db/schema.ts';
 import type { WorkOrderStatus } from '../domain/state-machine.ts';
 
@@ -67,19 +67,22 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
   return conditions;
 }
 
-export async function create(input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
-  return db.transaction(async (tx) => {
-    const [row] = await tx.insert(workOrders).values(input).returning();
-    await tx.insert(workOrderStatusHistory).values({
-      workOrderId: row!.id,
-      fromStatus: null,
-      toStatus: row!.status,
-      actor: input.createdBy,
-      origin: input.origin,
-      correlationId,
-    });
-    return row!;
+/** `create()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır. */
+export async function createTx(tx: Tx, input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
+  const [row] = await tx.insert(workOrders).values(input).returning();
+  await tx.insert(workOrderStatusHistory).values({
+    workOrderId: row!.id,
+    fromStatus: null,
+    toStatus: row!.status,
+    actor: input.createdBy,
+    origin: input.origin,
+    correlationId,
   });
+  return row!;
+}
+
+export async function create(input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
+  return db.transaction((tx) => createTx(tx, input, correlationId));
 }
 
 export async function findById(id: string): Promise<WorkOrderRow | null> {
@@ -107,6 +110,36 @@ export async function list(
   return { items, total: totalRows[0]?.value ?? 0 };
 }
 
+/** `updateWithVersion()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır. */
+export async function updateWithVersionTx(
+  tx: Tx,
+  id: string,
+  expectedVersion: number,
+  patch: { status?: WorkOrderStatus; outageId?: string | null },
+  meta: StatusChangeMeta,
+): Promise<WorkOrderRow | null> {
+  const [row] = await tx
+    .update(workOrders)
+    .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
+    .where(and(eq(workOrders.id, id), eq(workOrders.version, expectedVersion)))
+    .returning();
+
+  if (!row) return null;
+
+  if (patch.status && patch.status !== meta.fromStatus) {
+    await tx.insert(workOrderStatusHistory).values({
+      workOrderId: id,
+      fromStatus: meta.fromStatus,
+      toStatus: patch.status,
+      actor: meta.actor,
+      origin: meta.origin,
+      correlationId: meta.correlationId,
+    });
+  }
+
+  return row;
+}
+
 /** Optimistic locking — bkz. outage-service/src/repository/outage.repository.ts için aynı gerekçe. */
 export async function updateWithVersion(
   id: string,
@@ -114,28 +147,21 @@ export async function updateWithVersion(
   patch: { status?: WorkOrderStatus; outageId?: string | null },
   meta: StatusChangeMeta,
 ): Promise<WorkOrderRow | null> {
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(workOrders)
-      .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
-      .where(and(eq(workOrders.id, id), eq(workOrders.version, expectedVersion)))
-      .returning();
+  return db.transaction((tx) => updateWithVersionTx(tx, id, expectedVersion, patch, meta));
+}
 
-    if (!row) return null;
+/**
+ * Bir kesintiyi iş emrine bağlar (`outageId`i doldurur). Yalnızca UPDATE
+ * yapar — `outage.linked` consumer'ı bunu kullanır (Savunma 2).
+ */
+export async function linkOutageTx(tx: Tx, workOrderId: string, outageId: string): Promise<WorkOrderRow | null> {
+  const [row] = await tx
+    .update(workOrders)
+    .set({ outageId, version: sql`${workOrders.version} + 1`, updatedAt: new Date() })
+    .where(eq(workOrders.id, workOrderId))
+    .returning();
 
-    if (patch.status && patch.status !== meta.fromStatus) {
-      await tx.insert(workOrderStatusHistory).values({
-        workOrderId: id,
-        fromStatus: meta.fromStatus,
-        toStatus: patch.status,
-        actor: meta.actor,
-        origin: meta.origin,
-        correlationId: meta.correlationId,
-      });
-    }
-
-    return row;
-  });
+  return row ?? null;
 }
 
 export async function getHistory(workOrderId: string): Promise<WorkOrderStatusHistoryRow[]> {

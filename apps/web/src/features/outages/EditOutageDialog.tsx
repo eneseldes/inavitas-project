@@ -5,16 +5,12 @@ import { ApiError } from '../../shared/api/errors.ts';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { isoToDateTimeLocalInput } from '../../shared/datetime.ts';
 import type { Outage } from '../../types/outage.ts';
 import styles from './EditOutageDialog.module.scss';
 import { usePatchOutage } from './useOutages.ts';
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
-
-/** `datetime-local` input'unun beklediği `YYYY-MM-DDTHH:mm` biçimi. */
-function toDateTimeLocal(iso: string | null): string {
-  return iso ? iso.slice(0, 16) : '';
-}
 
 function makeSchema(startedAt: string) {
   return z
@@ -54,7 +50,7 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
-    defaultValues: { endedAt: toDateTimeLocal(outage.endedAt) },
+    defaultValues: { endedAt: isoToDateTimeLocalInput(outage.endedAt) },
   });
 
   const onSubmit = handleSubmit(async (values) => {

@@ -15,8 +15,6 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "infra:up": "docker compose up -d",
-    "infra:down": "docker compose down",
     "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service",
     "db:seed": "npm run db:seed -w services/access-service",
     "topics": "./scripts/create-topics.sh"

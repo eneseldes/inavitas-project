@@ -1,4 +1,4 @@
-import { baseEnvSchema, loadConfig } from '@inavitas/shared';
+import { baseEnvSchema, kafkaEnvSchema, loadConfig } from '@inavitas/shared';
 import { z } from 'zod';
 
 /**
@@ -7,7 +7,7 @@ import { z } from 'zod';
  * JWT_SECRET burada YOK: bu servis JWT doğrulamaz, gateway'in eklediği
  * `X-User-*` header'larına güvenir (packages/shared authenticateFromHeaders).
  */
-const envSchema = baseEnvSchema.extend({
+const envSchema = baseEnvSchema.merge(kafkaEnvSchema).extend({
   WORK_ORDER_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(3003),
 
   WORK_ORDER_APP_DATABASE_URL: z.string().startsWith('postgresql://'),

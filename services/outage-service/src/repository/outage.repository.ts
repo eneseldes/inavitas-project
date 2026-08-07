@@ -1,6 +1,6 @@
 import type { PaginationQuery, SortOrder } from '@inavitas/shared';
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, type SQL } from 'drizzle-orm';
-import { db } from '../db.ts';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, sql, type SQL } from 'drizzle-orm';
+import { db, type Tx } from '../db.ts';
 import { outages, outageStatusHistory } from '../db/schema.ts';
 import type { OutageStatus } from '../domain/state-machine.ts';
 
@@ -71,19 +71,22 @@ function buildConditions(filters: OutageFilters): SQL[] {
   return conditions;
 }
 
-export async function create(input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
-  return db.transaction(async (tx) => {
-    const [row] = await tx.insert(outages).values(input).returning();
-    await tx.insert(outageStatusHistory).values({
-      outageId: row!.id,
-      fromStatus: null,
-      toStatus: row!.status,
-      actor: input.createdBy,
-      origin: input.origin,
-      correlationId,
-    });
-    return row!;
+/** `create()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır (bkz. kafka/consumers.ts). */
+export async function createTx(tx: Tx, input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
+  const [row] = await tx.insert(outages).values(input).returning();
+  await tx.insert(outageStatusHistory).values({
+    outageId: row!.id,
+    fromStatus: null,
+    toStatus: row!.status,
+    actor: input.createdBy,
+    origin: input.origin,
+    correlationId,
   });
+  return row!;
+}
+
+export async function create(input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
+  return db.transaction((tx) => createTx(tx, input, correlationId));
 }
 
 export async function findById(id: string): Promise<OutageRow | null> {
@@ -116,34 +119,58 @@ export async function list(
  * eşleşirse günceller, `version`i bir artırır. Etkilenen satır 0 ise
  * çağıran taraf bunu 409 Conflict'e çevirir (version uyuşmazlığı).
  */
+/** `updateWithVersion()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır. */
+export async function updateWithVersionTx(
+  tx: Tx,
+  id: string,
+  expectedVersion: number,
+  patch: { status?: OutageStatus; endedAt?: Date | null; workOrderId?: string | null },
+  meta: StatusChangeMeta,
+): Promise<OutageRow | null> {
+  const [row] = await tx
+    .update(outages)
+    .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
+    .where(and(eq(outages.id, id), eq(outages.version, expectedVersion)))
+    .returning();
+
+  if (!row) return null;
+
+  if (patch.status && patch.status !== meta.fromStatus) {
+    await tx.insert(outageStatusHistory).values({
+      outageId: id,
+      fromStatus: meta.fromStatus,
+      toStatus: patch.status,
+      actor: meta.actor,
+      origin: meta.origin,
+      correlationId: meta.correlationId,
+    });
+  }
+
+  return row;
+}
+
 export async function updateWithVersion(
   id: string,
   expectedVersion: number,
   patch: { status?: OutageStatus; endedAt?: Date | null; workOrderId?: string | null },
   meta: StatusChangeMeta,
 ): Promise<OutageRow | null> {
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(outages)
-      .set({ ...patch, version: expectedVersion + 1, updatedAt: new Date() })
-      .where(and(eq(outages.id, id), eq(outages.version, expectedVersion)))
-      .returning();
+  return db.transaction((tx) => updateWithVersionTx(tx, id, expectedVersion, patch, meta));
+}
 
-    if (!row) return null;
+/**
+ * Bir iş emrini kesintiye bağlar (`workOrderId`i doldurur). Yalnızca UPDATE
+ * yapar, status/history dokunmaz — `work-order.linked` consumer'ı bunu
+ * kullanır (Savunma 2: linked event'leri asla yeni kayıt açmaz).
+ */
+export async function linkWorkOrderTx(tx: Tx, outageId: string, workOrderId: string): Promise<OutageRow | null> {
+  const [row] = await tx
+    .update(outages)
+    .set({ workOrderId, version: sql`${outages.version} + 1`, updatedAt: new Date() })
+    .where(eq(outages.id, outageId))
+    .returning();
 
-    if (patch.status && patch.status !== meta.fromStatus) {
-      await tx.insert(outageStatusHistory).values({
-        outageId: id,
-        fromStatus: meta.fromStatus,
-        toStatus: patch.status,
-        actor: meta.actor,
-        origin: meta.origin,
-        correlationId: meta.correlationId,
-      });
-    }
-
-    return row;
-  });
+  return row ?? null;
 }
 
 export async function getHistory(outageId: string): Promise<OutageStatusHistoryRow[]> {

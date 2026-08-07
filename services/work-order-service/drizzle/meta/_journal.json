@@ -15,6 +15,13 @@
       "when": 1786028040657,
       "tag": "0001_add_wo_status_history",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786102156350,
+      "tag": "0002_add_processed_events",
+      "breakpoints": true
     }
   ]
 }

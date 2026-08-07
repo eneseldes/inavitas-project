@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
 import { ApiError } from '../../shared/api/errors.ts';
+import { toDateTimeLocalInput } from '../../shared/datetime.ts';
 import { useCreateOutage } from './useOutages.ts';
 
 /** FR-2.1/FR-2.7 ile aynı kural: endedAt, startedAt'tan önce olamaz. */
@@ -30,7 +31,7 @@ export function CreateOutageDialog({ onClose }: { onClose: () => void }) {
     formState: { errors, isSubmitting },
   } = useForm<CreateOutageValues>({
     resolver: zodResolver(CreateOutageSchema),
-    defaultValues: { startedAt: new Date().toISOString().slice(0, 16) },
+    defaultValues: { startedAt: toDateTimeLocalInput(new Date()) },
   });
 
   const onSubmit = handleSubmit(async (values) => {
