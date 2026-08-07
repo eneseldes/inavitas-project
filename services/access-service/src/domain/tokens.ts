@@ -2,14 +2,7 @@ import type { AuthenticatedUser } from '@inavitas/shared';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.ts';
 
-/**
- * JWT üretimi ve doğrulaması (FR-1.1, FR-1.3).
- *
- * Payload BİLEREK küçük: hassas veri (parola hash'i, telefon, adres) asla
- * girmez. JWT imzalıdır ama ŞİFRELİ DEĞİLDİR — içeriğini herkes okuyabilir.
- */
-
-/** Access token'ın taşıdığı alanlar. */
+/** Access token payload verisi. */
 export interface AccessTokenPayload {
   sub: string;
   email: string;
@@ -17,17 +10,16 @@ export interface AccessTokenPayload {
   perms: string[];
 }
 
-/** Refresh token yalnızca kimi temsil ettiğini ve kendi kimliğini taşır. */
+/** Refresh token payload verisi (kullanıcı id ve benzersiz token id - jti). */
 export interface RefreshTokenPayload {
   sub: string;
-  /** Token'ın kendi kimliği — rotation'da iptal etmek için gerekli. */
   jti: string;
 }
 
-/** İki token tipini imza doğrulandıktan SONRA da ayırt edebilmek için. */
 const ACCESS_TYPE = 'access';
 const REFRESH_TYPE = 'refresh';
 
+/** Kullanıcı için yeni bir Access Token imzalar. */
 export function signAccessToken(user: AuthenticatedUser): string {
   const payload: AccessTokenPayload & { typ: string } = {
     sub: user.id,
@@ -42,6 +34,7 @@ export function signAccessToken(user: AuthenticatedUser): string {
   });
 }
 
+/** Yeni bir Refresh Token imzalar. */
 export function signRefreshToken(userId: string, jti: string): string {
   return jwt.sign({ sub: userId, jti, typ: REFRESH_TYPE }, config.JWT_SECRET, {
     expiresIn: config.JWT_REFRESH_TTL as jwt.SignOptions['expiresIn'],
@@ -49,10 +42,7 @@ export function signRefreshToken(userId: string, jti: string): string {
 }
 
 /**
- * Access token'ı doğrular. İmza geçersiz veya süresi dolmuşsa fırlatır.
- *
- * `typ` kontrolü kritik: refresh token da aynı secret'la imzalı olduğu için
- * bu kontrol olmadan saldırgan refresh token'ı access token yerine kullanabilir.
+ * Access Token'ı doğrular ve payload nesnesini döner.
  */
 export function verifyAccessToken(token: string): AccessTokenPayload {
   const decoded = jwt.verify(token, config.JWT_SECRET) as AccessTokenPayload & { typ?: string };
@@ -64,6 +54,9 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
   return decoded;
 }
 
+/**
+ * Refresh Token'ı doğrular ve payload nesnesini döner.
+ */
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
   const decoded = jwt.verify(token, config.JWT_SECRET) as RefreshTokenPayload & { typ?: string };
 
@@ -74,7 +67,7 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
   return decoded;
 }
 
-/** JWT payload'ından uygulama içi kimlik nesnesine. */
+/** Token payload verisini AuthenticatedUser nesnesine dönüştürür. */
 export function toAuthenticatedUser(payload: AccessTokenPayload): AuthenticatedUser {
   return {
     id: payload.sub,

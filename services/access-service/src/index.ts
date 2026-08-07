@@ -14,13 +14,7 @@ const server = app.listen(config.ACCESS_SERVICE_PORT, () => {
   logger.info({ port: config.ACCESS_SERVICE_PORT }, 'access-service ayakta');
 });
 
-/**
- * Graceful shutdown.
- *
- * Ctrl+C'de süreci anında öldürmek, işlenmekte olan istekleri yarıda keser
- * ve DB bağlantılarını asılı bırakır. Önce yeni bağlantı kabulünü durdur,
- * açık istekleri bitir, sonra kapan.
- */
+/** Uygulamayı güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
 
@@ -35,7 +29,6 @@ async function shutdown(signal: string): Promise<void> {
     process.exit(0);
   });
 
-  // Askıda kalan bir istek yüzünden sonsuza kadar beklemeyelim.
   setTimeout(() => {
     logger.error('kapanış zaman aşımına uğradı, zorla çıkılıyor');
     process.exit(1);

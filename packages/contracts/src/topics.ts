@@ -1,7 +1,5 @@
 /**
- * Kafka topic adları. Tek kaynak burasıdır — hiçbir serviste 'outage.created'
- * diye string yazma, buradan import et. Yazım hatası yaptığında Kafka sessizce
- * yeni bir topic açmaz; TypeScript derleme anında yakalar.
+ * Kafka topic sabitleri. Tip güvenliği sağlamak amacıyla tüm servislerde ortak kullanılır.
  */
 export const TOPICS = {
   OUTAGE_CREATED: 'outage.created',
@@ -14,18 +12,18 @@ export const TOPICS = {
 
 export type Topic = (typeof TOPICS)[keyof typeof TOPICS];
 
-/** Tüm topic'lerin listesi — create-topics script'i ve testler kullanır. */
+/** Tüm topic'lerin listesi (betikler ve ilklendirme süreçleri için). */
 export const ALL_TOPICS: readonly Topic[] = Object.values(TOPICS);
 
 /**
- * Bir topic'in ölü mektup kutusu (dead letter queue) adı.
- * 3 denemeden sonra işlenemeyen mesajlar buraya gider.
+ * Belirtilen topic için Dead Letter Queue (DLQ) topic adını oluşturur.
+ * İşlenemeyen mesajlar bu kuyruğa aktarılır.
  */
 export function dlqOf(topic: Topic): `${Topic}.DLQ` {
   return `${topic}.DLQ`;
 }
 
-/** Consumer group adları — her servis kendi group'unda olmalı. */
+/** Servislere özel Kafka consumer group tanımları. */
 export const CONSUMER_GROUPS = {
   OUTAGE_SERVICE: 'outage-service-group',
   WORK_ORDER_SERVICE: 'work-order-service-group',

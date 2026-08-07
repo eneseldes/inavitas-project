@@ -7,7 +7,7 @@ import * as outageController from './controllers/outage.controller.ts';
 export function buildRouter(): Router {
   const router = Router();
 
-  // --- Sağlık kontrolleri --- (auth gerektirmez)
+  // --- Sağlık ve Hazırlık Kontrolleri ---
   router.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'outage-service' });
   });
@@ -20,11 +20,10 @@ export function buildRouter(): Router {
     }),
   );
 
-  // Bu noktadan sonraki her route kimlik ister. access-service'in aksine JWT'yi
-  // KENDİMİZ doğrulamıyoruz — gateway'in eklediği X-User-* header'larına
-  // güveniyoruz (Faz 3'e kadar bu header'ları testte elle ekliyorsun).
+  // --- Kimlik Doğrulama Katmanı ---
   router.use(authenticateFromHeaders());
 
+  // --- Kesinti Yönetim Uç Noktaları ---
   router.get('/outages', requirePermission(PERMISSIONS.OUTAGE_READ), asyncHandler<AuthedRequest>(outageController.list));
   router.get(
     '/outages/:id',

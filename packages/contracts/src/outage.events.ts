@@ -2,16 +2,16 @@ import { z } from 'zod';
 import { envelopeOf } from './envelope.ts';
 import { TOPICS } from './topics.ts';
 
-/** Kesinti durumları. DB enum'ı ile birebir aynı olmalı. */
+/** Kesinti durumları. */
 export const OutageStatus = z.enum([
-  'STARTED', // kayıt açıldı, kesinti sürüyor
-  'ENERGIZED', // enerji verildi
-  'ARCHIVED', // kayıt kapatıldı / arşivlendi
-  'CANCELLED', // hatalı kayıt / iptal — her durumdan buraya geçilebilir
+  'STARTED', // Kesinti başlatıldı/sürüyor
+  'ENERGIZED', // Enerji verildi
+  'ARCHIVED', // Arşivlendi / kapatıldı
+  'CANCELLED', // İptal edildi
 ]);
 export type OutageStatus = z.infer<typeof OutageStatus>;
 
-/** Coğrafi kimlik — kesintiye sebep olan kesicinin (circuit breaker) id'si. */
+/** Coğrafi ekipman/şebeke kimliği (GIS ID). */
 export const GisId = z.string().min(1).max(64);
 
 export const OutageCreatedPayload = z.object({
@@ -33,11 +33,8 @@ export const OutageEnergizedPayload = z.object({
 export type OutageEnergizedPayload = z.infer<typeof OutageEnergizedPayload>;
 
 /**
- * Kesintiye iş emri bağlandı.
- *
- * Bu event BİLEREK 'outage.created'dan ayrı: consumer'ı yalnızca bir UPDATE
- * yapar, asla yeni kayıt açmaz. Böylece döngü sadece origin bayrağıyla değil,
- * topolojik olarak da imkânsız hale gelir.
+ * Kesintiye var olan bir iş emri bağlandığında yayınlanan event payload'ı.
+ * Tüketici servisler bu event ile yeni kayıt açmaz, yalnızca mevcut kesintiyi günceller.
  */
 export const OutageLinkedPayload = z.object({
   outageId: z.uuid(),

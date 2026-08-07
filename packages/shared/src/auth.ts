@@ -1,14 +1,7 @@
-/**
- * Rol / izin sözleşmesi ve yetki kontrolü.
- *
- * Üç servis de bu dosyayı kullanır. access-service izinleri JWT'ye yazar,
- * diğer servisler gateway'in eklediği header'lardan okuyup burada doğrular.
- */
-
 import type { NextFunction, Request, Response } from 'express';
 import { ForbiddenError, UnauthenticatedError } from './errors.ts';
 
-/** Rol kodları — SRS 1.3. */
+/** Kullanıcı rol tanımları. */
 export const ROLES = {
   ADMIN: 'ADMIN',
   OUTAGE_OPERATOR: 'OUTAGE_OPERATOR',
@@ -18,8 +11,7 @@ export const ROLES = {
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 /**
- * İzin kodları. Yetki kontrolü HER ZAMAN izin üzerinden yapılır, rol
- * üzerinden değil — yarın yeni bir rol eklendiğinde kod değişmesin diye.
+ * İzin tanımları. Yetki kontrolleri doğrudan izinler (permissions) üzerinden yürütülür.
  */
 export const PERMISSIONS = {
   OUTAGE_READ: 'outage:read',
@@ -31,7 +23,7 @@ export const PERMISSIONS = {
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
-/** Rol → izin eşlemesi. Seed bu tablodan üretilir. */
+/** Rol → izin eşleme haritası. Veritabanı seed işlemlerinde ve yetkilendirmede kullanılır. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ADMIN: [
     PERMISSIONS.OUTAGE_READ,
@@ -46,7 +38,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
 
 export const ALL_PERMISSIONS: readonly Permission[] = Object.values(PERMISSIONS);
 
-/** İstek boyunca taşınan kimlik. JWT payload'ı ile aynı şekle sahiptir. */
+/** İstek boyunca taşınan kimlik ve yetki bilgileri. */
 export interface AuthenticatedUser {
   id: string;
   email: string;
@@ -55,11 +47,7 @@ export interface AuthenticatedUser {
 }
 
 /**
- * Express `Request`ine `user` ve `correlationId` ekliyoruz.
- *
- * Global `declare` yerine kendi tipimizi tanımlıyoruz: global genişletme
- * tüm projeye sızar ve "bu alan gerçekten dolu mu" sorusunu tip sisteminden
- * gizler. Burada açıkça `?` ile opsiyonel — middleware çalışmadıysa yok.
+ * Express Request tipini kullanıcı ve izleme (correlationId) bilgileri ile genişletir.
  */
 export interface AuthedRequest extends Request {
   user?: AuthenticatedUser;
@@ -67,18 +55,12 @@ export interface AuthedRequest extends Request {
 }
 
 /**
- * Belirli bir izni zorunlu kılan middleware.
- *
- * @example
- * router.post('/outages', requirePermission(PERMISSIONS.OUTAGE_WRITE), createOutage);
+ * İsteğin belirli bir izne sahip kullanıcı tarafından yapıldığını doğrulayan middleware.
  */
 export function requirePermission(permission: Permission) {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
     const user = req.user;
 
-    // 401 ile 403'ü ayır: "kim olduğunu bilmiyorum" ile "kim olduğunu
-    // biliyorum ama yetkin yok" farklı sorunlar, istemci farklı davranmalı
-    // (birinde login'e yönlendir, diğerinde hata göster).
     if (!user) {
       next(new UnauthenticatedError());
       return;
@@ -93,7 +75,9 @@ export function requirePermission(permission: Permission) {
   };
 }
 
-/** Verilen izinlerden en az birine sahip olmayı yeterli sayar. */
+/**
+ * İsteğin verilen izinlerden en az birine sahip kullanıcı tarafından yapıldığını doğrulayan middleware.
+ */
 export function requireAnyPermission(...permissions: Permission[]) {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
     const user = req.user;
@@ -113,11 +97,7 @@ export function requireAnyPermission(...permissions: Permission[]) {
 }
 
 /**
- * Gateway'in eklediği `X-User-*` header'larından kimliği okur.
- *
- * Bunu YALNIZCA downstream servisler (outage, work-order) kullanır — gateway
- * dış dünyadan gelen bu header'ları sildiği için içeride onlara güvenilebilir.
- * Gateway'in kendisi JWT'yi doğrudan doğrular, bu fonksiyonu kullanmaz.
+ * Gateway tarafından iletilen `X-User-*` HTTP header'larından kullanıcı kimliğini ayrıştırır.
  */
 export function userFromHeaders(req: Request): AuthenticatedUser | undefined {
   const id = req.header('x-user-id');
@@ -137,17 +117,8 @@ export function userFromHeaders(req: Request): AuthenticatedUser | undefined {
 }
 
 /**
- * `X-User-*` header'larından kimliği kurup `req.user`a yazan middleware.
- *
- * outage-service ve work-order-service bunu kullanır: access-service'in
- * aksine kendi JWT'lerini doğrulamazlar, gateway'in doğruladığı kimliğe
- * (ve doğruladıktan sonra eklediği header'lara) güvenirler.
- *
- * ⚠️ Faz 3'te gateway devreye girene kadar bu header'ları dışarıdan gelen
- * spoofed header'lardan ayıran hiçbir şey yok — o yüzden bu dönemde
- * servisleri doğrudan (gateway'siz) test ederken header'ları elle sen
- * ekliyorsun (bkz. docs/04-KURULUM.md test notları). Üretimde bu header'lar
- * yalnızca gateway'in eklediği, dışarıdan gelenler silindiği için güvenlidir.
+ * HTTP header'larındaki kullanıcı kimliğini okuyup `req.user` nesnesine aktaran middleware.
+ * Alt servislerde (outage-service, work-order-service) yetkilendirme bağlamını kurmak için kullanılır.
  */
 export function authenticateFromHeaders() {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {

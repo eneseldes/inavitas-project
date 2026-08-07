@@ -15,11 +15,6 @@ import { SORTABLE_FIELDS, type OutageFilters } from '../../repository/outage.rep
 import { toOutageDto, toOutageHistoryDto } from '../dto.ts';
 import { CreateOutageBody, ListOutagesQuery, PatchOutageBody } from '../schemas.ts';
 
-/**
- * Controller'lar ince: gövdeyi doğrula → repository/domain çağır → cevabı
- * biçimlendir. İş mantığı (durum geçişi, döngü koruması vb.) burada olmaz.
- */
-
 function toFilters(query: ListOutagesQuery): OutageFilters {
   return {
     status: query.status,
@@ -43,7 +38,7 @@ export async function list(req: AuthedRequest, res: Response): Promise<void> {
 }
 
 export async function getById(req: AuthedRequest, res: Response): Promise<void> {
-  const id = req.params.id as string; // route ':id' — her zaman tek bir string
+  const id = req.params.id as string;
   const row = await outageRepository.findById(id);
   if (!row) throw new NotFoundError('Kesinti', id);
 
@@ -55,7 +50,6 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
 
   const body = CreateOutageBody.parse(req.body);
 
-  // FR-2.6: endedAt set edildiğinde durum otomatik ENERGIZED olur.
   const status: OutageStatus = body.endedAt ? 'ENERGIZED' : (body.status ?? 'STARTED');
 
   const row = await outageRepository.create(
@@ -86,7 +80,6 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
   if (!current) throw new NotFoundError('Kesinti', id);
 
-  // FR-2.6: endedAt bu istekte ilk kez set ediliyorsa ve status verilmemişse otomatik ENERGIZED.
   const nextStatus: OutageStatus = body.status ?? (body.endedAt && !current.endedAt ? 'ENERGIZED' : current.status);
 
   if (nextStatus !== current.status && !canTransition(current.status, nextStatus)) {

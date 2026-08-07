@@ -46,7 +46,7 @@ export function OutageGrid() {
 
   const { data, isLoading, isFetching, refetch } = useOutages(query);
 
-  // FR-5.7: karşı ekrandan tıklanan ilişkili kayıt burada highlight edilir.
+  // İlişkili kayıt seçildiyse vurgulama (highlight) bilgisi yüklenir.
   const relatedId = searchParams.get('relatedOutageId') ?? undefined;
   const { data: relatedOutage } = useOutage(relatedId);
 

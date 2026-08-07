@@ -9,9 +9,8 @@ interface ProtectedRouteProps {
 }
 
 /**
- * FR-5.2: yetkisi olmayan ekranın route'una doğrudan gidilirse 403 sayfası
- * çıkar. Bu kontrol yalnızca UX'tir — gerçek koruma her zaman backend'de
- * (`requirePermission`); burada gizlense bile API çağrısı 403 döner.
+ * Kullanıcının oturum ve sayfa yetkisini kontrol eder.
+ * Yetkisiz erişim durumunda giriş sayfasına veya 403 sayfasına yönlendirir.
  */
 export function ProtectedRoute({ permission, children }: ProtectedRouteProps) {
   const { isAuthenticated, hasPermission } = useAuth();

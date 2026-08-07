@@ -1,7 +1,9 @@
 import type { Tx } from '../db.ts';
 import { processedEvents } from '../db/schema.ts';
 
-/** bkz. outage-service/src/repository/idempotency.repository.ts için aynı gerekçe. */
+/**
+ * Gelen event'i işlendi olarak kaydeder. Event önceden işlenmişse `false` döner.
+ */
 export async function markProcessed(tx: Tx, eventId: string, topic: string): Promise<boolean> {
   const rows = await tx
     .insert(processedEvents)

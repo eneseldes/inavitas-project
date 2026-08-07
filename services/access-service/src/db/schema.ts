@@ -11,24 +11,14 @@ import {
 } from 'drizzle-orm/pg-core';
 
 /**
- * access-service şeması — SRS 1.5 "Veritabanı: access_db".
- *
- * Buradaki foreign key'ler GERÇEK ve doğru: bu beş tablo aynı servise, aynı
- * veritabanına ait. FK yasağı yalnızca servis sınırını aşan referanslar için
- * geçerli (outages.work_order_id gibi).
- */
-
-/**
- * CITEXT — büyük/küçük harf duyarsız metin.
- *
- * Drizzle'ın pg-core'unda hazır gelmiyor; uzantı tipi olduğu için kendimiz
- * tanımlıyoruz. Karşılaştırmayı veritabanı yaptığı için uygulama katmanında
- * toLowerCase() yapmayı unutma riski ortadan kalkıyor.
+ * Büyük/küçük harf duyarsız metin tipi (CITEXT - PostgreSQL).
+ * E-posta adreslerinin duyarsız saklanması ve sorgulanması için kullanılır.
  */
 const citext = customType<{ data: string }>({
   dataType: () => 'citext',
 });
 
+/** Kullanıcılar tablosu. */
 export const users = pgTable('users', {
   id: uuid('id')
     .primaryKey()
@@ -38,13 +28,14 @@ export const users = pgTable('users', {
   fullName: varchar('full_name', { length: 128 }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
 
-  // Brute-force koruması (FR-1.5): 5 başarısız denemede 15 dk kilit.
+  /** Başarısız giriş denemeleri sayısı ve hesap kilitleme süresi. */
   failedAttempts: integer('failed_attempts').notNull().default(0),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Roller tablosu (ör. ADMIN, OUTAGE_OPERATOR). */
 export const roles = pgTable('roles', {
   id: uuid('id')
     .primaryKey()
@@ -53,6 +44,7 @@ export const roles = pgTable('roles', {
   name: varchar('name', { length: 64 }).notNull(),
 });
 
+/** İzinler tablosu (ör. outage:read, outage:write). */
 export const permissions = pgTable('permissions', {
   id: uuid('id')
     .primaryKey()
@@ -60,6 +52,7 @@ export const permissions = pgTable('permissions', {
   code: varchar('code', { length: 64 }).notNull().unique(),
 });
 
+/** Rol-İzin ilişki tablosu (Çoka-Çok). */
 export const rolePermissions = pgTable(
   'role_permissions',
   {
@@ -73,6 +66,7 @@ export const rolePermissions = pgTable(
   (table) => [primaryKey({ columns: [table.roleId, table.permissionId] })],
 );
 
+/** Kullanıcı-Rol ilişki tablosu (Çoka-Çok). */
 export const userRoles = pgTable(
   'user_roles',
   {
@@ -86,12 +80,7 @@ export const userRoles = pgTable(
   (table) => [primaryKey({ columns: [table.userId, table.roleId] })],
 );
 
-/**
- * İlişki tanımları — yalnızca Drizzle'ın `db.query` API'si için.
- *
- * Veritabanındaki FK'ları yukarıdaki `references()` çağrıları kuruyor;
- * buradakiler tip seviyesinde "bu tablodan şuna gidebilirsin" bilgisi.
- */
+/** Drizzle ORM ilişki (relations) tanımları. */
 export const usersRelations = relations(users, ({ many }) => ({
   userRoles: many(userRoles),
 }));

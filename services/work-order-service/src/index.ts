@@ -16,12 +16,11 @@ const server = app.listen(config.WORK_ORDER_SERVICE_PORT, () => {
   logger.info({ port: config.WORK_ORDER_SERVICE_PORT }, 'work-order-service ayakta');
 });
 
-// bkz. outage-service/src/index.ts için aynı gerekçe (Kafka'nın geç açılışını bekleme).
 await connectKafka();
 await startWorkOrderConsumer(createWorkOrderEventHandler(logger), logger);
 logger.info('Kafka consumer ayakta (outage.created, outage.linked, outage.energized)');
 
-/** Graceful shutdown — bkz. outage-service/src/index.ts için aynı gerekçe. */
+/** Servisi güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
 

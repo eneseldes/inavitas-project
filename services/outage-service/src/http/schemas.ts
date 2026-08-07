@@ -2,10 +2,9 @@ import { PaginationQuery } from '@inavitas/shared';
 import { z } from 'zod';
 import { OUTAGE_STATUSES } from '../domain/state-machine.ts';
 
-/** HTTP istek gövdelerinin/query'lerinin şemaları. Doğrulama sınırda yapılır, içeride değil. */
-
 export const OutageStatusEnum = z.enum(OUTAGE_STATUSES);
 
+/** Yeni kesinti oluşturma istek gövdesi şeması. */
 export const CreateOutageBody = z
   .object({
     gisId: z.string().min(1, 'gisId zorunlu').max(64),
@@ -19,6 +18,7 @@ export const CreateOutageBody = z
   });
 export type CreateOutageBody = z.infer<typeof CreateOutageBody>;
 
+/** Kesinti güncelleme (PATCH) istek gövdesi şeması. */
 export const PatchOutageBody = z
   .object({
     status: OutageStatusEnum.optional(),
@@ -30,11 +30,11 @@ export const PatchOutageBody = z
   });
 export type PatchOutageBody = z.infer<typeof PatchOutageBody>;
 
-/** Virgülle ayrılmış listeyi diziye çevirir: `status=STARTED,ENERGIZED`. */
 const csv = z
   .string()
   .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean));
 
+/** Kesinti listeleme sorgu (query) parametreleri şeması. */
 export const ListOutagesQuery = PaginationQuery.extend({
   sort: z.string().optional(),
   status: csv.pipe(z.array(OutageStatusEnum)).optional(),

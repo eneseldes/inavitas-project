@@ -116,7 +116,7 @@ export function buildOutageColumns(onOpenWorkOrder: (workOrderId: string) => voi
       id: 'workOrderId',
       header: 'İş Emri',
       accessorFn: (row) => row.workOrderId,
-      // FR-5.7: ilişkili kayıt ID'si tıklanabilir, karşı ekranda o kaydı filtreli açar.
+      // İlişkili kayıt ID'si tıklanabilir; karşı ekranda ilgili kaydı açar.
       cell: (ctx) => {
         const workOrderId = ctx.getValue<string | null>();
         if (!workOrderId) return <span className="text-muted">—</span>;

@@ -10,7 +10,6 @@ import {
 import { CONSUMER_GROUPS, TOPICS } from '@inavitas/contracts';
 import { config } from './config.ts';
 
-/** bkz. outage-service/src/kafka.ts için aynı gerekçe. */
 const kafka = createKafkaClient({
   clientId: `${config.KAFKA_CLIENT_ID}-work-order-service`,
   brokers: config.KAFKA_BROKERS,
@@ -28,7 +27,7 @@ export function getProducer(): EventPublisher {
   return producer;
 }
 
-/** `outage.created` ve `outage.linked` ve `outage.energized` — bkz. kafka/consumers.ts. */
+/** Kafka tüketicisini (outage topic'leri için) başlatır. */
 export async function startWorkOrderConsumer(handler: EventHandler, logger: Logger): Promise<void> {
   consumerHandle = await startConsumer(
     kafka,

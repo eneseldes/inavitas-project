@@ -1,13 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * work-order-service şeması — SRS 1.5 "Veritabanı: work_order_db".
- *
- * `outageId` BİLEREK `.references()` KULLANMIYOR — bkz. outage-service/src/db/schema.ts
- * içindeki `workOrderId` için aynı gerekçe: karşı taraf başka bir veritabanında.
- */
-
+/** İş emri durumları veritabanı enum tipi. */
 export const woStatusEnum = pgEnum('wo_status', [
   'STARTED',
   'ASSIGNED',
@@ -17,6 +11,7 @@ export const woStatusEnum = pgEnum('wo_status', [
   'CANCELLED',
 ]);
 
+/** İş emri tipleri veritabanı enum tipi. */
 export const woTypeEnum = pgEnum('wo_type', [
   'BASIC_WORK',
   'LIGHTING_WORK_ORDER',
@@ -25,9 +20,10 @@ export const woTypeEnum = pgEnum('wo_type', [
   'WITHOUT_OUTAGE_WORK_ORDER',
 ]);
 
-/** outage-service'teki aynı isimli tip gibi, bu da BAĞIMSIZ bir tanım (ayrı veritabanı). */
+/** Kaynak türü veritabanı enum tipi (kullanıcı veya sistem). */
 export const recordOriginEnum = pgEnum('record_origin', ['USER', 'SYSTEM']);
 
+/** İş emirleri tablosu. */
 export const workOrders = pgTable(
   'work_orders',
   {
@@ -37,9 +33,9 @@ export const workOrders = pgTable(
     status: woStatusEnum('status').notNull().default('STARTED'),
     type: woTypeEnum('type').notNull(),
     gisId: varchar('gis_id', { length: 64 }).notNull(),
-    outageId: uuid('outage_id'), // başka DB'ye referans, FK YOK
+    outageId: uuid('outage_id'),
     origin: recordOriginEnum('origin').notNull().default('USER'),
-    createdBy: varchar('created_by', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
+    createdBy: varchar('created_by', { length: 64 }).notNull(),
     version: integer('version').notNull().default(0),
   },
   (table) => [
@@ -50,6 +46,7 @@ export const workOrders = pgTable(
   ],
 );
 
+/** İş emri durum değişiklik geçmişi tablosu. */
 export const workOrderStatusHistory = pgTable(
   'work_order_status_history',
   {
@@ -57,10 +54,10 @@ export const workOrderStatusHistory = pgTable(
     workOrderId: uuid('work_order_id')
       .notNull()
       .references(() => workOrders.id, { onDelete: 'cascade' }),
-    fromStatus: woStatusEnum('from_status'), // NULL = ilk oluşturma
+    fromStatus: woStatusEnum('from_status'),
     toStatus: woStatusEnum('to_status').notNull(),
     changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
-    actor: varchar('actor', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
+    actor: varchar('actor', { length: 64 }).notNull(),
     origin: recordOriginEnum('origin').notNull(),
     correlationId: varchar('correlation_id', { length: 64 }),
   },
@@ -69,7 +66,7 @@ export const workOrderStatusHistory = pgTable(
   ],
 );
 
-/** Kafka consumer idempotency tablosu — bkz. outage-service/src/db/schema.ts için aynı gerekçe. */
+/** Kafka event idempotency takibi tablosu (çift işlemeyi önler). */
 export const processedEvents = pgTable('processed_events', {
   eventId: uuid('event_id').primaryKey(),
   topic: varchar('topic', { length: 128 }).notNull(),

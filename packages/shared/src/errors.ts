@@ -1,8 +1,5 @@
 /**
- * Tüm servislerin ortak hata sözleşmesi.
- *
- * Üç servis de aynı gövdeyi döndürdüğü için frontend'de tek bir hata
- * gösterici yazman yeterli olur.
+ * Servisler arası ortak HTTP hata kodları ve hata nesneleri.
  */
 
 export const ERROR_CODES = {
@@ -17,13 +14,13 @@ export const ERROR_CODES = {
 
 export type ErrorCode = keyof typeof ERROR_CODES;
 
-/** Hata gövdesindeki alan bazlı ayrıntı. */
+/** Hata detay alanı (ör. form/girdi doğrulama hatalarında). */
 export interface ErrorDetail {
   field: string;
   issue: string;
 }
 
-/** API'nin döndürdüğü hata gövdesi. */
+/** Standart API hata yanıtı yapısı. */
 export interface ErrorResponse {
   error: {
     code: ErrorCode;
@@ -33,15 +30,12 @@ export interface ErrorResponse {
   };
 }
 
+/** Temel uygulama hatası sınıfı. */
 export class AppError extends Error {
   readonly code: ErrorCode;
   readonly statusCode: number;
   readonly details?: ErrorDetail[];
-  /**
-   * Kafka consumer'ında kullanılır: geçici hata mı (DB down → tekrar dene),
-   * kalıcı hata mı (bozuk payload → doğrudan DLQ). Zehirli mesajın tüm
-   * partition'ı bloklamasını bu ayrım engeller.
-   */
+  /** Kafka tüketicilerinde yeniden denenebilirlik (retryability) durumunu belirtir. */
   readonly retryable: boolean;
 
   constructor(
@@ -54,7 +48,6 @@ export class AppError extends Error {
     this.code = code;
     this.statusCode = ERROR_CODES[code];
     this.details = options.details;
-    // Varsayılan: yalnızca sunucu hataları tekrar denenebilir.
     this.retryable = options.retryable ?? this.statusCode >= 500;
   }
 
@@ -94,7 +87,7 @@ export class NotFoundError extends AppError {
   }
 }
 
-/** Geçersiz durum geçişi veya optimistic lock çakışması. */
+/** Çakışma veya geçersiz durum geçişi hatası. */
 export class ConflictError extends AppError {
   constructor(message: string, details?: ErrorDetail[]) {
     super('CONFLICT', message, { details });
@@ -114,10 +107,8 @@ export class InternalError extends AppError {
 }
 
 /**
- * Bilinmeyen bir hatayı güvenli şekilde ErrorResponse'a çevirir.
- *
- * Beklenmeyen hataların mesajını istemciye SIZDIRMAZ — SQL hatası veya
- * dosya yolu içerebilir. Ayrıntı loglara gider, istemci genel mesaj görür.
+ * fırlatılan hatayı standart ErrorResponse formatına dönüştürür.
+ * İç sistem detayları istemciye sızdırılmayacak şekilde işlenir.
  */
 export function toErrorResponse(err: unknown, correlationId: string): ErrorResponse {
   if (err instanceof AppError) {
@@ -132,7 +123,7 @@ export function toErrorResponse(err: unknown, correlationId: string): ErrorRespo
   };
 }
 
-/** Bir hatanın tekrar denenebilir olup olmadığı. Consumer retry mantığı kullanır. */
+/** Hataya göre Kafka işleminde yeniden deneme (retry) yapılıp yapılmayacağını belirler. */
 export function isRetryable(err: unknown): boolean {
   return err instanceof AppError ? err.retryable : true;
 }

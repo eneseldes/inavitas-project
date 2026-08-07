@@ -4,13 +4,7 @@ import { verifyAccessToken } from './verify-token.ts';
 
 const SPOOFABLE_HEADERS = ['x-user-id', 'x-user-email', 'x-user-roles', 'x-user-permissions'];
 
-/**
- * Dışarıdan gelen `X-User-*` header'larını siler (spoofing koruması).
- *
- * ⚠️ Bu, requireAuth()'tan ÖNCE ve PUBLIC route'larda DAHİL her zaman
- * çalışmalı — login isteğine sızmış bir `X-User-Id` header'ı downstream'e
- * kadar hayatta kalmamalı (02-MIMARI 2.2: "önce sil, sonra yaz").
- */
+/** Dışarıdan gelen sahte `X-User-*` header'larını temizler. */
 export function stripSpoofedHeaders() {
   return (req: Request, _res: Response, next: NextFunction): void => {
     for (const header of SPOOFABLE_HEADERS) delete req.headers[header];
@@ -18,7 +12,7 @@ export function stripSpoofedHeaders() {
   };
 }
 
-/** `Authorization: Bearer <token>`i doğrular, kimliği `req.user`a yazar. */
+/** `Authorization: Bearer <token>` başlığını doğrular ve kullanıcı kimliğini `req.user` alanına atar. */
 export function requireAuth() {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
     const header = req.header('authorization');
@@ -33,7 +27,6 @@ export function requireAuth() {
       req.user = { id: payload.sub, email: payload.email, roles: payload.roles, permissions: payload.perms };
       next();
     } catch {
-      // Süresi dolmuş / imzası bozuk / yanlış tip — hepsi tek cevap (access-service ile aynı gerekçe).
       next(new UnauthenticatedError('Token geçersiz veya süresi dolmuş'));
     }
   };

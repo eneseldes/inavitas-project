@@ -9,15 +9,11 @@ import { authenticate } from './authenticate.ts';
 export function buildRouter(): Router {
   const router = Router();
 
-  // --- Sağlık kontrolleri ---
-  // liveness: süreç ayakta mı. Bağımlılıkları KONTROL ETMEZ — Postgres
-  // düştüğünde container'ın yeniden başlatılması sorunu çözmez, sadece
-  // yeniden başlatma döngüsüne sokar.
+  // --- Sağlık ve Hazırlık Kontrolleri ---
   router.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'access-service' });
   });
 
-  // readiness: trafik alabilir miyim. Burada DB'ye gerçekten dokunuyoruz.
   router.get(
     '/ready',
     asyncHandler(async (_req, res) => {
@@ -26,17 +22,14 @@ export function buildRouter(): Router {
     }),
   );
 
-  // --- Kimlik doğrulama ---
-  // login/refresh/logout herkese açık: token almanın yolu bunlar.
+  // --- Kimlik Doğrulama Uç Noktaları ---
   router.post('/auth/login', asyncHandler<AuthedRequest>(authController.login));
   router.post('/auth/refresh', asyncHandler<AuthedRequest>(authController.refresh));
   router.post('/auth/logout', asyncHandler<AuthedRequest>(authController.logout));
 
   router.get('/auth/me', authenticate(), asyncHandler<AuthedRequest>(authController.me));
 
-  // --- Kullanıcı yönetimi ---
-  // Faz 1'de yalnızca izin zincirinin uçtan uca çalıştığını gösteren bir uç.
-  // Tam CRUD (SRS: GET/POST /api/users) Faz 3'te gateway ile birlikte gelecek.
+  // --- Kullanıcı Yönetim Uç Noktaları ---
   router.get(
     '/users',
     authenticate(),

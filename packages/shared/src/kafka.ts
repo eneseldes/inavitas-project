@@ -9,34 +9,23 @@ export interface KafkaConnectionOptions {
   brokers: string[];
 }
 
-/**
- * Tek bir Kafka istemcisi — hem producer hem consumer(lar) bunun üzerinden
- * kurulur. `retry.retries: 10` şart: Kafka container'ı ~15-30 sn'de hazır
- * olur, servis onu beklemeden ayağa kalkarsa ilk bağlantı denemesi başarısız
- * olur (roadmap Faz 0/4 tuzağı).
- */
+/** Kafka istemcisi (client) örneği oluşturur. */
 export function createKafkaClient(opts: KafkaConnectionOptions): Kafka {
   return new Kafka({
     clientId: opts.clientId,
     brokers: opts.brokers,
     retry: { initialRetryTime: 300, retries: 10 },
-    // kafkajs'in kendi log çıktısı formatı bizimkinden farklı ve gürültülü;
-    // uygulama tarafındaki hataları biz zaten pino ile logluyoruz.
     logLevel: logLevel.ERROR,
   });
 }
 
 export interface EventPublisher {
-  /** Zarfı JSON'a çevirip verilen topic'e, verilen partition anahtarıyla yazar. */
+  /** Event zarfını JSON formatında belirtilen topic'e yayınlar. */
   publish(topic: string, key: string, envelope: unknown): Promise<void>;
   disconnect(): Promise<void>;
 }
 
-/**
- * Üretici sarmalayıcı. `AUTO_CREATE_TOPICS_ENABLE=false` olduğu için
- * `allowAutoTopicCreation: false` — yazım hatası yaptığında sessizce yeni
- * bir topic açmak yerine `UNKNOWN_TOPIC_OR_PARTITION` almak istiyoruz.
- */
+/** Kafka event üreticisi (producer) oluşturur. */
 export async function createProducer(kafka: Kafka): Promise<EventPublisher> {
   const producer = kafka.producer({ allowAutoTopicCreation: false });
   await producer.connect();
@@ -54,7 +43,7 @@ export async function createProducer(kafka: Kafka): Promise<EventPublisher> {
   };
 }
 
-/** Kalıcı hata / 3 denemeden sonra tükenen mesajlar için bekleme süreleri (02-MIMARI 2.6). */
+/** İşleme hatalarında kademeli bekleme (backoff) süreleri (milisaniye). */
 const RETRY_DELAYS_MS = [1_000, 5_000, 25_000];
 
 export type EventHandler = (topic: string, message: unknown) => Promise<void>;
@@ -64,17 +53,8 @@ export interface ConsumerHandle {
 }
 
 /**
- * Bir consumer'ı ayağa kaldırır ve mesajları `handler`a verir.
- *
- * Zehirli mesaj koruması burada yaşar: `handler` kalıcı bir hatayla
- * (`isRetryable(err) === false`, örn. ValidationError) veya 3 denemeden
- * sonra hâlâ hata veriyorsa, mesaj `{topic}.DLQ`'ya yazılır ve offset
- * normal şekilde ilerler — bir bozuk mesaj partition'ı sonsuza kadar
- * bloklamaz (roadmap Faz 4 tuzak tablosu, FR-4.6).
- *
- * Yeniden deneme aralarında `heartbeat()` çağrılır: en kötü senaryoda
- * (1s + 5s + 25s ≈ 31s) `sessionTimeout: 30_000`i aşabilir ve consumer
- * group'tan atılabilirdi; heartbeat bunu önler.
+ * Kafka tüketici (consumer) dinleyicisini başlatır.
+ * Geçici hatalarda kademeli yeniden deneme yapar; kalıcı veya sınırı aşan hatalarda mesajı DLQ topic'ine aktarır.
  */
 export async function startConsumer(
   kafka: Kafka,
@@ -86,10 +66,6 @@ export async function startConsumer(
 ): Promise<ConsumerHandle> {
   const consumer = kafka.consumer({ groupId, sessionTimeout: 30_000, heartbeatInterval: 3_000 });
   await consumer.connect();
-  // fromBeginning: true — bu group ilk kez bağlandığında (henüz commit edilmiş
-  // offset yokken) topic'in başından okusun. AS-6 (servis kapalıyken biriken
-  // event'lerin geri gelince işlenmesi) bunu gerektirir. Daha önce commit
-  // edilmiş bir offset varsa bu bayrağın etkisi yok, kaldığı yerden devam eder.
   await consumer.subscribe({ topics, fromBeginning: true });
 
   await consumer.run({
@@ -101,7 +77,7 @@ export async function startConsumer(
       try {
         parsed = JSON.parse(raw);
       } catch (err) {
-        logger.error({ topic, partition, err }, 'bozuk JSON, DLQ\'ya atılıyor');
+        logger.error({ topic, partition, err }, 'Bozuk JSON formatı, mesaj DLQ kuyruğuna aktarılıyor');
         await dlq.publish(`${topic}.DLQ`, key ?? '', { raw, reason: 'invalid_json' });
         return;
       }
@@ -115,7 +91,7 @@ export async function startConsumer(
           if (!canRetry) {
             logger.error(
               { topic, partition, err, attempt },
-              'event işlenemedi, DLQ\'ya atılıyor',
+              'Event işlenemedi, maksimum deneme sınırına ulaşıldı veya kalıcı hata: DLQ\'ya aktarılıyor',
             );
             await dlq.publish(`${topic}.DLQ`, key ?? '', {
               original: parsed,
@@ -124,7 +100,7 @@ export async function startConsumer(
             return;
           }
 
-          logger.warn({ topic, partition, err, attempt }, 'geçici hata, tekrar denenecek');
+          logger.warn({ topic, partition, err, attempt }, 'Geçici işleme hatası, tekrar denenecek');
           await heartbeat();
           await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
           await heartbeat();

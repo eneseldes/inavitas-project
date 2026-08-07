@@ -1,25 +1,13 @@
 import { sql } from 'drizzle-orm';
 import { check, index, integer, pgEnum, pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
-/**
- * outage-service şeması — SRS 1.5 "Veritabanı: outage_db".
- *
- * `workOrderId` BİLEREK `.references()` KULLANMIYOR: karşı taraf başka bir
- * veritabanında (`work_order_db`), hatta Drizzle'ın hiç bağlanamadığı bir
- * DB kullanıcısının arkasında. `.references()` yazsaydık migration bir FK
- * constraint'i aynı veritabanında arar, bulamaz ve migration uygulanamaz
- * (roadmap Faz 2 tuzağı). Bu yüzden yalnızca skaler bir `uuid` sütunu.
- */
-
+/** Kesinti durumları veritabanı enum tipi. */
 export const outageStatusEnum = pgEnum('outage_status', ['STARTED', 'ENERGIZED', 'ARCHIVED', 'CANCELLED']);
 
-/**
- * `record_origin` tipi burada VE work-order-service'te ayrı ayrı tanımlanır.
- * Kod tekrarı değil — bağımsız veritabanlarındaki aynı isimli tipler
- * birbirinden habersizdir. Tek ortak tanım packages/contracts'taki TS tipi.
- */
+/** Kaynak türü veritabanı enum tipi (kullanıcı veya sistem). */
 export const recordOriginEnum = pgEnum('record_origin', ['USER', 'SYSTEM']);
 
+/** Kesintiler tablosu. */
 export const outages = pgTable(
   'outages',
   {
@@ -29,18 +17,17 @@ export const outages = pgTable(
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }),
     status: outageStatusEnum('status').notNull().default('STARTED'),
-    workOrderId: uuid('work_order_id'), // başka DB'ye referans, FK YOK
+    workOrderId: uuid('work_order_id'),
     gisId: varchar('gis_id', { length: 64 }).notNull(),
     origin: recordOriginEnum('origin').notNull().default('USER'),
-    createdBy: varchar('created_by', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
-    version: integer('version').notNull().default(0), // optimistic locking
+    createdBy: varchar('created_by', { length: 64 }).notNull(),
+    version: integer('version').notNull().default(0),
   },
   (table) => [
     index('idx_outages_created_at').on(table.createdAt.desc()),
     index('idx_outages_status').on(table.status),
     index('idx_outages_gis_id').on(table.gisId),
     index('idx_outages_work_order').on(table.workOrderId).where(sql`${table.workOrderId} IS NOT NULL`),
-    // Aktif kesinti sorgusu için partial index.
     index('idx_outages_active')
       .on(table.gisId, table.startedAt.desc())
       .where(sql`${table.status} = 'STARTED'`),
@@ -48,6 +35,7 @@ export const outages = pgTable(
   ],
 );
 
+/** Kesinti durum değişiklik geçmişi tablosu. */
 export const outageStatusHistory = pgTable(
   'outage_status_history',
   {
@@ -55,10 +43,10 @@ export const outageStatusHistory = pgTable(
     outageId: uuid('outage_id')
       .notNull()
       .references(() => outages.id, { onDelete: 'cascade' }),
-    fromStatus: outageStatusEnum('from_status'), // NULL = ilk oluşturma
+    fromStatus: outageStatusEnum('from_status'),
     toStatus: outageStatusEnum('to_status').notNull(),
     changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
-    actor: varchar('actor', { length: 64 }).notNull(), // kullanıcı e-postası veya 'SYSTEM'
+    actor: varchar('actor', { length: 64 }).notNull(),
     origin: recordOriginEnum('origin').notNull(),
     correlationId: varchar('correlation_id', { length: 64 }),
   },
@@ -67,15 +55,7 @@ export const outageStatusHistory = pgTable(
   ],
 );
 
-/**
- * Kafka consumer idempotency tablosu — SRS 1.5.
- *
- * `eventId` PK olduğu için aynı event iki kez işlenmeye çalışıldığında
- * ikinci INSERT `onConflictDoNothing()` ile sessizce başarısız olur; bu
- * kontrolü consumer'ın iş mantığıyla AYNI transaction'da yapmak zorunludur
- * (bkz. 03-YOL-HARITASI Faz 4 tuzakları) — aksi halde INSERT ile iş mantığı
- * arasında çökme penceresi kalır ve aynı event iki kez işlenebilir.
- */
+/** Kafka event idempotency takibi tablosu (çift işlemeyi önler). */
 export const processedEvents = pgTable('processed_events', {
   eventId: uuid('event_id').primaryKey(),
   topic: varchar('topic', { length: 128 }).notNull(),

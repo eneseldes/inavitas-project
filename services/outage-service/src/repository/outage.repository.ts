@@ -4,7 +4,6 @@ import { db, type Tx } from '../db.ts';
 import { outages, outageStatusHistory } from '../db/schema.ts';
 import type { OutageStatus } from '../domain/state-machine.ts';
 
-/** Drizzle'ı yalnızca bu katman bilir; controller/service düz nesnelerle çalışır. */
 export type OutageRow = typeof outages.$inferSelect;
 export type OutageStatusHistoryRow = typeof outageStatusHistory.$inferSelect;
 
@@ -12,9 +11,9 @@ export interface OutageFilters {
   status?: OutageStatus[];
   gisId?: string;
   startedAtFrom?: Date;
-  startedAtTo?: Date; // exclusive üst sınır
+  startedAtTo?: Date;
   createdAtFrom?: Date;
-  createdAtTo?: Date; // exclusive üst sınır
+  createdAtTo?: Date;
   hasWorkOrder?: boolean;
 }
 
@@ -35,13 +34,9 @@ export interface StatusChangeMeta {
   correlationId?: string;
 }
 
-/** GET /outages sıralama alanları için izin listesi — SQL enjeksiyonuna açık serbest string yok. */
+/** Sıralama yapılabilecek alanlar. */
 export const SORTABLE_FIELDS = ['createdAt', 'startedAt', 'status', 'gisId'] as const;
 
-// Record<...> ile ortak bir kolon tipine zorlamıyoruz: her sütunun kendi
-// literal `name` tipi farklı, Record bunu tek bir tipe daraltmaya çalışıp
-// derleme hatası veriyor. Düz obje + `keyof` araması aynı SQL enjeksiyon
-// korumasını (yalnızca izin verilen alan adları) tip hatası olmadan sağlar.
 const SORT_COLUMNS = {
   createdAt: outages.createdAt,
   startedAt: outages.startedAt,
@@ -57,9 +52,6 @@ function buildConditions(filters: OutageFilters): SQL[] {
       filters.status.length === 1 ? eq(outages.status, filters.status[0]!) : inArray(outages.status, filters.status),
     );
   }
-  // Önek eşleşmesi ('a%' — "a ile başlayan"), tam eşleşme DEĞİL. Kullanıcı
-  // arama kutusuna kesicinin ID'sinin başını yazıp geri kalanını görmek
-  // ister; `eq()` bunu saçma şekilde reddediyordu.
   if (filters.gisId) conditions.push(ilike(outages.gisId, `${filters.gisId}%`));
   if (filters.startedAtFrom) conditions.push(gte(outages.startedAt, filters.startedAtFrom));
   if (filters.startedAtTo) conditions.push(lt(outages.startedAt, filters.startedAtTo));
@@ -71,7 +63,7 @@ function buildConditions(filters: OutageFilters): SQL[] {
   return conditions;
 }
 
-/** `create()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır (bkz. kafka/consumers.ts). */
+/** Transaction içinde yeni kesinti kaydı ve durum geçmişi oluşturur. */
 export async function createTx(tx: Tx, input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
   const [row] = await tx.insert(outages).values(input).returning();
   await tx.insert(outageStatusHistory).values({
@@ -85,15 +77,18 @@ export async function createTx(tx: Tx, input: CreateOutageInput, correlationId?:
   return row!;
 }
 
+/** Yeni kesinti kaydı oluşturur. */
 export async function create(input: CreateOutageInput, correlationId?: string): Promise<OutageRow> {
   return db.transaction((tx) => createTx(tx, input, correlationId));
 }
 
+/** Kesinti ID ile kayıt arar. */
 export async function findById(id: string): Promise<OutageRow | null> {
   const [row] = await db.select().from(outages).where(eq(outages.id, id));
   return row ?? null;
 }
 
+/** Kesintileri filtreler, sıralar ve sayfalanmış olarak listeler. */
 export async function list(
   filters: OutageFilters,
   pagination: PaginationQuery,
@@ -114,12 +109,7 @@ export async function list(
   return { items, total: totalRows[0]?.value ?? 0 };
 }
 
-/**
- * Optimistic locking (roadmap Faz 2, adım 5): yalnızca beklenen `version`
- * eşleşirse günceller, `version`i bir artırır. Etkilenen satır 0 ise
- * çağıran taraf bunu 409 Conflict'e çevirir (version uyuşmazlığı).
- */
-/** `updateWithVersion()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır. */
+/** Optimistic locking kontrolü ile kesinti kaydını ve durum geçmişini günceller. */
 export async function updateWithVersionTx(
   tx: Tx,
   id: string,
@@ -158,11 +148,7 @@ export async function updateWithVersion(
   return db.transaction((tx) => updateWithVersionTx(tx, id, expectedVersion, patch, meta));
 }
 
-/**
- * Bir iş emrini kesintiye bağlar (`workOrderId`i doldurur). Yalnızca UPDATE
- * yapar, status/history dokunmaz — `work-order.linked` consumer'ı bunu
- * kullanır (Savunma 2: linked event'leri asla yeni kayıt açmaz).
- */
+/** Kesintiye iş emri bağlantısı atar (workOrderId günceller). */
 export async function linkWorkOrderTx(tx: Tx, outageId: string, workOrderId: string): Promise<OutageRow | null> {
   const [row] = await tx
     .update(outages)
@@ -173,6 +159,7 @@ export async function linkWorkOrderTx(tx: Tx, outageId: string, workOrderId: str
   return row ?? null;
 }
 
+/** Kesintinin durum değişiklik geçmişini getirir. */
 export async function getHistory(outageId: string): Promise<OutageStatusHistoryRow[]> {
   return db
     .select()

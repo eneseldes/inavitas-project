@@ -1,20 +1,12 @@
 import { z } from 'zod';
 
-/**
- * Ortam değişkeni doğrulaması.
- *
- * Kural: eksik veya hatalı env varsa servis AÇILMAZ. Yarım yapılandırmayla
- * ayağa kalkıp üçüncü istekte "undefined is not a valid connection string"
- * ile patlamak, en baştan net bir hatayla durmaktan çok daha kötüdür.
- */
-
-/** Her servisin ihtiyaç duyduğu ortak alanlar. */
+/** Ortak servis ortam değişkenleri şeması. */
 export const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
-/** Kafka kullanan servisler bunu da birleştirir. */
+/** Kafka yapılandırma şeması. */
 export const kafkaEnvSchema = z.object({
   KAFKA_BROKERS: z
     .string()
@@ -23,17 +15,17 @@ export const kafkaEnvSchema = z.object({
   KAFKA_CLIENT_ID: z.string().min(1),
 });
 
-/** Redis kullanan servisler. */
+/** Redis yapılandırma şeması. */
 export const redisEnvSchema = z.object({
   REDIS_URL: z.url(),
 });
 
-/** Postgres kullanan servisler. Her servis KENDİ veritabanına bağlanır. */
+/** PostgreSQL yapılandırma şeması. */
 export const databaseEnvSchema = z.object({
   DATABASE_URL: z.string().startsWith('postgresql://'),
 });
 
-/** HTTP sunan servisler. */
+/** HTTP port yapılandırma şeması. */
 export const httpEnvSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535),
 });
@@ -46,14 +38,8 @@ export class ConfigError extends Error {
 }
 
 /**
- * Env'i doğrular ve tipli config nesnesi döndürür.
- *
- * Hatalıysa hangi değişkenin neden geçersiz olduğunu satır satır yazıp
- * süreci sonlandırır. `.env` dosyasını unutmuş biri için en faydalı çıktı budur.
- *
- * @example
- * const envSchema = baseEnvSchema.merge(httpEnvSchema).merge(databaseEnvSchema);
- * export const config = loadConfig(envSchema, 'outage-service');
+ * Ortam değişkenlerini verilen Zod şemasıyla doğrular ve tipli konfigürasyon nesnesi döner.
+ * Hata durumunda eksik/geçersiz değişkenleri konsola basarak uygulamayı durdurur.
  */
 export function loadConfig<TSchema extends z.ZodType>(
   schema: TSchema,
@@ -68,8 +54,6 @@ export function loadConfig<TSchema extends z.ZodType>(
       return `  - ${name}: ${issue.message}`;
     });
 
-    // Logger'ı burada kullanmıyoruz: config yüklenmeden logger'ı da
-    // yapılandıramayız. Bu, console.error'ın haklı olduğu tek yer.
     console.error(
       `\n[${serviceName}] Ortam değişkenleri geçersiz — servis başlatılmıyor:\n` +
         lines.join('\n') +
@@ -81,7 +65,7 @@ export function loadConfig<TSchema extends z.ZodType>(
   return result.data;
 }
 
-/** `config.NODE_ENV === 'development'` yazmaktan kısa yol. */
+/** Geliştirme ortamında (development) olunup olunmadığını kontrol eder. */
 export function isDevelopment(nodeEnv: string): boolean {
   return nodeEnv === 'development';
 }

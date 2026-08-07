@@ -16,19 +16,11 @@ const server = app.listen(config.OUTAGE_SERVICE_PORT, () => {
   logger.info({ port: config.OUTAGE_SERVICE_PORT }, 'outage-service ayakta');
 });
 
-// Kafka bağlantısı HTTP sunucusundan bağımsız kurulur: `retry.retries: 10`
-// sayesinde Kafka henüz hazır değilse (~15-30 sn JVM açılışı) burada bekler,
-// servisi çökertmez (roadmap Faz 4 tuzağı).
 await connectKafka();
 await startOutageConsumer(createOutageEventHandler(logger), logger);
 logger.info('Kafka consumer ayakta (work-order.created, work-order.linked, work-order.done)');
 
-/**
- * Graceful shutdown — bkz. access-service/src/index.ts için aynı gerekçe.
- * Kafka'yı DB'den önce kapatıyoruz: consumer işlediği son mesajı bitirene
- * kadar DB bağlantısına ihtiyacı var; sırayı tersine çevirirsen yarım
- * işlenmiş bir mesaj DB bağlantısı koptuktan sonra hataya düşer.
- */
+/** Servisi güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
 

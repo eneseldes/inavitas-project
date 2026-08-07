@@ -7,7 +7,7 @@ import { ApiError } from '../../shared/api/errors.ts';
 import { toDateTimeLocalInput } from '../../shared/datetime.ts';
 import { useCreateOutage } from './useOutages.ts';
 
-/** FR-2.1/FR-2.7 ile aynı kural: endedAt, startedAt'tan önce olamaz. */
+/** Bitiş zamanı verilmişse başlangıç zamanından önce olamaz. */
 const CreateOutageSchema = z
   .object({
     gisId: z.string().min(1, 'gisId zorunlu').max(64),

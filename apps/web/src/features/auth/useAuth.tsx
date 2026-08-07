@@ -31,9 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async (): Promise<void> => {
     const refreshToken = getAuth()?.refreshToken;
 
-    // Çıkışın kendisi FR-1.4 gereği her zaman "başarılı" sayılır — istek
-    // başarısız olsa bile yerel oturumu temizliyoruz (bkz. access-service
-    // auth.service.ts'teki aynı gerekçe).
+    // Çıkış işleminde API çağrısı başarısız olsa bile yerel oturumu temizler.
     if (refreshToken) {
       await apiFetch('/api/auth/logout', {
         method: 'POST',

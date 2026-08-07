@@ -10,11 +10,6 @@ import {
 import { CONSUMER_GROUPS, TOPICS } from '@inavitas/contracts';
 import { config } from './config.ts';
 
-/**
- * Kafka bağlantı yaşam döngüsü — db.ts'teki singleton pool deseninin aynısı.
- * `connectKafka()`i index.ts açılışta çağırır, `disconnectKafka()`i
- * graceful shutdown'da.
- */
 const kafka = createKafkaClient({
   clientId: `${config.KAFKA_CLIENT_ID}-outage-service`,
   brokers: config.KAFKA_BROKERS,
@@ -32,11 +27,7 @@ export function getProducer(): EventPublisher {
   return producer;
 }
 
-/**
- * Consumer'ı başlatır. `work-order.created`, `work-order.linked` ve
- * `work-order.done` — outage-service'in dinlediği üç topic (bkz.
- * kafka/consumers.ts).
- */
+/** Kafka tüketicisini (work-order topic'leri için) başlatır. */
 export async function startOutageConsumer(handler: EventHandler, logger: Logger): Promise<void> {
   consumerHandle = await startConsumer(
     kafka,

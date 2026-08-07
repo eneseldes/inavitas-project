@@ -1,6 +1,6 @@
 import type { WorkOrderRow, WorkOrderStatusHistoryRow } from '../repository/work-order.repository.ts';
 
-/** DB satırını API response şekline çevirir. */
+/** İş emri veritabanı kaydını API DTO nesnesine dönüştürür. */
 export function toWorkOrderDto(row: WorkOrderRow) {
   return {
     id: row.id,
@@ -16,6 +16,7 @@ export function toWorkOrderDto(row: WorkOrderRow) {
   };
 }
 
+/** İş emri geçmişi veritabanı kaydını API DTO nesnesine dönüştürür. */
 export function toWorkOrderHistoryDto(row: WorkOrderStatusHistoryRow) {
   return {
     id: row.id,

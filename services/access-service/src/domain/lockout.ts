@@ -1,8 +1,5 @@
 /**
- * Hesap kilitleme kuralları (FR-1.5): 5 ardışık başarısız denemede 15 dk kilit.
- *
- * Saf fonksiyonlar — Prisma'yı, Express'i, saati bilmez (şimdiki zaman
- * parametre olarak geçilir). Bu sayede testleri altyapısız ve deterministik.
+ * Hesap kilitleme iş mantığı kuralları (ör. 5 ardışık başarısız denemede 15 dk kilit).
  */
 
 export const MAX_FAILED_ATTEMPTS = 5;
@@ -13,22 +10,19 @@ export interface LockState {
   lockedUntil: Date | null;
 }
 
-/** Hesap şu anda kilitli mi? */
+/** Hesabın belirtilen anda kilitli olup olmadığını kontrol eder. */
 export function isLocked(state: LockState, now: Date = new Date()): boolean {
   return state.lockedUntil !== null && state.lockedUntil.getTime() > now.getTime();
 }
 
-/** Kilidin bitmesine kaç saniye kaldığı — istemciye "x sn sonra dene" demek için. */
+/** Hesap kilitliyse kilidin açılmasına kalan süreyi saniye cinsinden hesaplar. */
 export function lockRemainingSeconds(state: LockState, now: Date = new Date()): number {
   if (!isLocked(state, now)) return 0;
   return Math.ceil((state.lockedUntil!.getTime() - now.getTime()) / 1000);
 }
 
 /**
- * Başarısız denemeden sonraki yeni kilit durumu.
- *
- * Süresi dolmuş bir kilit varsa sayaç sıfırdan başlar: 15 dk önce 4 kez
- * yanlış girmiş bir kullanıcı, bugünkü ilk hatasında kilitlenmemeli.
+ * Başarısız bir giriş denemesi sonrası yeni kilit durumunu günceller.
  */
 export function registerFailure(state: LockState, now: Date = new Date()): LockState {
   const expiredLock = state.lockedUntil !== null && state.lockedUntil.getTime() <= now.getTime();
@@ -41,7 +35,7 @@ export function registerFailure(state: LockState, now: Date = new Date()): LockS
   return { failedAttempts: attempts, lockedUntil: null };
 }
 
-/** Başarılı girişten sonra: sayaç ve kilit temizlenir. */
+/** Başarılı giriş sonrası kilit sayacını sıfırlar. */
 export function resetLock(): LockState {
   return { failedAttempts: 0, lockedUntil: null };
 }

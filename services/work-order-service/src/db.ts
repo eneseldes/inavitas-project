@@ -4,17 +4,16 @@ import { Pool } from 'pg';
 import { config } from './config.ts';
 import * as schema from './db/schema.ts';
 
-/**
- * Bağlantı havuzu ve Drizzle örneği — süreç başına TEK sefer (bkz.
- * outage-service/src/db.ts için aynı gerekçe).
- */
+/** PostgreSQL bağlantı havuzu. */
 const pool = new Pool({ connectionString: config.WORK_ORDER_APP_DATABASE_URL });
 
+/** Drizzle ORM veritabanı istemcisi. */
 export const db = drizzle(pool, { schema });
 
-/** `db.transaction()`daki `tx`in tipi — bkz. outage-service/src/db.ts için aynı gerekçe. */
+/** Veritabanı transaction veri tipi. */
 export type Tx = NodePgTransaction<typeof schema, ExtractTablesWithRelations<typeof schema>>;
 
+/** Veritabanı bağlantı havuzunu kapatır. */
 export async function disconnectDb(): Promise<void> {
   await pool.end();
 }

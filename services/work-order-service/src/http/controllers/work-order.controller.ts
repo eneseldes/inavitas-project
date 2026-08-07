@@ -15,11 +15,6 @@ import { SORTABLE_FIELDS, type WorkOrderFilters } from '../../repository/work-or
 import { toWorkOrderDto, toWorkOrderHistoryDto } from '../dto.ts';
 import { CreateWorkOrderBody, ListWorkOrdersQuery, PatchWorkOrderBody } from '../schemas.ts';
 
-/**
- * Controller'lar ince: gövdeyi doğrula → repository/domain çağır → cevabı
- * biçimlendir. İş mantığı burada olmaz.
- */
-
 function toFilters(query: ListWorkOrdersQuery): WorkOrderFilters {
   return {
     status: query.status,
@@ -42,7 +37,7 @@ export async function list(req: AuthedRequest, res: Response): Promise<void> {
 }
 
 export async function getById(req: AuthedRequest, res: Response): Promise<void> {
-  const id = req.params.id as string; // route ':id' — her zaman tek bir string
+  const id = req.params.id as string;
   const row = await workOrderRepository.findById(id);
   if (!row) throw new NotFoundError('İş emri', id);
 

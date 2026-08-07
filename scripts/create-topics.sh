@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Faz 4 — Kafka topic'lerini oluşturur. AUTO_CREATE_TOPICS_ENABLE=false
-# olduğu için bu script her zaman elle çalıştırılmalı (bkz. docs/04-KURULUM.md).
-# Yazım hatası yaparsan Kafka sessizce yeni bir topic açmaz, sen de burada
-# `--if-not-exists` ile tekrar tekrar güvenle çalıştırabilirsin.
+# Kafka topic'lerini ve DLQ topic'lerini oluşturur.
+# `--if-not-exists` parametresi ile güvenle tekrar çalıştırılabilir.
 
 TOPICS=(
   outage.created outage.energized outage.linked

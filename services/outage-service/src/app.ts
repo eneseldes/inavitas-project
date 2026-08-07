@@ -3,9 +3,7 @@ import express, { type Express } from 'express';
 import { buildRouter } from './http/routes.ts';
 
 /**
- * Express uygulamasını kurar — ama dinlemez (bkz. access-service/src/app.ts
- * için aynı gerekçe: `listen`i index.ts'e bırakmak testlerin supertest ile
- * gerçek port açmadan çalışmasını sağlar).
+ * Express uygulamasını oluşturur ve middleware zincirini yapılandırır.
  */
 export function createApp(logger: Logger): Express {
   const app = express();

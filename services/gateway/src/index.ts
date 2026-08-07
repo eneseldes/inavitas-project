@@ -13,7 +13,7 @@ const server = app.listen(config.GATEWAY_PORT, () => {
   logger.info({ port: config.GATEWAY_PORT }, 'gateway ayakta');
 });
 
-/** Graceful shutdown — bkz. access-service/src/index.ts için aynı gerekçe. DB yok, kapatılacak tek şey server. */
+/** Servisi güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
 

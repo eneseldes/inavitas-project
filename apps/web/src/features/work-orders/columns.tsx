@@ -93,7 +93,7 @@ export function buildWorkOrderColumns(onOpenOutage: (outageId: string) => void):
       id: 'outageId',
       header: 'Kesinti',
       accessorFn: (row) => row.outageId,
-      // FR-5.7: ilişkili kayıt ID'si tıklanabilir, karşı ekranda o kaydı filtreli açar.
+      // İlişkili kayıt ID'si tıklanabilir; karşı ekranda ilgili kaydı açar.
       cell: (ctx) => {
         const outageId = ctx.getValue<string | null>();
         if (!outageId) return <span className="text-muted">—</span>;

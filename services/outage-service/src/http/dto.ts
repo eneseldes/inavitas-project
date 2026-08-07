@@ -1,7 +1,7 @@
 import { computeDurationMinutes } from '../domain/rules.ts';
 import type { OutageRow, OutageStatusHistoryRow } from '../repository/outage.repository.ts';
 
-/** DB satırını API response şekline çevirir; `durationMinutes` türetilmiş alan (SRS 1.5). */
+/** Kesinti veritabanı kaydını API DTO nesnesine dönüştürür. */
 export function toOutageDto(row: OutageRow) {
   return {
     id: row.id,
@@ -19,6 +19,7 @@ export function toOutageDto(row: OutageRow) {
   };
 }
 
+/** Kesinti geçmişi veritabanı kaydını API DTO nesnesine dönüştürür. */
 export function toOutageHistoryDto(row: OutageStatusHistoryRow) {
   return {
     id: row.id,

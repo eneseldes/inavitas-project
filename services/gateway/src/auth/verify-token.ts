@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config.ts';
 
-/** access-service'in ürettiği payload ile birebir aynı şekil (bkz. access-service/src/domain/tokens.ts). */
+/** Access token payload verisi. */
 export interface AccessTokenPayload {
   sub: string;
   email: string;
@@ -12,15 +12,7 @@ export interface AccessTokenPayload {
 
 const ACCESS_TYPE = 'access';
 
-/**
- * Access token'ı doğrular — access-service/src/domain/tokens.ts'teki
- * `verifyAccessToken` ile AYNI mantık, kasıtlı olarak burada tekrar
- * yazılıyor: gateway JWT doğrulamasını yapan TEK servis (ADR #5), bunun
- * için access-service'e çalışma zamanı bağımlılığı olmamalı.
- *
- * `typ` kontrolü kritik: refresh token da aynı secret'la imzalı, bu kontrol
- * olmadan biri refresh token'ı access token yerine geçirebilir.
- */
+/** Access token imzasını ve tipini doğrular. */
 export function verifyAccessToken(token: string): AccessTokenPayload {
   const decoded = jwt.verify(token, config.JWT_SECRET) as AccessTokenPayload;
 

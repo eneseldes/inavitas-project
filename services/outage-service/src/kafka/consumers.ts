@@ -18,15 +18,7 @@ import { createTx, linkWorkOrderTx, updateWithVersionTx } from '../repository/ou
 import { publishOutageEnergizedIfNeeded, publishOutageLinked } from './producer.ts';
 
 /**
- * `work-order.created` — FR-4.1: kullanıcı kaynaklı bir iş emri açıldığında,
- * aynı `gisId` için `origin=SYSTEM` bir kesinti kaydı oluşur.
- *
- * Sıralama BİLEREK bu şekilde (02-MIMARI 2.5, Savunma 1 — döngü korumasının
- * kalbi):
- *   ① origin !== 'USER' (ya da derinlik aşıldı) → çık
- *   ② zaten bağlıysa (workOrderId'nin karşılığı var) → çık
- *   ③ idempotency + INSERT aynı transaction'da
- *   ④ 'outage.linked' yayınla — 'outage.created' DEĞİL (Savunma 2)
+ * 'work-order.created' event'i işleyicisi: Kullanıcı kaynaklı bir iş emri oluştuğunda otomatik sistem kesintisi oluşturur.
  */
 export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, log: Logger): Promise<void> {
   if (!shouldTriggerCounterpart(envelope)) {
@@ -77,8 +69,7 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
 }
 
 /**
- * `work-order.linked` — geri bağlama bildirimi. SADECE UPDATE yapar, yeni
- * event yayınlamaz (Savunma 2): döngü burada topolojik olarak da imkânsız.
+ * 'work-order.linked' event'i işleyicisi: Kesintiyi ilgili iş emrine bağlar.
  */
 export async function handleWorkOrderLinked(envelope: WorkOrderLinkedEvent, log: Logger): Promise<void> {
   const updated = await db.transaction(async (tx) => {
@@ -97,14 +88,7 @@ export async function handleWorkOrderLinked(envelope: WorkOrderLinkedEvent, log:
 }
 
 /**
- * `work-order.done` — SRS 1.6 çapraz kural: iş emri DONE olduğunda, bağlı
- * kesinti hâlâ açıksa otomatik ENERGIZED yapılır.
- *
- * Bu, "counterpart kaydı yaratma" akışı DEĞİL (Savunma 1'in korumaya
- * çalıştığı döngü budur), sadece var olan bir kaydı ileri taşıma; bu yüzden
- * `origin` filtresi gerekmiyor — güvenlik `canTransition()` kontrolünden
- * geliyor: durum zaten ENERGIZED/ARCHIVED/CANCELLED'sa no-op, tekrar tetiklense
- * de sonsuz döngü oluşmaz (durum makinesinde geri dönüş yok).
+ * 'work-order.done' event'i işleyicisi: Bağlı iş emri tamamlandığında kesintiyi otomatik ENERGIZED yapar.
  */
 export async function handleWorkOrderDone(envelope: WorkOrderDoneEvent, log: Logger): Promise<void> {
   if (!envelope.payload.outageId) {
@@ -165,10 +149,7 @@ const VALIDATORS = {
 } as const;
 
 /**
- * Tüm outage-service consumer'larının tek girişi — `startConsumer()`a bu
- * verilir. Şema doğrulaması burada yapılır: geçersiz payload `ValidationError`
- * fırlatır (retryable=false), `packages/shared/kafka.ts` bunu retry etmeden
- * doğrudan DLQ'ya atar (zehirli mesaj koruması).
+ * outage-service Kafka event dinleyici işleyicisi (event handler).
  */
 export function createOutageEventHandler(logger: Logger): EventHandler {
   return async (topic, message) => {

@@ -15,7 +15,7 @@ const LoginFormSchema = z.object({
 });
 type LoginFormValues = z.infer<typeof LoginFormSchema>;
 
-/** Yetkisi olan ilk ekrana yönlendirir (FR-5.1). */
+/** Kullanıcının yetkisi olan ilk ekrana yönlendirir. */
 function firstAllowedRoute(permissions: string[]): string {
   if (permissions.includes('outage:read')) return '/outages';
   if (permissions.includes('workorder:read')) return '/work-orders';

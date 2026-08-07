@@ -18,10 +18,7 @@ import { createTx, linkOutageTx, updateWithVersionTx } from '../repository/work-
 import { publishWorkOrderLinked } from './producer.ts';
 
 /**
- * `outage.created` — FR-4.2: kullanıcı kaynaklı bir kesinti açıldığında,
- * aynı `gisId` için `origin=SYSTEM`, `type=UNPLANNED_OUTAGE_WORK_ORDER` bir
- * iş emri oluşur. Sıralama outage-service'teki handleWorkOrderCreated ile
- * simetrik (bkz. orada aynı gerekçe).
+ * 'outage.created' event'i işleyicisi: Kullanıcı kaynaklı bir kesinti açıldığında otomatik sistem iş emri oluşturur.
  */
 export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Logger): Promise<void> {
   if (!shouldTriggerCounterpart(envelope)) {
@@ -70,7 +67,9 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
   );
 }
 
-/** `outage.linked` — SADECE UPDATE yapar, yeni event yayınlamaz (Savunma 2). */
+/**
+ * 'outage.linked' event'i işleyicisi: İş emrini ilgili kesintiye bağlar.
+ */
 export async function handleOutageLinked(envelope: OutageLinkedEvent, log: Logger): Promise<void> {
   const updated = await db.transaction(async (tx) => {
     const processed = await markProcessed(tx, envelope.eventId, TOPICS.OUTAGE_LINKED);
@@ -88,11 +87,7 @@ export async function handleOutageLinked(envelope: OutageLinkedEvent, log: Logge
 }
 
 /**
- * `outage.energized` — "kesinti giderildi" ile "iş emri ENERGIZED" aynı
- * fiziksel milestone (enerji geri geldi); bağlı iş emri bu durumu
- * yakalayabiliyorsa (canTransition) ileri taşınır. Yalnızca UPDATE yapar,
- * yeni event yayınlamaz — `work-order.done` ayrı, kullanıcının/ekibin
- * kapanış işlemini tamamladığını bildiren, bilinçli bir sonraki adımdır.
+ * 'outage.energized' event'i işleyicisi: Kesinti enerjilendiğinde bağlı iş emrini ENERGIZED yapar.
  */
 export async function handleOutageEnergized(envelope: OutageEnergizedEvent, log: Logger): Promise<void> {
   if (!envelope.payload.workOrderId) {
@@ -144,7 +139,7 @@ const VALIDATORS = {
   [TOPICS.OUTAGE_ENERGIZED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_ENERGIZED, raw),
 } as const;
 
-/** bkz. outage-service/src/kafka/consumers.ts createOutageEventHandler için aynı gerekçe. */
+/** work-order-service Kafka event dinleyici işleyicisi (event handler). */
 export function createWorkOrderEventHandler(logger: Logger): EventHandler {
   return async (topic, message) => {
     const validate = VALIDATORS[topic as keyof typeof VALIDATORS];

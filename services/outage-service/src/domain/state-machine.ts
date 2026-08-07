@@ -1,9 +1,5 @@
 /**
- * Kesinti durum makinesi — SRS 1.6.
- *
- * Framework'ten bağımsız saf mantık: Express/Drizzle bilmez, milisaniyelerde
- * test edilir (02-MIMARI 2.8). Geçersiz geçişler API'de 409 Conflict ile
- * reddedilir; bu kural yalnızca burada yaşar, controller'a dağılmaz.
+ * Kesinti durum makinesi ve durum geçiş kuralları.
  */
 
 export const OUTAGE_STATUSES = ['STARTED', 'ENERGIZED', 'ARCHIVED', 'CANCELLED'] as const;
@@ -13,7 +9,8 @@ const TRANSITIONS: Record<OutageStatus, OutageStatus[]> = {
   STARTED: ['ENERGIZED', 'CANCELLED'],
   ENERGIZED: ['ARCHIVED', 'CANCELLED'],
   ARCHIVED: ['CANCELLED'],
-  CANCELLED: [], // terminal durum, çıkış yok
+  CANCELLED: [],
 };
 
+/** Mevcut durumdan yeni duruma geçişin geçerli olup olmadığını kontrol eder. */
 export const canTransition = (from: OutageStatus, to: OutageStatus): boolean => TRANSITIONS[from].includes(to);

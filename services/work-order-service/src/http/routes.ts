@@ -7,7 +7,7 @@ import * as workOrderController from './controllers/work-order.controller.ts';
 export function buildRouter(): Router {
   const router = Router();
 
-  // --- Sağlık kontrolleri --- (auth gerektirmez)
+  // --- Sağlık ve Hazırlık Kontrolleri ---
   router.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'work-order-service' });
   });
@@ -20,10 +20,10 @@ export function buildRouter(): Router {
     }),
   );
 
-  // Bu noktadan sonraki her route kimlik ister — gateway'in eklediği
-  // X-User-* header'larına güveniyoruz (bkz. outage-service/src/http/routes.ts).
+  // --- Kimlik Doğrulama Katmanı ---
   router.use(authenticateFromHeaders());
 
+  // --- İş Emri Yönetim Uç Noktaları ---
   router.get(
     '/work-orders',
     requirePermission(PERMISSIONS.WORKORDER_READ),

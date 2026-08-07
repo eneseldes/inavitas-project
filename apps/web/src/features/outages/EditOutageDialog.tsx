@@ -26,18 +26,7 @@ interface EditOutageDialogProps {
   onClose: () => void;
 }
 
-/**
- * Kesinti güncelleme modalı — İşlemler sütunundaki kalem ikonuyla açılır.
- *
- * Backend PATCH /outages/:id yalnızca `status` ve `endedAt` alanlarını kabul
- * ediyor (bkz. outage-service/src/http/schemas.ts PatchOutageBody); `status`
- * burada BİLEREK gönderilmiyor — durum geçişleri sütundaki ayrı select'in
- * işi (kısıtlı liste, ENERGIZED içermez). Bu modal yalnızca `endedAt`i
- * düzeltmek/kaydetmek için var. `endedAt` ilk kez set edildiğinde backend'in
- * FR-2.6 kuralı gereği durum otomatik ENERGIZED'a geçebilir — bu, "gerçekte
- * ne zaman bittiğini kaydetme" eylemi, kullanıcının elle "ENERGIZED yap"
- * demesinden farklı ve dokümante edilmiş bir davranış.
- */
+/** Kesinti güncelleme modalı. */
 export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
   const patchOutage = usePatchOutage();
   const { show } = useToast();
@@ -96,7 +85,7 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
         <div className="field">
           <label htmlFor="endedAt" className="field__label">
             Bitiş zamanı
-            <span className="field__hint"> (verilirse durum otomatik "Enerji Verildi" olabilir — FR-2.6)</span>
+            <span className="field__hint"> (verilirse durum otomatik "Enerji Verildi" olur)</span>
           </label>
           <input id="endedAt" type="datetime-local" className="input" {...register('endedAt')} />
           {errors.endedAt && <p className="field__error">{errors.endedAt.message}</p>}

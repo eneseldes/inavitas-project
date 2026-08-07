@@ -4,7 +4,6 @@ import { db, type Tx } from '../db.ts';
 import { workOrders, workOrderStatusHistory } from '../db/schema.ts';
 import type { WorkOrderStatus } from '../domain/state-machine.ts';
 
-/** Drizzle'ı yalnızca bu katman bilir; controller/service düz nesnelerle çalışır. */
 export type WorkOrderRow = typeof workOrders.$inferSelect;
 export type WorkOrderStatusHistoryRow = typeof workOrderStatusHistory.$inferSelect;
 export type WorkOrderType = WorkOrderRow['type'];
@@ -14,7 +13,7 @@ export interface WorkOrderFilters {
   type?: WorkOrderType;
   gisId?: string;
   createdAtFrom?: Date;
-  createdAtTo?: Date; // exclusive üst sınır
+  createdAtTo?: Date;
   hasOutage?: boolean;
 }
 
@@ -34,11 +33,9 @@ export interface StatusChangeMeta {
   correlationId?: string;
 }
 
-/** GET /work-orders sıralama alanları için izin listesi. */
+/** Sıralama yapılabilecek alanlar. */
 export const SORTABLE_FIELDS = ['createdAt', 'status', 'type', 'gisId'] as const;
 
-// bkz. outage-service/src/repository/outage.repository.ts için aynı gerekçe
-// (Record ortak kolon tipine zorlar, düz obje zorlamaz).
 const SORT_COLUMNS = {
   createdAt: workOrders.createdAt,
   status: workOrders.status,
@@ -57,7 +54,6 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
     );
   }
   if (filters.type) conditions.push(eq(workOrders.type, filters.type));
-  // Önek eşleşmesi ('a%') — bkz. outage-service/src/repository/outage.repository.ts için aynı gerekçe.
   if (filters.gisId) conditions.push(ilike(workOrders.gisId, `${filters.gisId}%`));
   if (filters.createdAtFrom) conditions.push(gte(workOrders.createdAt, filters.createdAtFrom));
   if (filters.createdAtTo) conditions.push(lt(workOrders.createdAt, filters.createdAtTo));
@@ -67,7 +63,7 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
   return conditions;
 }
 
-/** `create()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır. */
+/** Transaction içinde yeni iş emri kaydı ve durum geçmişi oluşturur. */
 export async function createTx(tx: Tx, input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
   const [row] = await tx.insert(workOrders).values(input).returning();
   await tx.insert(workOrderStatusHistory).values({
@@ -81,15 +77,18 @@ export async function createTx(tx: Tx, input: CreateWorkOrderInput, correlationI
   return row!;
 }
 
+/** Yeni iş emri kaydı oluşturur. */
 export async function create(input: CreateWorkOrderInput, correlationId?: string): Promise<WorkOrderRow> {
   return db.transaction((tx) => createTx(tx, input, correlationId));
 }
 
+/** İş emri ID ile kayıt arar. */
 export async function findById(id: string): Promise<WorkOrderRow | null> {
   const [row] = await db.select().from(workOrders).where(eq(workOrders.id, id));
   return row ?? null;
 }
 
+/** İş emirlerini filtreler, sıralar ve sayfalanmış olarak listeler. */
 export async function list(
   filters: WorkOrderFilters,
   pagination: PaginationQuery,
@@ -110,7 +109,7 @@ export async function list(
   return { items, total: totalRows[0]?.value ?? 0 };
 }
 
-/** `updateWithVersion()`in tx-kabul eden çekirdeği — Kafka consumer'ları da bunu kullanır. */
+/** Transaction içinde optimistic locking kontrolü ile iş emrini ve durum geçmişini günceller. */
 export async function updateWithVersionTx(
   tx: Tx,
   id: string,
@@ -140,7 +139,7 @@ export async function updateWithVersionTx(
   return row;
 }
 
-/** Optimistic locking — bkz. outage-service/src/repository/outage.repository.ts için aynı gerekçe. */
+/** Optimistic locking kontrolü ile iş emrini günceller. */
 export async function updateWithVersion(
   id: string,
   expectedVersion: number,
@@ -150,10 +149,7 @@ export async function updateWithVersion(
   return db.transaction((tx) => updateWithVersionTx(tx, id, expectedVersion, patch, meta));
 }
 
-/**
- * Bir kesintiyi iş emrine bağlar (`outageId`i doldurur). Yalnızca UPDATE
- * yapar — `outage.linked` consumer'ı bunu kullanır (Savunma 2).
- */
+/** İş emrine kesinti bağlantısı atar (outageId günceller). */
 export async function linkOutageTx(tx: Tx, workOrderId: string, outageId: string): Promise<WorkOrderRow | null> {
   const [row] = await tx
     .update(workOrders)
@@ -164,6 +160,7 @@ export async function linkOutageTx(tx: Tx, workOrderId: string, outageId: string
   return row ?? null;
 }
 
+/** İş emrinin durum değişiklik geçmişini getirir. */
 export async function getHistory(workOrderId: string): Promise<WorkOrderStatusHistoryRow[]> {
   return db
     .select()

@@ -3,12 +3,7 @@ import { db } from '../db.ts';
 import { users } from '../db/schema.ts';
 import type { LockState } from '../domain/lockout.ts';
 
-/**
- * Kullanıcı sorguları. Drizzle'ı yalnızca bu katman bilir; servis katmanı
- * düz nesnelerle çalışır.
- */
-
-/** Rolleri ve izinleriyle birlikte kullanıcı. */
+/** Roller ve izinler eklenmiş kullanıcı veri yapısı. */
 export interface UserWithAccess {
   id: string;
   email: string;
@@ -21,7 +16,6 @@ export interface UserWithAccess {
   permissions: string[];
 }
 
-/** İç içe rol → izin ilişkisini `db.query` ile bir seferde çeker. */
 const withAccess = {
   userRoles: { with: { role: { with: { rolePermissions: { with: { permission: true } } } } } },
 } as const;
@@ -30,12 +24,7 @@ type UserRow = NonNullable<
   Awaited<ReturnType<typeof db.query.users.findFirst<{ with: typeof withAccess }>>>
 >;
 
-/**
- * İç içe rol → izin ilişkisini düz iki listeye indirger.
- *
- * İzinler `Set` üzerinden geçiyor: iki rolü olan bir kullanıcıda ortak
- * izinler tekrarlanır ve JWT'de aynı izin iki kez yer alır.
- */
+/** Veritabanı ilişki satırlarını düz roller ve benzersiz izin dizilerine dönüştürür. */
 function toUserWithAccess(row: UserRow): UserWithAccess {
   const roles = row.userRoles.map((ur) => ur.role.code);
   const permissions = new Set<string>();
@@ -59,23 +48,19 @@ function toUserWithAccess(row: UserRow): UserWithAccess {
   };
 }
 
-/**
- * E-posta ile kullanıcı bulur.
- *
- * Küçük/büyük harf normalizasyonu YAPMIYORUZ: `email` sütunu CITEXT,
- * karşılaştırmayı veritabanı harf duyarsız yapıyor.
- */
+/** E-posta adresiyle kullanıcı arar. */
 export async function findByEmail(email: string): Promise<UserWithAccess | null> {
   const row = await db.query.users.findFirst({ where: eq(users.email, email), with: withAccess });
   return row ? toUserWithAccess(row) : null;
 }
 
+/** Benzersiz ID ile kullanıcı arar. */
 export async function findById(id: string): Promise<UserWithAccess | null> {
   const row = await db.query.users.findFirst({ where: eq(users.id, id), with: withAccess });
   return row ? toUserWithAccess(row) : null;
 }
 
-/** Başarılı/başarısız giriş sonrası kilit durumunu yazar. */
+/** Kullanıcının kilit durumunu ve başarısız deneme sayısını günceller. */
 export async function updateLockState(userId: string, state: LockState): Promise<void> {
   await db
     .update(users)

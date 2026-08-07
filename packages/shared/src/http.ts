@@ -1,10 +1,3 @@
-/**
- * Üç servisin de ortak kullandığı Express parçaları.
- *
- * Hata gövdesini tek yerden üretmek, frontend'de tek bir hata gösterici
- * yazabilmenin ön şartı (bkz. errors.ts).
- */
-
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from 'express';
 import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
@@ -14,14 +7,7 @@ import { newCorrelationId, withCorrelation, type Logger } from './logger.ts';
 
 export const CORRELATION_HEADER = 'x-correlation-id';
 
-/**
- * pino-http `req.log` alanını kendi `declare module 'http'` genişletmesiyle
- * ekliyor, ama bu genişletme yalnızca pino-http'i DOĞRUDAN import eden
- * dosyanın derleme kapsamına giriyor. `httpLogger`ı burada tek yerden
- * kurduğumuz için tüketici servisler artık pino-http'i import etmiyor —
- * genişletmeyi burada kendimiz açıkça tanımlıyoruz ki `req.log` her yerde
- * tip güvenli kalsın.
- */
+/** Express Request arayüzüne Pino HTTP logger tipini ekler. */
 declare module 'http' {
   interface IncomingMessage {
     log: Logger;
@@ -29,10 +15,7 @@ declare module 'http' {
 }
 
 /**
- * İsteğe correlationId iliştirir ve cevap header'ında geri yollar.
- *
- * Gelen istekte header varsa onu KORUR — zincirin gateway'de başlayıp
- * buraya kadar aynı id ile gelmesi tüm izlenebilirliğin dayandığı nokta.
+ * Gelen HTTP isteğine correlationId atar (veya var olanı korur) ve yanıt header'ına ekler.
  */
 export function correlationMiddleware(): RequestHandler {
   return (req: AuthedRequest, res: Response, next: NextFunction): void => {
@@ -46,20 +29,8 @@ export function correlationMiddleware(): RequestHandler {
 }
 
 /**
- * Ortak istek/cevap logger'ı.
- *
- * pino-http'nin varsayılanı her istekte tüm header'ları ve `req`/`res`
- * nesnelerini dökerek konsolu kullanılmaz hale getiriyordu. Bunun yerine
- * `method url statusCode` özetleyen TEK satır basıyoruz; bu bilgi zaten
- * mesajın içinde olduğu için ayrıca `req`/`res` alanı da BASMIYORUZ —
- * aksi halde aynı bilginin iki kopyası tutulmuş olurdu. correlationId
- * `customProps` ile her logda zaten var.
- *
- * Başarılı (2xx/3xx) istekler `debug` seviyesinde: her sayfa açılışında/
- * listeleme isteğinde tekrar eden access-log satırları varsayılan `info`
- * görünümünü boğuyordu, asıl önemli olan iş olayları (örn. "kesinti
- * durumu değişti") ve hatalar kayboluyordu. 4xx/5xx `warn`/`error`'da
- * kalır, LOG_LEVEL=debug ile tüm trafik istendiğinde geri açılabilir.
+ * HTTP istek ve yanıtlarını loglayan middleware.
+ * Sağlık kontrollerini loglardan muaf tutar ve yanıt koduna göre log seviyesini belirler.
  */
 export function httpLogger(logger: Logger): RequestHandler {
   return (pinoHttp as any)({
@@ -82,7 +53,7 @@ export function httpLogger(logger: Logger): RequestHandler {
   });
 }
 
-/** Route handler'lardaki async hataları Express'e taşır. */
+/** Asenkron route handler fonksiyonlarındaki yakalanmayan hataları Express hata yakalayıcısına iletir. */
 export function asyncHandler<T extends Request = Request>(
   handler: (req: T, res: Response, next: NextFunction) => Promise<unknown>,
 ): RequestHandler {
@@ -91,7 +62,7 @@ export function asyncHandler<T extends Request = Request>(
   };
 }
 
-/** Zod hatasını API'nin `ErrorDetail` biçimine çevirir. */
+/** Zod doğrulama hatasını API ErrorDetail formatına dönüştürür. */
 function zodToDetails(err: ZodError): ErrorDetail[] {
   return err.issues.map((issue) => ({
     field: issue.path.join('.') || '(kök)',
@@ -100,34 +71,29 @@ function zodToDetails(err: ZodError): ErrorDetail[] {
 }
 
 /**
- * Merkezi hata yakalayıcı. Express 5'te async handler'ların reddi de buraya düşer.
- *
- * Express bir middleware'i DÖRT parametreli olduğu için hata yakalayıcı sayar —
- * `next` kullanılmasa bile imzadan silme, yoksa sessizce normal middleware olur.
+ * Merkezi Express hata yakalama middleware'i.
+ * Zod ve AppError türündeki hataları uygun HTTP yanıt kodları ile döndürür.
  */
 export function errorHandler(logger: Logger): ErrorRequestHandler {
   return (err, req, res, _next) => {
     const correlationId = (req as AuthedRequest).correlationId ?? 'yok';
     const log = withCorrelation(logger, correlationId);
 
-    // Zod hatasını 400'e çevir; ham ZodError istemciye gitmesin.
     const error = err instanceof ZodError ? new ValidationError('Girdi doğrulaması başarısız', zodToDetails(err)) : err;
 
     if (error instanceof AppError) {
-      // Beklenen hatalar gürültü yapmasın: 4xx debug, 5xx error seviyesinde.
       const level = error.statusCode >= 500 ? 'error' : 'debug';
       log[level]({ err: error, code: error.code }, error.message);
       res.status(error.statusCode).json(error.toResponse(correlationId));
       return;
     }
 
-    // Buraya düşen her şey beklenmeyen: tam ayrıntı loga, istemciye genel mesaj.
     log.error({ err: error }, 'beklenmeyen hata');
     res.status(500).json(toErrorResponse(error, correlationId));
   };
 }
 
-/** Tanımsız route için 404 — errorHandler'dan hemen ÖNCE ekle. */
+/** Tanımlanmamış uç noktalar için 404 yanıtı üreten middleware. */
 export function notFoundHandler(): RequestHandler {
   return (req, _res, next) => {
     next(new AppError('NOT_FOUND', `Böyle bir uç nokta yok: ${req.method} ${req.path}`));

@@ -16,11 +16,7 @@ export interface PublishOptions {
   causedBy?: Pick<RawEventEnvelope, 'eventId' | 'depth'>;
 }
 
-/**
- * `POST /work-orders` sonrası çağrılır — SADECE kullanıcı kaynaklı kayıtlar
- * için (bkz. outage-service/src/kafka/producer.ts publishOutageCreated için
- * aynı gerekçe). Sistem kaynaklı kayıtlar `work-order.linked` yayınlar.
- */
+/** Kullanıcı tarafından yeni iş emri oluşturulduğunda 'work-order.created' event'ini yayınlar. */
 export async function publishWorkOrderCreated(row: WorkOrderRow, correlationId: string, actor: string, log: Logger): Promise<void> {
   const payload: WorkOrderCreatedPayload = {
     workOrderId: row.id,
@@ -45,10 +41,7 @@ export async function publishWorkOrderCreated(row: WorkOrderRow, correlationId: 
   }
 }
 
-/**
- * Bir iş emri DONE olduğunda yayınlanır — outage-service bunu dinleyip bağlı
- * kesintiyi ENERGIZED yapar (SRS 1.6 çapraz kural).
- */
+/** İş emri DONE durumuna geldiğinde 'work-order.done' event'ini yayınlar. */
 export async function publishWorkOrderDone(row: WorkOrderRow, correlationId: string, actor: string, log: Logger): Promise<void> {
   const payload: WorkOrderDonePayload = {
     workOrderId: row.id,
@@ -73,7 +66,7 @@ export async function publishWorkOrderDone(row: WorkOrderRow, correlationId: str
   }
 }
 
-/** `outage.created` consumer'ının geri bağlama event'i — bkz. kafka/consumers.ts. */
+/** İş emrine bir kesinti bağlandığında 'work-order.linked' event'ini yayınlar. */
 export async function publishWorkOrderLinked(
   workOrderId: string,
   gisId: string,

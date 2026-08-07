@@ -1,8 +1,5 @@
 /**
- * İş emri durum makinesi — SRS 1.6.
- *
- * Framework'ten bağımsız saf mantık (bkz. outage-service/src/domain/state-machine.ts
- * için aynı gerekçe).
+ * İş emri durum makinesi ve durum geçiş kuralları.
  */
 
 export const WORK_ORDER_STATUSES = ['STARTED', 'ASSIGNED', 'IN_PROGRESS', 'ENERGIZED', 'DONE', 'CANCELLED'] as const;
@@ -14,7 +11,8 @@ const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   IN_PROGRESS: ['ENERGIZED', 'CANCELLED'],
   ENERGIZED: ['DONE', 'CANCELLED'],
   DONE: ['CANCELLED'],
-  CANCELLED: [], // terminal durum, çıkış yok
+  CANCELLED: [],
 };
 
+/** Mevcut durumdan hedef duruma geçişin geçerli olup olmadığını kontrol eder. */
 export const canTransition = (from: WorkOrderStatus, to: WorkOrderStatus): boolean => TRANSITIONS[from].includes(to);

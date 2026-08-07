@@ -7,7 +7,7 @@ import { OutageGrid } from '../features/outages/OutageGrid.tsx';
 import { WorkOrderGrid } from '../features/work-orders/WorkOrderGrid.tsx';
 import { AppShell } from '../shared/components/AppShell.tsx';
 
-/** FR-5.1: başarılı girişte kullanıcının yetkisi olan ilk ekrana yönlendirir. */
+/** Kullanıcının yetkisine göre erişebildiği ilk ekrana yönlendirir. */
 function RootRedirect() {
   const { user } = useAuth();
   const permissions = user?.permissions ?? [];

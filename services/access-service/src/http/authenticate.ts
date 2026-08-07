@@ -3,12 +3,7 @@ import type { NextFunction, Response } from 'express';
 import { toAuthenticatedUser, verifyAccessToken } from '../domain/tokens.ts';
 
 /**
- * `Authorization: Bearer <token>` header'ından kimliği çözer.
- *
- * access-service token'ı KENDİSİ üretiyor, dolayısıyla kendisi doğrular.
- * Diğer servisler bunun yerine gateway'in eklediği header'lara güvenir
- * (`userFromHeaders`, packages/shared) — çünkü JWT'yi gateway zaten
- * bir kez doğruladı ve dış dünyadan gelen header'ları sildi.
+ * Authorization: Bearer <token> başlığından Access Token'ı doğrular ve kullanıcı kimliğini kurulur.
  */
 export function authenticate() {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
@@ -25,7 +20,6 @@ export function authenticate() {
       req.user = toAuthenticatedUser(verifyAccessToken(token));
       next();
     } catch {
-      // Süresi dolmuş / imzası bozuk / yanlış tip — hepsi tek cevap.
       next(new UnauthenticatedError('Token geçersiz veya süresi dolmuş'));
     }
   };

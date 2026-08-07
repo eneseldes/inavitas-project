@@ -18,9 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/work-orders', label: 'İş Emirleri', icon: FiFileText, permission: 'workorder:read' },
 ];
 
-/**
- * FR-5.2: yetkisi olmayan ekranın menü öğesi gösterilmez.
- */
+/** Ana uygulama düzeni ve gezinti menüsü. Yetkisi olmayan menü öğeleri gizlenir. */
 export function AppShell() {
   const { user, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
