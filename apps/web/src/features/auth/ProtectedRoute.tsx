@@ -13,8 +13,14 @@ interface ProtectedRouteProps {
  * Yetkisiz erişim durumunda giriş sayfasına veya 403 sayfasına yönlendirir.
  */
 export function ProtectedRoute({ permission, children }: ProtectedRouteProps) {
-  const { isAuthenticated, hasPermission } = useAuth();
+  const { isAuthenticated, isInitializing, hasPermission } = useAuth();
   const location = useLocation();
+
+  // `/api/auth/me` sonucu beklenirken erken "giriş yapılmamış" yönlendirmesi yapılmaz
+  // (aksi halde her sayfa yenilemesinde login ekranına anlık geçiş görülür).
+  if (isInitializing) {
+    return null;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

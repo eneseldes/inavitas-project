@@ -1,4 +1,5 @@
 import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@inavitas/shared';
+import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
 import { buildRouter } from './http/routes.ts';
 
@@ -13,6 +14,7 @@ export function createApp(logger: Logger): Express {
   app.use(correlationMiddleware());
   app.use(httpLogger(logger));
   app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
 
   app.use(buildRouter());
 

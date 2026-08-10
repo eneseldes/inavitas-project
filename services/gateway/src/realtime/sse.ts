@@ -28,10 +28,14 @@ export class SseHub {
   handle(req: Request, res: Response): void {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
     });
     res.flushHeaders();
+
+    // Proxy (Vite/Nginx) arabelleklerini boşaltıp tarayıcıda onopen'ı derhal tetiklemek için ilk baytı yaz.
+    res.write(': connected\n\n');
 
     this.clients.add(res);
 

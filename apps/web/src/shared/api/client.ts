@@ -1,8 +1,10 @@
-import type { LoginResponse } from '../../types/auth.ts';
-import { clearAuth, getAccessToken, getRefreshToken, saveTokens } from './auth-storage.ts';
+import { getCsrfToken } from './csrf.ts';
 import { ApiError, toApiError } from './errors.ts';
 
-const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+/** Boş: nginx/vite proxy sayesinde frontend ile API her zaman aynı origin. */
+const API_URL = '';
+
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 interface RequestOptions {
   method?: string;
@@ -10,14 +12,20 @@ interface RequestOptions {
   headers?: Record<string, string>;
   /** login/refresh gibi public uçlar — 401 alınca refresh DENENMEZ (sonsuz döngü olur). */
   skipAuthRetry?: boolean;
+  /** false ise refresh de başarısız olunca /login'e yönlendirilmez (ör. oturum var mı diye sessizce bakan istekler). */
+  redirectOnAuthFailure?: boolean;
 }
 
 function buildHeaders(options: RequestOptions): Headers {
   const headers = new Headers(options.headers);
-  const token = getAccessToken();
+  const method = (options.method ?? 'GET').toUpperCase();
 
-  if (token) headers.set('Authorization', `Bearer ${token}`);
   if (options.body !== undefined) headers.set('Content-Type', 'application/json');
+
+  if (MUTATING_METHODS.has(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+  }
 
   return headers;
 }
@@ -27,44 +35,28 @@ function rawFetch(path: string, options: RequestOptions): Promise<Response> {
     method: options.method ?? 'GET',
     headers: buildHeaders(options),
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    credentials: 'include',
   });
 }
 
-/**
- * Eşzamanlı 401 hatalarında tek bir yenileme (refresh) isteği yapılmasını sağlar.
- * Yarış koşullarını (race condition) ve gereksiz belirteç iptallerini engeller.
- */
+/** Eşzamanlı 401'lerde tek bir refresh isteği yapılmasını sağlar. */
 let refreshPromise: Promise<void> | null = null;
 
 async function refreshAccessToken(): Promise<void> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) throw new ApiError(401, 'UNAUTHENTICATED', 'Oturum bulunamadı');
-
   const res = await fetch(`${API_URL}/api/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
+    credentials: 'include',
+    headers: buildHeaders({ method: 'POST' }),
   });
 
   if (!res.ok) throw await toApiError(res);
-
-  const body = (await res.json()) as Pick<LoginResponse, 'accessToken' | 'refreshToken'>;
-  saveTokens(body.accessToken, body.refreshToken);
 }
 
-/**
- * Merkezi API çağrı fonksiyonu.
- *
- * - Access token'ı Authorization header'ına ekler
- * - 401 alınca refresh dener, BİR KEZ isteği tekrarlar (sonsuz döngüye
- *   girmemek için skipAuthRetry olmadıkça yalnızca bir kez)
- * - Refresh de başarısız olursa oturumu temizler, /login'e yönlendirir
- * - Hata gövdesini ApiError'a normalize eder
- */
+/** 401 alınca bir kez refresh dener, olmazsa /login'e yönlendirir; hataları ApiError'a çevirir. */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   let res = await rawFetch(path, options);
 
-  if (res.status === 401 && !options.skipAuthRetry && getRefreshToken()) {
+  if (res.status === 401 && !options.skipAuthRetry) {
     try {
       refreshPromise ??= refreshAccessToken().finally(() => {
         refreshPromise = null;
@@ -72,8 +64,9 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       await refreshPromise;
       res = await rawFetch(path, options);
     } catch {
-      clearAuth();
-      window.location.assign('/login');
+      if (options.redirectOnAuthFailure !== false && window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
       throw new ApiError(401, 'UNAUTHENTICATED', 'Oturum sona erdi, tekrar giriş yapın');
     }
   }

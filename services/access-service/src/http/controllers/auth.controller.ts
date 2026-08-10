@@ -1,26 +1,35 @@
-import { UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
+import { AUTH_COOKIE_NAMES, UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
 import type { Response } from 'express';
 import * as authService from '../../services/auth.service.ts';
-import { LoginBody, RefreshBody } from '../schemas.ts';
+import { clearAuthCookies, setAuthCookies } from '../cookies.ts';
+import { LoginBody } from '../schemas.ts';
+
+function refreshTokenFromCookie(req: AuthedRequest): string {
+  const token = req.cookies?.[AUTH_COOKIE_NAMES.REFRESH];
+  if (typeof token !== 'string' || !token) throw new UnauthenticatedError('Refresh token bulunamadı');
+  return token;
+}
 
 export async function login(req: AuthedRequest, res: Response): Promise<void> {
   const { email, password } = LoginBody.parse(req.body);
   const result = await authService.login(email, password);
 
-  res.status(200).json(result);
+  setAuthCookies(res, result);
+  res.status(200).json({ user: result.user });
 }
 
 export async function refresh(req: AuthedRequest, res: Response): Promise<void> {
-  const { refreshToken } = RefreshBody.parse(req.body);
-  const tokens = await authService.refresh(refreshToken);
+  const tokens = await authService.refresh(refreshTokenFromCookie(req));
 
-  res.status(200).json(tokens);
+  setAuthCookies(res, tokens);
+  res.status(204).send();
 }
 
 export async function logout(req: AuthedRequest, res: Response): Promise<void> {
-  const { refreshToken } = RefreshBody.parse(req.body);
-  await authService.logout(refreshToken);
+  const token = req.cookies?.[AUTH_COOKIE_NAMES.REFRESH];
+  if (typeof token === 'string' && token) await authService.logout(token);
 
+  clearAuthCookies(res);
   res.status(204).send();
 }
 

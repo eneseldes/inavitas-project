@@ -8,6 +8,20 @@ export default defineConfig({
   envDir: path.resolve(import.meta.dirname, '../..'),
   server: {
     port: 5173,
+    host: '0.0.0.0',
+    // nginx'in prod'da yaptığını dev'de vite yapar: /api gateway'e proxy'lenir (tek origin).
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        ws: false,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('Connection', 'keep-alive');
+          });
+        },
+      },
+    },
   },
   css: {
     modules: {

@@ -1,4 +1,4 @@
-import { UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
+import { AUTH_COOKIE_NAMES, CSRF_HEADER_NAME, UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
 import type { NextFunction, Request, Response } from 'express';
 import { verifyAccessToken } from './verify-token.ts';
 
@@ -12,25 +12,13 @@ export function stripSpoofedHeaders() {
   };
 }
 
-/**
- * SSE bağlantıları (tarayıcının `EventSource` API'si) özel header gönderemez;
- * bu yüzden canlı akış (`/stream`) uç noktalarında token query param'dan da
- * kabul edilir. Diğer tüm uç noktalarda yalnızca Authorization header geçerlidir.
- */
-function tokenFromStreamQuery(req: Request): string | undefined {
-  if (!req.path.endsWith('/stream')) return undefined;
-  const token = req.query.access_token;
-  return typeof token === 'string' ? token : undefined;
-}
-
-/** `Authorization: Bearer <token>` başlığını doğrular ve kullanıcı kimliğini `req.user` alanına atar. */
+/** `access_token` çerezini doğrular ve `req.user`'ı doldurur. */
 export function requireAuth() {
   return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
-    const header = req.header('authorization');
-    const token = header?.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : tokenFromStreamQuery(req);
+    const token = req.cookies?.[AUTH_COOKIE_NAMES.ACCESS];
 
-    if (!token) {
-      next(new UnauthenticatedError('Authorization header eksik veya hatalı biçimde'));
+    if (typeof token !== 'string' || !token) {
+      next(new UnauthenticatedError('Oturum çerezi eksik veya hatalı biçimde'));
       return;
     }
 
@@ -41,5 +29,27 @@ export function requireAuth() {
     } catch {
       next(new UnauthenticatedError('Token geçersiz veya süresi dolmuş'));
     }
+  };
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/** Çift-gönderim CSRF: `X-CSRF-Token` header'ı `csrf_token` çereziyle eşleşmeli. */
+export function verifyCsrf() {
+  return (req: AuthedRequest, _res: Response, next: NextFunction): void => {
+    if (SAFE_METHODS.has(req.method.toUpperCase())) {
+      next();
+      return;
+    }
+
+    const cookieToken = req.cookies?.[AUTH_COOKIE_NAMES.CSRF];
+    const headerToken = req.header(CSRF_HEADER_NAME);
+
+    if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+      next(new UnauthenticatedError('CSRF doğrulaması başarısız'));
+      return;
+    }
+
+    next();
   };
 }

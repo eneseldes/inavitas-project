@@ -29,7 +29,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, 'kapanış başlatıldı');
 
   server.close(async (err) => {
-    if (err) {
+    if (err && (err as { code?: string }).code !== 'ERR_SERVER_NOT_RUNNING') {
       logger.error({ err }, 'sunucu kapatılamadı');
       process.exit(1);
     }

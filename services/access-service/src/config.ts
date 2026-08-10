@@ -14,6 +14,12 @@ const envSchema = baseEnvSchema.merge(redisEnvSchema).extend({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET en az 32 karakter olmalı'),
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('7d'),
+
+  /** Çerezlerde `Secure` bayrağı — yalnızca gerçek HTTPS arkasında `true` yapın. */
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

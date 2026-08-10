@@ -1,11 +1,12 @@
-import { createContext, use, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiFetch } from '../../shared/api/client.ts';
-import { clearAuth, getAuth, saveAuth } from '../../shared/api/auth-storage.ts';
 import type { AuthUser, LoginResponse } from '../../types/auth.ts';
 
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  /** Sayfa yüklenişinde `/api/auth/me` ile oturum durumu doğrulanana kadar `true`. */
+  isInitializing: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
@@ -14,7 +15,28 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => getAuth()?.user ?? null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Çerezler JS'e görünmez; oturum durumu sunucuya sorularak öğrenilir.
+  useEffect(() => {
+    let cancelled = false;
+
+    apiFetch<AuthUser>('/api/auth/me', { redirectOnAuthFailure: false })
+      .then((me) => {
+        if (!cancelled) setUser(me);
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsInitializing(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
     const result = await apiFetch<LoginResponse>('/api/auth/login', {
@@ -23,32 +45,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       skipAuthRetry: true,
     });
 
-    saveAuth(result);
     setUser(result.user);
     return result.user;
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
-    const refreshToken = getAuth()?.refreshToken;
-
     // Çıkış işleminde API çağrısı başarısız olsa bile yerel oturumu temizler.
-    if (refreshToken) {
-      await apiFetch('/api/auth/logout', {
-        method: 'POST',
-        body: { refreshToken },
-        skipAuthRetry: true,
-      }).catch(() => undefined);
-    }
-
-    clearAuth();
+    await apiFetch('/api/auth/logout', { method: 'POST', skipAuthRetry: true }).catch(() => undefined);
     setUser(null);
   }, []);
 
   const hasPermission = useCallback((permission: string): boolean => (user?.permissions ?? []).includes(permission), [user]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isAuthenticated: user !== null, login, logout, hasPermission }),
-    [user, login, logout, hasPermission],
+    () => ({ user, isAuthenticated: user !== null, isInitializing, login, logout, hasPermission }),
+    [user, isInitializing, login, logout, hasPermission],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

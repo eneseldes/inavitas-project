@@ -65,9 +65,8 @@ services:
         condition: service_healthy
 
   # --- Uygulama Servisleri ---------------------------------------------------
-  # Dört servis tek bir imajı (kök `Dockerfile`) paylaşır; `command:` ile hangi
-  # servisin dist çıktısının çalıştırılacağı belirlenir. Yalnızca gateway dış ağa (host)
-  # açıktır; alt servisler doğrudan dışarıya açılmaz.
+  # Dört backend servisi tek imajı (kök `Dockerfile`) paylaşır. Dışa yalnızca
+  # `web` (nginx, :80) açıktır; `gateway` dahil hiçbiri host'a port açmaz.
 
   access-service:
     image: inavitas-backend:latest
@@ -82,6 +81,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -151,8 +151,9 @@ services:
       ACCESS_SERVICE_HOST: access-service
       OUTAGE_SERVICE_HOST: outage-service
       WORK_ORDER_SERVICE_HOST: work-order-service
-      CORS_ORIGIN: http://localhost:5173
-    ports: ["8080:8080"]
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
+    # Dışa port açmaz, yalnızca docker network üzerinden erişilir.
+    expose: ["8080"]
     depends_on:
       redis: { condition: service_healthy }
       access-service: { condition: service_healthy }
@@ -164,6 +165,24 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  web:
+    image: inavitas-web:latest
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports: ["80:80"]
+    depends_on:
+      gateway: { condition: service_healthy }
+    healthcheck:
+      # `localhost` konteyner içinde önce IPv6 (`::1`) çözülüyor; nginx yalnızca
+      # IPv4 dinlediğinden bu "connection refused" ile yanlış pozitif veriyordu.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   loki:
     image: grafana/loki:3.3.0
