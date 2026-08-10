@@ -85,6 +85,9 @@ describe('ROLE_PERMISSIONS', () => {
       'workorder:read',
       'workorder:write',
       'user:manage',
+      'translation:read',
+      'translation:write',
+      'translation:publish',
     ]);
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).toEqual(['outage:read', 'outage:write']);
     expect(ROLE_PERMISSIONS[ROLES.WORK_ORDER_OPERATOR]).toEqual(['workorder:read', 'workorder:write']);

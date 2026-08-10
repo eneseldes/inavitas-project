@@ -52,12 +52,14 @@ export class SseHub {
 export interface SseHubs {
   outage: SseHub;
   workOrder: SseHub;
+  translation: SseHub;
 }
 
-/** Kesinti ve iş emri canlı akışları için hub'ları oluşturur. */
+/** Kesinti, iş emri ve çeviri canlı akışları için hub'ları oluşturur. */
 export function createSseHubs(subscriber: Redis): SseHubs {
   return {
     outage: new SseHub('ui:outage', subscriber),
     workOrder: new SseHub('ui:work-order', subscriber),
+    translation: new SseHub('ui:translation', subscriber),
   };
 }

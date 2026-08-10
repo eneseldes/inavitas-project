@@ -10,7 +10,13 @@ import { redis, redisSubscriber } from './redis.ts';
 import { createSseHubs } from './realtime/sse.ts';
 
 /** Kimlik doğrulama gerektirmeyen (herkese açık) rotalar. */
-const PUBLIC_PATHS = new Set(['/api/auth/login', '/api/auth/refresh', '/api/auth/logout']);
+const PUBLIC_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+  '/api/translations/bundle',
+  '/api/translations/locales',
+]);
 
 /** Login'de henüz CSRF çerezi kurulmadığından muaf; diğer tüm mutasyonlar korunur. */
 const CSRF_EXEMPT_PATHS = new Set(['/api/auth/login']);
@@ -74,14 +80,19 @@ export function createApp(logger: Logger): Express {
   const sseHubs = createSseHubs(redisSubscriber);
   app.get('/api/outages/stream', (req, res) => sseHubs.outage.handle(req, res));
   app.get('/api/work-orders/stream', (req, res) => sseHubs.workOrder.handle(req, res));
+  app.get('/api/translations/stream', (req, res) => sseHubs.translation.handle(req, res));
 
-  // outage/work-order servislerine Cookie header'ı iletilmez (yalnızca x-user-* güvenilir).
+  // outage/work-order/translation servislerine Cookie header'ı iletilmez (yalnızca x-user-* güvenilir).
   app.use(buildProxy('/api/auth/**', SERVICE_TARGETS.access, { '^/api/auth': '/auth' }));
   app.use(buildProxy('/api/users/**', SERVICE_TARGETS.access, { '^/api/users': '/users' }));
   app.use(buildProxy('/api/outages/**', SERVICE_TARGETS.outage, { '^/api/outages': '/outages' }, { forwardCookies: false }));
   app.use(
     buildProxy('/api/work-orders/**', SERVICE_TARGETS.workOrder, { '^/api/work-orders': '/work-orders' }, { forwardCookies: false }),
   );
+  app.use(
+    buildProxy('/api/translations/**', SERVICE_TARGETS.translation, { '^/api/translations': '/translations' }, { forwardCookies: false }),
+  );
+
 
   app.use(notFoundHandler());
   app.use(errorHandler(logger));

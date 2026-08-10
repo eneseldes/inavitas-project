@@ -16,6 +16,8 @@ const envSchema = baseEnvSchema.merge(redisEnvSchema).extend({
   OUTAGE_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(3002),
   WORK_ORDER_SERVICE_HOST: z.string().default('localhost'),
   WORK_ORDER_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(3003),
+  TRANSLATION_SERVICE_HOST: z.string().default('localhost'),
+  TRANSLATION_SERVICE_PORT: z.coerce.number().int().min(1).max(65535).default(3004),
 
   /** İzin verilen CORS kök adresi. */
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
@@ -30,4 +32,5 @@ export const SERVICE_TARGETS = {
   access: `http://${config.ACCESS_SERVICE_HOST}:${config.ACCESS_SERVICE_PORT}`,
   outage: `http://${config.OUTAGE_SERVICE_HOST}:${config.OUTAGE_SERVICE_PORT}`,
   workOrder: `http://${config.WORK_ORDER_SERVICE_HOST}:${config.WORK_ORDER_SERVICE_PORT}`,
+  translation: `http://${config.TRANSLATION_SERVICE_HOST}:${config.TRANSLATION_SERVICE_PORT}`,
 } as const;
