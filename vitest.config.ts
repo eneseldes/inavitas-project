@@ -19,6 +19,7 @@ export default defineConfig({
       // baseEnvSchema'nın izin verdiği en sessiz seviye ('silent' yok).
       LOG_LEVEL: 'fatal',
       ACCESS_APP_DATABASE_URL: 'postgresql://test:test@localhost:5432/test_db',
+      TRANSLATION_APP_DATABASE_URL: 'postgresql://test:test@localhost:5432/test_db',
       JWT_SECRET: 'test-secret-en-az-32-karakter-olmali-tamam',
       JWT_ACCESS_TTL: '15m',
       JWT_REFRESH_TTL: '7d',

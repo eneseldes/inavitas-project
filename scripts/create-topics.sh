@@ -7,6 +7,7 @@ set -euo pipefail
 TOPICS=(
   outage.created outage.energized outage.linked
   work-order.created work-order.done work-order.linked
+  translation.published
 )
 DLQ_SUFFIX=".DLQ"
 KCMD="/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092"

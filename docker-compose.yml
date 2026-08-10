@@ -138,6 +138,31 @@ services:
       retries: 10
       start_period: 10s
 
+  translation-service:
+    image: inavitas-backend:latest
+    build: .
+    command: ["node", "services/translation-service/dist/index.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      TRANSLATION_SERVICE_PORT: "3004"
+      TRANSLATION_APP_DATABASE_URL: postgresql://translation_app:translation_app_pw@postgres:5432/translation_db
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-inavitas}
+      TRANSLATION_PROVIDER: ${TRANSLATION_PROVIDER:-none}
+      DEEPL_API_KEY: ${DEEPL_API_KEY:-}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3004/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   gateway:
     image: inavitas-backend:latest
     build: .
@@ -151,6 +176,7 @@ services:
       ACCESS_SERVICE_HOST: access-service
       OUTAGE_SERVICE_HOST: outage-service
       WORK_ORDER_SERVICE_HOST: work-order-service
+      TRANSLATION_SERVICE_HOST: translation-service
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
     # Dışa port açmaz, yalnızca docker network üzerinden erişilir.
     expose: ["8080"]
@@ -159,12 +185,14 @@ services:
       access-service: { condition: service_healthy }
       outage-service: { condition: service_healthy }
       work-order-service: { condition: service_healthy }
+      translation-service: { condition: service_healthy }
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 10s
+
 
   web:
     image: inavitas-web:latest

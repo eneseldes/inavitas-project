@@ -8,6 +8,7 @@ export const TOPICS = {
   WORK_ORDER_CREATED: 'work-order.created',
   WORK_ORDER_DONE: 'work-order.done',
   WORK_ORDER_LINKED: 'work-order.linked',
+  TRANSLATION_PUBLISHED: 'translation.published',
 } as const;
 
 export type Topic = (typeof TOPICS)[keyof typeof TOPICS];

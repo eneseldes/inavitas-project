@@ -10,11 +10,13 @@ import {
   WorkOrderDoneEvent,
   WorkOrderLinkedEvent,
 } from './work-order.events.ts';
+import { TranslationPublishedEvent } from './translation.events.ts';
 
 export * from './envelope.ts';
 export * from './outage.events.ts';
 export * from './topics.ts';
 export * from './work-order.events.ts';
+export * from './translation.events.ts';
 
 /**
  * Topic → şema eşlemesi. Consumer gelen mesajı bu harita üzerinden doğrular.
@@ -26,6 +28,7 @@ export const EVENT_SCHEMAS = {
   [TOPICS.WORK_ORDER_CREATED]: WorkOrderCreatedEvent,
   [TOPICS.WORK_ORDER_DONE]: WorkOrderDoneEvent,
   [TOPICS.WORK_ORDER_LINKED]: WorkOrderLinkedEvent,
+  [TOPICS.TRANSLATION_PUBLISHED]: TranslationPublishedEvent,
 } as const;
 
 export type EventSchemas = typeof EVENT_SCHEMAS;
