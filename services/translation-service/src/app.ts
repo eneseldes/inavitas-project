@@ -2,6 +2,9 @@ import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type 
 import express, { type Express } from 'express';
 import { buildRouter } from './http/routes.ts';
 
+/**
+ * Express uygulamasını oluşturur ve middleware zincirini yapılandırır.
+ */
 export function createApp(logger: Logger): Express {
   const app = express();
 

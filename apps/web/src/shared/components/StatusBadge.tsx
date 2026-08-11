@@ -1,5 +1,5 @@
 import { clsx } from 'clsx';
-import { OUTAGE_STATUS_LABELS, WORK_ORDER_STATUS_LABELS } from '../labels.ts';
+import { useLabels } from '../../features/i18n/useLabels.ts';
 import type { OutageStatus } from '../../types/outage.ts';
 import type { WorkOrderStatus } from '../../types/work-order.ts';
 
@@ -14,11 +14,16 @@ const COLORS: Record<OutageStatus | WorkOrderStatus, string> = {
   CANCELLED: 'badge--red',
 };
 
-const LABELS: Record<OutageStatus | WorkOrderStatus, string> = {
-  ...OUTAGE_STATUS_LABELS,
-  ...WORK_ORDER_STATUS_LABELS,
-};
+// Kesinti ve iş emri durum enum'ları `STARTED`/`ENERGIZED`/`CANCELLED` değerlerini
+// paylaşır — hangi etiket setine ait olduğu çağıranın tipiyle belli olduğundan
+// iki useLabels çözümleyicisi de aynı duruma bakılınca aynı sonucu üretir.
+function isWorkOrderOnlyStatus(status: OutageStatus | WorkOrderStatus): status is 'ASSIGNED' | 'IN_PROGRESS' | 'DONE' {
+  return status === 'ASSIGNED' || status === 'IN_PROGRESS' || status === 'DONE';
+}
 
 export function StatusBadge({ status }: { status: OutageStatus | WorkOrderStatus }) {
-  return <span className={clsx('badge', COLORS[status])}>{LABELS[status]}</span>;
+  const labels = useLabels();
+  const text = isWorkOrderOnlyStatus(status) ? labels.workOrderStatus(status) : labels.outageStatus(status as OutageStatus);
+
+  return <span className={clsx('badge', COLORS[status])}>{text}</span>;
 }

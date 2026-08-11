@@ -6,6 +6,7 @@ const envSchema = baseEnvSchema.merge(kafkaEnvSchema).merge(redisEnvSchema).exte
   TRANSLATION_APP_DATABASE_URL: z.string().startsWith('postgresql://'),
   TRANSLATION_PROVIDER: z.enum(['none', 'deepl']).default('none'),
   DEEPL_API_KEY: z.string().optional(),
+  MAX_AUTO_TRANSLATE_KEYS: z.coerce.number().int().min(1).default(50),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

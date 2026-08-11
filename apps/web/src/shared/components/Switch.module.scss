@@ -1,0 +1,33 @@
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
+
+.track {
+  @include m.clickable;
+  position: relative;
+  width: 2rem;
+  height: 1.125rem;
+  padding: 0.125rem;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-full;
+  background: v.$color-surface-alt;
+  flex-shrink: 0;
+  @include m.focus-ring;
+}
+
+.trackOn {
+  background: v.$color-brand-500;
+  border-color: v.$color-brand-500;
+}
+
+.thumb {
+  display: block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: v.$radius-full;
+  background: v.$color-surface;
+  transition: transform v.$transition-fast;
+}
+
+.trackOn .thumb {
+  transform: translateX(0.875rem);
+}

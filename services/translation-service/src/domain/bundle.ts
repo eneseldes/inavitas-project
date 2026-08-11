@@ -5,8 +5,5 @@ export type Dictionary = Record<string, string>;
  * İstenen dilde eksik kalan anahtarlar varsayılan dildeki karşılığıyla tamamlanır.
  */
 export function buildBundle(defaultMap: Dictionary, requestedMap: Dictionary): Dictionary {
-  return {
-    ...defaultMap,
-    ...requestedMap,
-  };
+  return { ...defaultMap, ...requestedMap };
 }

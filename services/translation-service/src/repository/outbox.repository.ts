@@ -11,6 +11,7 @@ export async function enqueueTx(tx: Tx, topic: string, partitionKey: string, pay
 
 /**
  * Henüz yayınlanmamış bir grup kaydı kilitler (`FOR UPDATE SKIP LOCKED`).
+ * Kilitleme, poller'ın her tetiklenişinde aynı satırları tekrar almasını önler.
  */
 export async function claimBatchTx(tx: Tx, limit: number): Promise<OutboxRow[]> {
   return tx
@@ -26,6 +27,7 @@ export async function markPublishedTx(tx: Tx, id: string): Promise<void> {
   await tx.update(outbox).set({ publishedAt: new Date() }).where(eq(outbox.id, id));
 }
 
+/** Denemeyi bir artırır ve yeni deneme sayısını döner (alarm eşiği kontrolü için). */
 export async function markFailedTx(tx: Tx, id: string): Promise<number> {
   const [row] = await tx
     .update(outbox)

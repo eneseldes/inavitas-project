@@ -13,11 +13,25 @@ $color-brand-900: #145332;
 
 $color-brand: $color-brand-500;
 
-$color-ink: #1f2d24;
-$color-ink-soft: #576b5f;
-$color-hairline: #e2e8f0;
-$color-bg: #f8fafc;
-$color-white: #ffffff;
+// DİKKAT: bu değişkenler artık SABİT DEĞİL, _theme.scss'teki CSS custom
+// property'lerine referanstır. Üzerlerinde darken()/lighten()/rgba() gibi
+// SCSS renk fonksiyonu ÇALIŞMAZ — yeni bir ton gerekiyorsa _theme.scss'e
+// yeni token ekle (yukarıdaki marka/slate/kırmızı gibi paletler bu köprünün
+// dışında kalır, onlar hâlâ gerçek SCSS renk değeridir).
+$color-bg: var(--c-bg);
+$color-surface: var(--c-surface);
+$color-surface-alt: var(--c-surface-alt);
+$color-ink: var(--c-ink);
+$color-ink-soft: var(--c-ink-soft);
+$color-ink-inverse: var(--c-ink-inverse);
+$color-hairline: var(--c-hairline);
+$color-overlay: var(--c-overlay);
+$color-warn-surface: var(--c-warn-surface);
+$color-warn-border: var(--c-warn-border);
+$color-row-hover: var(--c-row-hover);
+$color-glass-surface: var(--c-glass-surface);
+$color-glass-border: var(--c-glass-border);
+$shadow-ambient: var(--c-shadow-ambient);
 
 $color-red-50: #fef2f2;
 $color-red-100: #fee2e2;
@@ -61,7 +75,7 @@ $radius-lg: 0.75rem;
 $radius-xl: 1rem;
 $radius-full: 9999px;
 
-$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+$shadow-sm: var(--shadow-sm);
 $shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
 $shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 

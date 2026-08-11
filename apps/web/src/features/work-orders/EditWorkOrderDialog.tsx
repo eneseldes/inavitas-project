@@ -3,7 +3,8 @@ import { ApiError } from '../../shared/api/errors.ts';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
-import { ORIGIN_LABELS, WORK_ORDER_STATUS_LABELS, WORK_ORDER_TYPE_LABELS } from '../../shared/labels.ts';
+import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useLabels } from '../i18n/useLabels.ts';
 import type { WorkOrder, WorkOrderStatus } from '../../types/work-order.ts';
 import { NEXT_STATUSES } from './columns.tsx';
 import styles from './EditWorkOrderDialog.module.scss';
@@ -25,6 +26,8 @@ interface EditWorkOrderDialogProps {
 export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogProps) {
   const patchWorkOrder = usePatchWorkOrder();
   const { show } = useToast();
+  const { t } = useTranslation();
+  const labels = useLabels();
   const [nextStatus, setNextStatus] = useState<WorkOrderStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
@@ -38,17 +41,17 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
     setError(null);
     try {
       await patchWorkOrder.mutateAsync({ id: workOrder.id, status: nextStatus, version: workOrder.version });
-      show('success', `İş emri ${WORK_ORDER_STATUS_LABELS[nextStatus]} durumuna geçti`);
+      show('success', t('work-order.toast.statusChanged', { status: labels.workOrderStatus(nextStatus) }));
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'İş emri güncellenemedi');
+      setError(err instanceof ApiError ? t(err.message) : t('work-order.toast.updateError'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal title="İş Emrini Güncelle" onClose={onClose}>
+    <Modal title={t('work-order.dialog.edit.title')} onClose={onClose}>
       <div className={styles.readOnlyBlock}>
         <div className={styles.readOnlyRow}>
           <span className={styles.readOnlyLabel}>ID</span>
@@ -61,19 +64,19 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
           <span className={`${styles.readOnlyValue} font-mono`}>{workOrder.gisId}</span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>Tip</span>
-          <span className={styles.readOnlyValue}>{WORK_ORDER_TYPE_LABELS[workOrder.type]}</span>
+          <span className={styles.readOnlyLabel}>{t('work-order.dialog.edit.typeLabel')}</span>
+          <span className={styles.readOnlyValue}>{labels.workOrderType(workOrder.type)}</span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>Kaynak</span>
-          <span className={styles.readOnlyValue}>{ORIGIN_LABELS[workOrder.origin]}</span>
+          <span className={styles.readOnlyLabel}>{t('work-order.dialog.edit.originLabel')}</span>
+          <span className={styles.readOnlyValue}>{labels.origin(workOrder.origin)}</span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>Oluşturulma</span>
+          <span className={styles.readOnlyLabel}>{t('work-order.dialog.edit.createdAtLabel')}</span>
           <span className={styles.readOnlyValue}>{dateFormatter.format(new Date(workOrder.createdAt))}</span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>Mevcut durum</span>
+          <span className={styles.readOnlyLabel}>{t('work-order.dialog.edit.currentStatusLabel')}</span>
           <StatusBadge status={workOrder.status} />
         </div>
       </div>
@@ -82,30 +85,30 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
 
       <div className="field">
         <label htmlFor="nextStatus" className="field__label">
-          Yeni durum
+          {t('work-order.dialog.edit.nextStatusLabel')}
         </label>
         {options.length > 0 ? (
           <select id="nextStatus" className="select" value={nextStatus} onChange={(e) => setNextStatus(e.target.value as WorkOrderStatus)}>
             <option value="" disabled>
-              Geçiş seç…
+              {t('work-order.dialog.edit.selectTransition')}
             </option>
             {options.map((status) => (
               <option key={status} value={status}>
-                {WORK_ORDER_STATUS_LABELS[status]}
+                {labels.workOrderStatus(status)}
               </option>
             ))}
           </select>
         ) : (
-          <p className="field__hint">Bu durumdan başka bir duruma geçiş yok.</p>
+          <p className="field__hint">{t('work-order.dialog.edit.noTransitions')}</p>
         )}
       </div>
 
       <div className="form-actions">
         <button type="button" onClick={onClose} className="btn btn--ghost">
-          Vazgeç
+          {t('common.action.cancel')}
         </button>
         <button type="button" onClick={onSubmit} disabled={!nextStatus || isSubmitting} className="btn btn--primary">
-          {isSubmitting ? 'Kaydediliyor…' : 'Kaydet'}
+          {isSubmitting ? t('common.action.saving') : t('common.action.save')}
         </button>
       </div>
     </Modal>

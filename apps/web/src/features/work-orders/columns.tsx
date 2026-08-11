@@ -2,8 +2,11 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { FiLink } from 'react-icons/fi';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
-import { ORIGIN_LABELS, WORK_ORDER_STATUS_LABELS, WORK_ORDER_TYPE_LABELS } from '../../shared/labels.ts';
+import type { TranslateFn } from '../i18n/I18nProvider.tsx';
+import type { useLabels } from '../i18n/useLabels.ts';
 import { WORK_ORDER_STATUSES, WORK_ORDER_TYPES, type WorkOrder, type WorkOrderStatus } from '../../types/work-order.ts';
+
+type Labels = ReturnType<typeof useLabels>;
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -23,10 +26,14 @@ export const NEXT_STATUSES: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   CANCELLED: [],
 };
 
-const STATUS_FILTER_OPTIONS = WORK_ORDER_STATUSES.map((status) => ({ value: status, label: WORK_ORDER_STATUS_LABELS[status] }));
-const TYPE_FILTER_OPTIONS = WORK_ORDER_TYPES.map((type) => ({ value: type, label: WORK_ORDER_TYPE_LABELS[type] }));
+export function buildWorkOrderColumns(
+  t: TranslateFn,
+  labels: Labels,
+  onOpenOutage: (outageId: string) => void,
+): ColumnDef<WorkOrder>[] {
+  const statusFilterOptions = WORK_ORDER_STATUSES.map((status) => ({ value: status, label: labels.workOrderStatus(status) }));
+  const typeFilterOptions = WORK_ORDER_TYPES.map((type) => ({ value: type, label: labels.workOrderType(type) }));
 
-export function buildWorkOrderColumns(onOpenOutage: (outageId: string) => void): ColumnDef<WorkOrder>[] {
   return [
     {
       id: 'id',
@@ -43,7 +50,7 @@ export function buildWorkOrderColumns(onOpenOutage: (outageId: string) => void):
     },
     {
       id: 'createdAt',
-      header: 'Oluşturulma',
+      header: t('work-order.column.createdAt'),
       accessorFn: (row) => row.createdAt,
       cell: (ctx) => formatDate(ctx.getValue<string>()),
       meta: { sortField: 'createdAt' } satisfies ColumnMeta,
@@ -55,41 +62,41 @@ export function buildWorkOrderColumns(onOpenOutage: (outageId: string) => void):
       cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
       meta: {
         sortField: 'gisId',
-        filter: { field: 'gisId', type: 'text', placeholder: 'ör. CB-10' },
+        filter: { field: 'gisId', type: 'text', placeholder: t('common.placeholder.gisIdExample') },
       } satisfies ColumnMeta,
     },
     {
       id: 'type',
-      header: 'Tip',
+      header: t('work-order.column.type'),
       accessorFn: (row) => row.type,
-      cell: (ctx) => <span>{WORK_ORDER_TYPE_LABELS[ctx.getValue<WorkOrder['type']>()]}</span>,
+      cell: (ctx) => <span>{labels.workOrderType(ctx.getValue<WorkOrder['type']>())}</span>,
       meta: {
         sortField: 'type',
-        filter: { field: 'type', type: 'multiselect', options: TYPE_FILTER_OPTIONS },
+        filter: { field: 'type', type: 'multiselect', options: typeFilterOptions },
       } satisfies ColumnMeta,
     },
     {
       id: 'status',
-      header: 'Durum',
+      header: t('work-order.column.status'),
       accessorFn: (row) => row.status,
       cell: (ctx) => <StatusBadge status={ctx.getValue<WorkOrder['status']>()} />,
       meta: {
         sortField: 'status',
-        filter: { field: 'status', type: 'multiselect', options: STATUS_FILTER_OPTIONS },
+        filter: { field: 'status', type: 'multiselect', options: statusFilterOptions },
       } satisfies ColumnMeta,
     },
     {
       id: 'origin',
-      header: 'Kaynak',
+      header: t('work-order.column.origin'),
       accessorFn: (row) => row.origin,
       cell: (ctx) => {
         const origin = ctx.getValue<WorkOrder['origin']>();
-        return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{ORIGIN_LABELS[origin]}</span>;
+        return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
       },
     },
     {
       id: 'outageId',
-      header: 'Kesinti',
+      header: t('work-order.column.outageId'),
       accessorFn: (row) => row.outageId,
       // İlişkili kayıt ID'si tıklanabilir; karşı ekranda ilgili kaydı açar.
       cell: (ctx) => {
@@ -103,7 +110,7 @@ export function buildWorkOrderColumns(onOpenOutage: (outageId: string) => void):
               onOpenOutage(outageId);
             }}
             className="link"
-            title="Kesinti ekranında aç"
+            title={t('work-order.action.openOutage')}
           >
             <FiLink />
             {outageId.slice(0, 8)}

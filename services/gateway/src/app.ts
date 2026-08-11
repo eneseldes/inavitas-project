@@ -2,21 +2,19 @@ import { asyncHandler, correlationMiddleware, errorHandler, httpLogger, notFound
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
-import { loginRateLimiter } from './auth/rate-limit.ts';
+import { bundleRateLimiter, loginRateLimiter } from './auth/rate-limit.ts';
 import { requireAuth, stripSpoofedHeaders, verifyCsrf } from './auth/middleware.ts';
 import { config, SERVICE_TARGETS } from './config.ts';
 import { buildProxy } from './proxy.ts';
 import { redis, redisSubscriber } from './redis.ts';
 import { createSseHubs } from './realtime/sse.ts';
 
-/** Kimlik doğrulama gerektirmeyen (herkese açık) rotalar. */
-const PUBLIC_PATHS = new Set([
-  '/api/auth/login',
-  '/api/auth/refresh',
-  '/api/auth/logout',
-  '/api/translations/bundle',
-  '/api/translations/locales',
-]);
+function isPublicPath(req: express.Request): boolean {
+  if (req.method === 'GET' && (req.path === '/api/translations/bundle' || req.path === '/api/translations/locales')) {
+    return true;
+  }
+  return req.path === '/api/auth/login' || req.path === '/api/auth/refresh' || req.path === '/api/auth/logout';
+}
 
 /** Login'de henüz CSRF çerezi kurulmadığından muaf; diğer tüm mutasyonlar korunur. */
 const CSRF_EXEMPT_PATHS = new Set(['/api/auth/login']);
@@ -59,6 +57,8 @@ export function createApp(logger: Logger): Express {
   // Sahte header temizleme ve kimlik doğrulama kontrolleri
   app.use(stripSpoofedHeaders());
   app.post('/api/auth/login', loginRateLimiter(redis));
+  app.use('/api/translations/bundle', bundleRateLimiter(redis));
+  app.use('/api/translations/locales', bundleRateLimiter(redis));
 
   app.use((req, res, next) => {
     if (CSRF_EXEMPT_PATHS.has(req.path)) {
@@ -69,7 +69,7 @@ export function createApp(logger: Logger): Express {
   });
 
   app.use((req, res, next) => {
-    if (PUBLIC_PATHS.has(req.path)) {
+    if (isPublicPath(req)) {
       next();
       return;
     }

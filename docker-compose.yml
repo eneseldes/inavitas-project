@@ -72,6 +72,9 @@ services:
     image: inavitas-backend:latest
     build: .
     command: ["node", "services/access-service/dist/index.js"]
+    # Pino log dosyalarını host'un ./logs klasörüne aç ki promtail toplayabilsin.
+    volumes:
+      - ./logs:/app/logs
     environment:
       NODE_ENV: production
       LOG_LEVEL: info
@@ -96,6 +99,8 @@ services:
     image: inavitas-backend:latest
     build: .
     command: ["node", "services/outage-service/dist/index.js"]
+    volumes:
+      - ./logs:/app/logs
     environment:
       NODE_ENV: production
       LOG_LEVEL: info
@@ -119,6 +124,8 @@ services:
     image: inavitas-backend:latest
     build: .
     command: ["node", "services/work-order-service/dist/index.js"]
+    volumes:
+      - ./logs:/app/logs
     environment:
       NODE_ENV: production
       LOG_LEVEL: info
@@ -142,6 +149,8 @@ services:
     image: inavitas-backend:latest
     build: .
     command: ["node", "services/translation-service/dist/index.js"]
+    volumes:
+      - ./logs:/app/logs
     environment:
       NODE_ENV: production
       LOG_LEVEL: info
@@ -167,6 +176,8 @@ services:
     image: inavitas-backend:latest
     build: .
     command: ["node", "services/gateway/dist/index.js"]
+    volumes:
+      - ./logs:/app/logs
     environment:
       NODE_ENV: production
       LOG_LEVEL: info

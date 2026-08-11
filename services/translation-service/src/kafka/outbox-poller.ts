@@ -5,6 +5,7 @@ import { claimBatchTx, markFailedTx, markPublishedTx } from '../repository/outbo
 
 const POLL_INTERVAL_MS = 500;
 const BATCH_SIZE = 100;
+/** Bu kadar başarısız denemeden sonra alarm seviyesinde logla (manuel inceleme sinyali). */
 const ALARM_THRESHOLD = 5;
 
 async function pollOnce(log: Logger): Promise<void> {
@@ -38,6 +39,10 @@ export interface OutboxPollerHandle {
   stop(): void;
 }
 
+/**
+ * Outbox tablosundaki yayınlanmamış olayları periyodik olarak Kafka'ya iletir.
+ * `FOR UPDATE SKIP LOCKED` mekanizması ile eşzamanlı örneklerin aynı satırı işlemesi engellenir.
+ */
 export function startOutboxPoller(log: Logger): OutboxPollerHandle {
   const timer = setInterval(() => {
     pollOnce(log).catch((err) => log.error({ err }, 'outbox poller döngüsü başarısız'));

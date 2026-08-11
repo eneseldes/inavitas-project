@@ -32,4 +32,13 @@ describe('buildBundle', () => {
 
     expect(result).toEqual({ 'app.title': 'Başlık' });
   });
+
+  it('yayınlanmış boş string değeri varsayılanın üzerine yazılır', () => {
+    const defaultMap = { 'auth.hero.titleAfter': 'ile yönetin' };
+    const requestedMap = { 'auth.hero.titleAfter': '' };
+
+    const result = buildBundle(defaultMap, requestedMap);
+
+    expect(result).toEqual({ 'auth.hero.titleAfter': '' });
+  });
 });

@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service && npm run db:migrate -w services/translation-service",
-    "db:seed": "npm run db:seed -w services/access-service",
+    "db:seed": "npm run db:seed -w services/access-service && npm run db:seed -w services/translation-service",
     "topics": "./scripts/create-topics.sh",
     "reconcile": "dotenv -e .env -- tsx scripts/reconcile.ts"
   },

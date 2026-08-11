@@ -15,8 +15,13 @@ const server = app.listen(config.ACCESS_SERVICE_PORT, () => {
   logger.info({ port: config.ACCESS_SERVICE_PORT }, 'access-service ayakta');
 });
 
+let shuttingDown = false;
+
 /** Uygulamayı güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
   logger.info({ signal }, 'kapanış başlatıldı');
 
   server.close(async (err) => {

@@ -1,0 +1,40 @@
+// Tema köprüsü — ham renk değerleri YALNIZ burada yaşar (açık + karanlık).
+// _variables.scss buradaki custom property'lere referans verir; component
+// SCSS dosyaları hiçbir değişiklik olmadan v.$color-* kullanmaya devam eder.
+:root {
+  --c-bg: #f8fafc;
+  --c-surface: #ffffff;
+  --c-surface-alt: #f1f5f9;
+  --c-ink: #1f2d24;
+  --c-ink-soft: #576b5f;
+  --c-hairline: #e2e8f0;
+  --c-overlay: rgba(15, 23, 30, 0.4);
+  --c-warn-surface: #fefce8;
+  --c-warn-border: #fde047;
+  --c-row-hover: rgba(241, 245, 249, 0.4);
+  --c-glass-surface: rgba(255, 255, 255, 0.78);
+  --c-glass-border: rgba(255, 255, 255, 0.9);
+  --c-shadow-ambient: rgba(0, 0, 0, 0.03);
+  // Renkli (marka) arkaplan üzerindeki metin — temadan bağımsız sabit kalır.
+  --c-ink-inverse: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme='dark'] {
+  --c-bg: #0f172a;
+  --c-surface: #1e293b;
+  --c-surface-alt: #334155;
+  --c-ink: #e2e8f0;
+  --c-ink-soft: #94a3b8;
+  --c-hairline: #334155;
+  --c-overlay: rgba(0, 0, 0, 0.6);
+  --c-warn-surface: #422006;
+  --c-warn-border: #a16207;
+  --c-row-hover: rgba(255, 255, 255, 0.06);
+  --c-glass-surface: rgba(30, 41, 59, 0.78);
+  --c-glass-border: rgba(51, 65, 85, 0.7);
+  --c-shadow-ambient: rgba(0, 0, 0, 0.4);
+  --c-ink-inverse: #ffffff;
+  // Koyu zeminde siyah gölge görünmez; opaklık artırılır.
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+}

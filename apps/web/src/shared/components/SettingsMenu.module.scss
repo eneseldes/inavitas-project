@@ -1,0 +1,57 @@
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
+
+.popover {
+  position: fixed;
+  z-index: v.$z-popover;
+  width: 14rem;
+  padding: v.$space-2;
+  background: v.$color-surface;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-lg;
+  box-shadow: v.$shadow-lg;
+  animation: pop v.$transition-fast;
+  font-size: 0.8125rem;
+  color: v.$color-ink;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+  padding: v.$space-2;
+}
+
+.divider {
+  height: 1px;
+  margin: v.$space-1 0;
+  background: v.$color-hairline;
+}
+
+.menuButton {
+  @include m.clickable;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: v.$space-2;
+  border-radius: v.$radius-md;
+  font-size: 0.8125rem;
+  color: v.$color-ink;
+  @include m.focus-ring;
+
+  &:hover {
+    background: v.$color-slate-100;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

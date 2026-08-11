@@ -2,8 +2,9 @@ import { PaginationQuery } from '@inavitas/shared';
 import { z } from 'zod';
 
 export const GetBundleQuery = z.object({
-  locale: z.string().min(2).max(10),
-  namespace: z.string().min(1).max(64),
+  locale: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/),
+  // Opsiyonel — verilmezse tüm namespace'ler tek düz sözlükte döner (bkz. E3).
+  namespace: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/).optional(),
 });
 export type GetBundleQuery = z.infer<typeof GetBundleQuery>;
 
@@ -29,15 +30,34 @@ export const UpdateTranslationBody = z.object({
 });
 export type UpdateTranslationBody = z.infer<typeof UpdateTranslationBody>;
 
+export const CreateLocaleBody = z.object({
+  code: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/),
+  name: z.string().min(1).max(64),
+  isDefault: z.boolean().optional(),
+});
+export type CreateLocaleBody = z.infer<typeof CreateLocaleBody>;
+
+export const UpdateLocaleBody = z.object({
+  isActive: z.boolean(),
+});
+export type UpdateLocaleBody = z.infer<typeof UpdateLocaleBody>;
+
 export const PublishBody = z.object({
   namespace: z.string().optional(),
   locales: z.array(z.string()).optional(),
 });
 export type PublishBody = z.infer<typeof PublishBody>;
 
-export const AutoTranslateBody = z.object({
-  keyIds: z.array(z.string().uuid()).min(1).max(50),
-  targetLocale: z.string().min(2).max(10),
-  sourceLocale: z.string().optional(),
-});
+export const AutoTranslateBody = z
+  .object({
+    targetLocale: z.string().min(2).max(10),
+    sourceLocale: z.string().optional(),
+    namespace: z.string().optional(),
+    keyIds: z.array(z.string().uuid()).optional(),
+    onlyMissing: z.boolean().optional().default(true),
+  })
+  // İkisi de yoksa yanlışlıkla tüm veritabanını çevirme riski oluşur.
+  .refine((body) => !!body.namespace || (body.keyIds && body.keyIds.length > 0), {
+    message: 'namespace veya keyIds alanlarından en az biri zorunludur',
+  });
 export type AutoTranslateBody = z.infer<typeof AutoTranslateBody>;

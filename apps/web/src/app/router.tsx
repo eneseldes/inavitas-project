@@ -4,7 +4,6 @@ import { LoginPage } from '../features/auth/LoginPage.tsx';
 import { ProtectedRoute } from '../features/auth/ProtectedRoute.tsx';
 import { useAuth } from '../features/auth/useAuth.tsx';
 import { OutageGrid } from '../features/outages/OutageGrid.tsx';
-import { TranslationManagementPage } from '../features/translations/TranslationManagementPage.tsx';
 import { WorkOrderGrid } from '../features/work-orders/WorkOrderGrid.tsx';
 import { AppShell } from '../shared/components/AppShell.tsx';
 
@@ -15,7 +14,6 @@ function RootRedirect() {
 
   if (permissions.includes('outage:read')) return <Navigate to="/outages" replace />;
   if (permissions.includes('workorder:read')) return <Navigate to="/work-orders" replace />;
-  if (permissions.includes('translation:read')) return <Navigate to="/translations" replace />;
   return <Navigate to="/403" replace />;
 }
 
@@ -46,14 +44,6 @@ export function AppRouter() {
           element={
             <ProtectedRoute permission="workorder:read">
               <WorkOrderGrid />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="translations"
-          element={
-            <ProtectedRoute permission="translation:read">
-              <TranslationManagementPage />
             </ProtectedRoute>
           }
         />

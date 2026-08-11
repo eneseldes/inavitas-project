@@ -5,6 +5,8 @@ import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx
 import { LiveIndicator } from '../../shared/components/LiveIndicator.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
+import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useLabels } from '../i18n/useLabels.ts';
 import type { SortDirection } from '../../types/api.ts';
 import type { WorkOrder, WorkOrderStatus, WorkOrderType } from '../../types/work-order.ts';
 import { CreateWorkOrderDialog } from './CreateWorkOrderDialog.tsx';
@@ -17,6 +19,8 @@ import { useWorkOrderStream } from './useWorkOrderStream.ts';
 
 export function WorkOrderGrid() {
   const { hasPermission } = useAuth();
+  const { t } = useTranslation();
+  const labels = useLabels();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isLive = useWorkOrderStream();
@@ -56,14 +60,14 @@ export function WorkOrderGrid() {
   const { data: relatedWorkOrder } = useWorkOrder(relatedId);
 
   const columns = useMemo(
-    () => buildWorkOrderColumns((outageId) => navigate(`/outages?relatedOutageId=${outageId}`)),
-    [navigate],
+    () => buildWorkOrderColumns(t, labels, (outageId) => navigate(`/outages?relatedOutageId=${outageId}`)),
+    [t, labels, navigate],
   );
 
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.title}>İş Emirleri</h1>
+        <h1 className={styles.title}>{t('work-order.page.title')}</h1>
         <LiveIndicator connected={isLive} />
       </div>
 
@@ -71,10 +75,11 @@ export function WorkOrderGrid() {
         <div className={styles.relatedBanner}>
           {relatedWorkOrder ? (
             <span>
-              İlişkili iş emri: <span className="font-mono">{relatedWorkOrder.id}</span> — <StatusBadge status={relatedWorkOrder.status} /> — GIS: {relatedWorkOrder.gisId}
+              {t('work-order.related.label')} <span className="font-mono">{relatedWorkOrder.id}</span> — <StatusBadge status={relatedWorkOrder.status} /> —{' '}
+              {t('outage.related.gisLabel')} {relatedWorkOrder.gisId}
             </span>
           ) : (
-            <span>İlişkili iş emri yükleniyor…</span>
+            <span>{t('work-order.related.loading')}</span>
           )}
           <button
             type="button"
@@ -112,11 +117,11 @@ export function WorkOrderGrid() {
         isLoading={isLoading}
         isFetching={isFetching}
         onRowClick={(workOrder) => setHistoryWorkOrder(workOrder)}
-        emptyMessage="İş emri kaydı yok"
+        emptyMessage={t('work-order.table.empty')}
         toolbarActions={
           hasPermission('workorder:write') && (
             <button type="button" onClick={() => setCreateOpen(true)} className="btn btn--primary">
-              <FiPlus /> Yeni İş Emri
+              <FiPlus /> {t('work-order.action.new')}
             </button>
           )
         }

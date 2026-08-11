@@ -2,8 +2,11 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { FiLink } from 'react-icons/fi';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
-import { OUTAGE_STATUS_LABELS, ORIGIN_LABELS } from '../../shared/labels.ts';
+import type { TranslateFn } from '../i18n/I18nProvider.tsx';
+import type { useLabels } from '../i18n/useLabels.ts';
 import { OUTAGE_STATUSES, type Outage, type OutageStatus } from '../../types/outage.ts';
+
+type Labels = ReturnType<typeof useLabels>;
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -33,9 +36,13 @@ export function isLocked(status: OutageStatus): boolean {
   return status === 'ARCHIVED' || status === 'CANCELLED';
 }
 
-const STATUS_FILTER_OPTIONS = OUTAGE_STATUSES.map((status) => ({ value: status, label: OUTAGE_STATUS_LABELS[status] }));
+export function buildOutageColumns(
+  t: TranslateFn,
+  labels: Labels,
+  onOpenWorkOrder: (workOrderId: string) => void,
+): ColumnDef<Outage>[] {
+  const statusFilterOptions = OUTAGE_STATUSES.map((status) => ({ value: status, label: labels.outageStatus(status) }));
 
-export function buildOutageColumns(onOpenWorkOrder: (workOrderId: string) => void): ColumnDef<Outage>[] {
   return [
     {
       id: 'id',
@@ -52,7 +59,7 @@ export function buildOutageColumns(onOpenWorkOrder: (workOrderId: string) => voi
     },
     {
       id: 'createdAt',
-      header: 'Oluşturulma',
+      header: t('outage.column.createdAt'),
       accessorFn: (row) => row.createdAt,
       cell: (ctx) => formatDate(ctx.getValue<string>()),
       meta: { sortField: 'createdAt' } satisfies ColumnMeta,
@@ -64,50 +71,50 @@ export function buildOutageColumns(onOpenWorkOrder: (workOrderId: string) => voi
       cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
       meta: {
         sortField: 'gisId',
-        filter: { field: 'gisId', type: 'text', placeholder: 'ör. CB-10' },
+        filter: { field: 'gisId', type: 'text', placeholder: t('common.placeholder.gisIdExample') },
       } satisfies ColumnMeta,
     },
     {
       id: 'status',
-      header: 'Durum',
+      header: t('outage.column.status'),
       accessorFn: (row) => row.status,
       cell: (ctx) => <StatusBadge status={ctx.getValue<Outage['status']>()} />,
       meta: {
         sortField: 'status',
-        filter: { field: 'status', type: 'multiselect', options: STATUS_FILTER_OPTIONS },
+        filter: { field: 'status', type: 'multiselect', options: statusFilterOptions },
       } satisfies ColumnMeta,
     },
     {
       id: 'startedAt',
-      header: 'Başlangıç',
+      header: t('outage.column.startedAt'),
       accessorFn: (row) => row.startedAt,
       cell: (ctx) => formatDate(ctx.getValue<string>()),
       meta: { sortField: 'startedAt' } satisfies ColumnMeta,
     },
     {
       id: 'endedAt',
-      header: 'Bitiş',
+      header: t('outage.column.endedAt'),
       accessorFn: (row) => row.endedAt,
       cell: (ctx) => formatDate(ctx.getValue<string | null>()),
     },
     {
       id: 'durationMinutes',
-      header: 'Süre (dk)',
+      header: t('outage.column.durationMinutes'),
       accessorFn: (row) => row.durationMinutes,
       cell: (ctx) => ctx.getValue<number | null>() ?? '—',
     },
     {
       id: 'origin',
-      header: 'Kaynak',
+      header: t('outage.column.origin'),
       accessorFn: (row) => row.origin,
       cell: (ctx) => {
         const origin = ctx.getValue<Outage['origin']>();
-        return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{ORIGIN_LABELS[origin]}</span>;
+        return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
       },
     },
     {
       id: 'workOrderId',
-      header: 'İş Emri',
+      header: t('outage.column.workOrderId'),
       accessorFn: (row) => row.workOrderId,
       // İlişkili kayıt ID'si tıklanabilir; karşı ekranda ilgili kaydı açar.
       cell: (ctx) => {
@@ -121,7 +128,7 @@ export function buildOutageColumns(onOpenWorkOrder: (workOrderId: string) => voi
               onOpenWorkOrder(workOrderId);
             }}
             className="link"
-            title="İş emri ekranında aç"
+            title={t('outage.action.openWorkOrder')}
           >
             <FiLink />
             {workOrderId.slice(0, 8)}

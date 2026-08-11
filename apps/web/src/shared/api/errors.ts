@@ -25,5 +25,6 @@ export async function toApiError(res: Response): Promise<ApiError> {
     return new ApiError(res.status, body.error.code, body.error.message, body.error.details, body.error.correlationId);
   }
 
-  return new ApiError(res.status, 'INTERNAL', 'Beklenmeyen bir hata oluştu');
+  // React ağacının dışında — metin değil anahtar üretilir, gösteren taraf t() ile çevirir.
+  return new ApiError(res.status, 'INTERNAL', 'common.error.unexpected');
 }

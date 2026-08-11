@@ -1,7 +1,8 @@
 import { FiArrowRight, FiEdit2, FiLock } from 'react-icons/fi';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
-import { ORIGIN_LABELS, formatActorName } from '../../shared/labels.ts';
+import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useLabels } from '../i18n/useLabels.ts';
 import type { Outage } from '../../types/outage.ts';
 import { isLocked } from './columns.tsx';
 import styles from './OutageHistoryDialog.module.scss';
@@ -11,45 +12,47 @@ const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', tim
 
 export function OutageHistoryDialog({ outage, onClose, onEdit }: { outage: Outage; onClose: () => void; onEdit: () => void }) {
   const { data, isLoading } = useOutageHistory(outage.id);
+  const { t } = useTranslation();
+  const labels = useLabels();
   const locked = isLocked(outage.status);
 
   return (
     <Modal
-      title={`Durum Geçmişi — ${outage.id.slice(0, 8)}`}
+      title={t('outage.dialog.history.title', { id: outage.id.slice(0, 8) })}
       onClose={onClose}
       size="lg"
       headerActions={
         locked ? (
-          <span className="locked-cell" title="Arşivlenmiş/iptal edilmiş kesinti kilitlidir, düzenlenemez">
+          <span className="locked-cell" title={t('outage.tooltip.locked')}>
             <FiLock />
-            Kilitli
+            {t('outage.action.locked')}
           </span>
         ) : (
-          <button type="button" onClick={onEdit} className="icon-btn icon-btn--sm" title="Kesintiyi güncelle">
+          <button type="button" onClick={onEdit} className="icon-btn icon-btn--sm" title={t('outage.action.edit')}>
             <FiEdit2 />
           </button>
         )
       }
     >
       <div className={styles.tableWrap}>
-        {isLoading && <p>Yükleniyor…</p>}
+        {isLoading && <p>{t('common.loading')}</p>}
         {data && (
           <table className="table">
             <thead>
               <tr>
-                <th>Tarih / Saat</th>
-                <th>Önceki Durum</th>
+                <th>{t('common.history.dateTime')}</th>
+                <th>{t('common.history.prevStatus')}</th>
                 <th className={styles.arrowCol}></th>
-                <th>Yeni Durum</th>
-                <th>İşlem Sahibi</th>
-                <th>Kaynak</th>
+                <th>{t('common.history.newStatus')}</th>
+                <th>{t('common.history.actor')}</th>
+                <th>{t('common.history.origin')}</th>
               </tr>
             </thead>
             <tbody>
               {data.items.length === 0 ? (
                 <tr>
                   <td colSpan={6} className={`text-muted ${styles.emptyCell}`}>
-                    Geçmiş kaydı bulunamadı.
+                    {t('common.history.empty')}
                   </td>
                 </tr>
               ) : (
@@ -60,7 +63,7 @@ export function OutageHistoryDialog({ outage, onClose, onEdit }: { outage: Outag
                       {entry.fromStatus ? (
                         <StatusBadge status={entry.fromStatus} />
                       ) : (
-                        <span className="text-muted">Oluşturuldu</span>
+                        <span className="text-muted">{t('common.history.created')}</span>
                       )}
                     </td>
                     <td>
@@ -69,8 +72,8 @@ export function OutageHistoryDialog({ outage, onClose, onEdit }: { outage: Outag
                     <td>
                       <StatusBadge status={entry.toStatus} />
                     </td>
-                    <td>{formatActorName(entry.actor)}</td>
-                    <td>{ORIGIN_LABELS[entry.origin]}</td>
+                    <td>{entry.actor}</td>
+                    <td>{labels.origin(entry.origin)}</td>
                   </tr>
                 ))
               )}

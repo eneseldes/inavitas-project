@@ -22,3 +22,27 @@ export function loginRateLimiter(redis: Redis) {
     next();
   };
 }
+
+const BUNDLE_WINDOW_SECONDS = 60;
+const BUNDLE_MAX_ATTEMPTS = 60;
+
+/**
+ * `/api/translations/bundle` ve `/api/translations/locales` auth'suz erişilebilen tek
+ * uçlardır — IP bazlı hız sınırlaması uygular (dakikada 60 istek), loginRateLimiter ile
+ * birebir aynı desen.
+ */
+export function bundleRateLimiter(redis: Redis) {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    const key = `ratelimit:bundle:${req.ip ?? 'unknown'}`;
+
+    const attempts = await redis.incr(key);
+    if (attempts === 1) await redis.expire(key, BUNDLE_WINDOW_SECONDS);
+
+    if (attempts > BUNDLE_MAX_ATTEMPTS) {
+      next(new RateLimitedError('Çok fazla istek, bir dakika sonra tekrar deneyin'));
+      return;
+    }
+
+    next();
+  };
+}

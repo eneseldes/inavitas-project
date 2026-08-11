@@ -1,4 +1,5 @@
 @use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
 
 .shell {
   display: flex;
@@ -12,9 +13,9 @@
   flex-direction: column;
   width: v.$sidebar-collapsed-width;
   padding: v.$space-4 0.5rem;
-  background: v.$color-white;
+  background: v.$color-surface;
   border-right: 1px solid v.$color-hairline;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.02);
+  box-shadow: 2px 0 10px v.$shadow-ambient;
   transition: width 280ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10;
   user-select: none;
@@ -176,6 +177,8 @@
   width: 100%;
 }
 
+// Avatar aynı zamanda daraltılmış sidebar'da ayarlar popover'ının tetikleyicisidir
+// ("avatar → hesap menüsü" evrensel kalıbı) — bu yüzden <button>.
 .avatarBadge {
   display: flex;
   align-items: center;
@@ -189,6 +192,7 @@
   font-size: 0.8125rem;
   font-weight: 700;
   flex-shrink: 0;
+  @include m.focus-ring;
 }
 
 .userInfo {
@@ -208,25 +212,36 @@
 
   .sidebarExpanded & {
     opacity: 1;
-    max-width: 160px;
+    // 160px → 124px: ⚙ butonu (28px) satıra eklendiğinde isim taşmasın diye.
+    max-width: 124px;
     transform: translateX(0);
     pointer-events: auto;
   }
 }
 
 .userName {
+  @include m.truncate;
   font-size: 0.8125rem;
   font-weight: 600;
   color: v.$color-ink;
-  text-overflow: ellipsis;
-  overflow: hidden;
 }
 
 .userRole {
+  @include m.truncate;
   font-size: 0.6875rem;
   color: v.$color-ink-soft;
-  text-overflow: ellipsis;
-  overflow: hidden;
+}
+
+// Yalnızca genişletilmiş sidebar'da görünür — daraltılmışta fiziksel yer yok,
+// avatar zaten aynı işlevi görüyor.
+.settingsBtn {
+  display: none;
+  flex-shrink: 0;
+
+  .sidebarExpanded & {
+    display: inline-flex;
+    margin-left: auto;
+  }
 }
 
 .logoutButton {
@@ -249,7 +264,7 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: v.$radius-full;
-  background: v.$color-white;
+  background: v.$color-surface;
   color: v.$color-ink-soft;
   border: 1px solid v.$color-hairline;
   box-shadow: v.$shadow-sm;

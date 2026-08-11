@@ -15,6 +15,8 @@ const REDACTED_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
   'headers.authorization',
+  'DEEPL_API_KEY',
+  '*.DEEPL_API_KEY',
 ];
 
 export interface LoggerOptions {

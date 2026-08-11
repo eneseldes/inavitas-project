@@ -7,7 +7,8 @@ import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
 import { isoToDateTimeLocalInput } from '../../shared/datetime.ts';
-import { OUTAGE_STATUS_LABELS } from '../../shared/labels.ts';
+import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useLabels } from '../i18n/useLabels.ts';
 import type { Outage, OutageStatus } from '../../types/outage.ts';
 import { USER_SELECTABLE_NEXT_STATUSES } from './columns.tsx';
 import styles from './EditOutageDialog.module.scss';
@@ -15,13 +16,13 @@ import { usePatchOutage } from './useOutages.ts';
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
-function makeSchema(startedAt: string) {
+function makeSchema(startedAt: string, invalidMessage: string) {
   return z
     .object({
       endedAt: z.string().optional(),
     })
     .refine((data) => !data.endedAt || new Date(data.endedAt) >= new Date(startedAt), {
-      message: "endedAt, startedAt'tan önce olamaz",
+      message: invalidMessage,
       path: ['endedAt'],
     });
 }
@@ -35,7 +36,9 @@ interface EditOutageDialogProps {
 export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
   const patchOutage = usePatchOutage();
   const { show } = useToast();
-  const schema = makeSchema(outage.startedAt);
+  const { t } = useTranslation();
+  const labels = useLabels();
+  const schema = makeSchema(outage.startedAt, t('outage.validation.endedAtBeforeStarted'));
   const options = USER_SELECTABLE_NEXT_STATUSES[outage.status] || [];
   const [nextStatus, setNextStatus] = useState<OutageStatus | ''>('');
 
@@ -59,15 +62,15 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
         ...(nextStatus ? { status: nextStatus } : {}),
         ...(values.endedAt ? { endedAt: new Date(values.endedAt).toISOString() } : {}),
       });
-      show('success', 'Kesinti güncellendi');
+      show('success', t('outage.toast.updateSuccess'));
       onClose();
     } catch (err) {
-      setError('root', { message: err instanceof ApiError ? err.message : 'Kesinti güncellenemedi' });
+      setError('root', { message: err instanceof ApiError ? t(err.message) : t('outage.toast.updateError') });
     }
   });
 
   return (
-    <Modal title="Kesintiyi Güncelle" onClose={onClose}>
+    <Modal title={t('outage.dialog.edit.title')} onClose={onClose}>
       <div className={styles.readOnlyBlock}>
         <div className={styles.readOnlyRow}>
           <span className={styles.readOnlyLabel}>ID</span>
@@ -80,11 +83,11 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
           <span className={`${styles.readOnlyValue} font-mono`}>{outage.gisId}</span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>Mevcut durum</span>
+          <span className={styles.readOnlyLabel}>{t('outage.dialog.edit.currentStatusLabel')}</span>
           <StatusBadge status={outage.status} />
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>Başlangıç</span>
+          <span className={styles.readOnlyLabel}>{t('outage.column.startedAt')}</span>
           <span className={styles.readOnlyValue}>{dateFormatter.format(new Date(outage.startedAt))}</span>
         </div>
       </div>
@@ -94,8 +97,8 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
 
         <div className="field">
           <label htmlFor="endedAt" className="field__label">
-            Bitiş zamanı
-            <span className="field__hint"> (verilirse durum otomatik "Enerji Verildi" olur)</span>
+            {t('outage.dialog.create.endedAtLabel')}
+            <span className="field__hint"> {t('outage.dialog.edit.endedAtHint', { status: labels.outageStatus('ENERGIZED') })}</span>
           </label>
           <input id="endedAt" type="datetime-local" className="input" {...register('endedAt')} />
           {errors.endedAt && <p className="field__error">{errors.endedAt.message}</p>}
@@ -103,7 +106,7 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
 
         <div className="field">
           <label htmlFor="nextStatus" className="field__label">
-            Yeni durum
+            {t('outage.dialog.edit.nextStatusLabel')}
           </label>
           {options.length > 0 ? (
             <select
@@ -113,25 +116,25 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
               onChange={(e) => setNextStatus(e.target.value as OutageStatus)}
             >
               <option value="" disabled>
-                Geçiş seç…
+                {t('outage.dialog.edit.selectTransition')}
               </option>
               {options.map((status) => (
                 <option key={status} value={status}>
-                  {OUTAGE_STATUS_LABELS[status]}
+                  {labels.outageStatus(status)}
                 </option>
               ))}
             </select>
           ) : (
-            <p className="field__hint">Bu durumdan başka bir duruma geçiş yok.</p>
+            <p className="field__hint">{t('outage.dialog.edit.noTransitions')}</p>
           )}
         </div>
 
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn--ghost">
-            Vazgeç
+            {t('common.action.cancel')}
           </button>
           <button type="submit" disabled={isSubmitting} className="btn btn--primary">
-            {isSubmitting ? 'Kaydediliyor…' : 'Kaydet'}
+            {isSubmitting ? t('common.action.saving') : t('common.action.save')}
           </button>
         </div>
       </form>

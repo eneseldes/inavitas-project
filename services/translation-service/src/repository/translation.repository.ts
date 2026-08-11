@@ -1,4 +1,4 @@
-import { eq, and, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, isNotNull, ne, sql } from 'drizzle-orm';
 import { db, type Tx } from '../db.ts';
 import {
   bundleVersions,
@@ -75,6 +75,59 @@ export async function buildPublishedBundle(
   return buildBundle(defaultDict, requestedDict);
 }
 
+/** Belirtilen dil için TÜM namespace'lerdeki yayınlanmış çeviri satırlarını döner (E3 — toplu bundle). */
+export async function getPublishedBundleRowsAll(localeCode: string, tx?: Tx): Promise<Dictionary> {
+  const rows = await client(tx)
+    .select({
+      keyName: translationKeys.keyName,
+      publishedValue: translations.publishedValue,
+    })
+    .from(translations)
+    .innerJoin(translationKeys, eq(translations.keyId, translationKeys.id))
+    .where(
+      and(
+        eq(translations.localeCode, localeCode),
+        isNotNull(translations.publishedValue),
+      ),
+    );
+
+  const dict: Dictionary = {};
+  for (const r of rows) {
+    if (r.publishedValue !== null) {
+      dict[r.keyName] = r.publishedValue;
+    }
+  }
+  return dict;
+}
+
+/** `namespace` opsiyonel istekler için: tüm namespace'ler tek düz sözlükte (anahtarlar zaten `outage.*`/`common.*` ön ekli, çakışma yok). */
+export async function buildPublishedBundleAll(requestedLocale: string, tx?: Tx): Promise<Dictionary> {
+  const defaultLocale = await getDefaultLocaleCode(tx);
+
+  const defaultDict = await getPublishedBundleRowsAll(defaultLocale, tx);
+
+  if (requestedLocale === defaultLocale) {
+    return defaultDict;
+  }
+
+  const requestedDict = await getPublishedBundleRowsAll(requestedLocale, tx);
+
+  return buildBundle(defaultDict, requestedDict);
+}
+
+/**
+ * O dildeki TÜM namespace'lerin bundle_versions toplamı — herhangi bir namespace
+ * yayınlandığında toplam artar, bu da toplu paketin ETag'ini doğal olarak değiştirir.
+ */
+export async function getAggregateBundleVersion(localeCode: string, tx?: Tx): Promise<number> {
+  const rows = await client(tx)
+    .select({ total: sql<number>`coalesce(sum(${bundleVersions.version}), 0)` })
+    .from(bundleVersions)
+    .where(eq(bundleVersions.localeCode, localeCode));
+
+  return Number(rows[0]?.total ?? 0);
+}
+
 /** Veritabanından mevcut bundle versiyonunu okur. */
 export async function getBundleVersion(
   localeCode: string,
@@ -93,7 +146,9 @@ export async function getBundleVersion(
     )
     .limit(1);
 
-  return rows[0]?.version ?? 1;
+  // Hiç yayınlanmamış paket v0'dır — ilk publish'in v1'e çıkışı ETag'i
+  // değiştirsin diye. Aksi halde ilk yayın istemcide 304 ile yutulur.
+  return rows[0]?.version ?? 0;
 }
 
 /** Bundle versiyonunu 1 artırır veya 1 olarak başlatır. */

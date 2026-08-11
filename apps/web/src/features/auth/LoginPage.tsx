@@ -5,15 +5,18 @@ import { FiLock, FiLogIn, FiMail } from 'react-icons/fi';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
+import { useTranslation } from '../i18n/I18nProvider.tsx';
 import styles from './LoginPage.module.scss';
 import { ParticleCanvas } from './ParticleCanvas.tsx';
 import { useAuth } from './useAuth.tsx';
 
-const LoginFormSchema = z.object({
-  email: z.string().email('Geçerli bir e-posta adresi girin'),
-  password: z.string().min(1, 'Parola zorunlu'),
-});
-type LoginFormValues = z.infer<typeof LoginFormSchema>;
+function useLoginFormSchema() {
+  const { t } = useTranslation();
+  return z.object({
+    email: z.string().email(t('auth.validation.email')),
+    password: z.string().min(1, t('auth.validation.passwordRequired')),
+  });
+}
 
 /** Kullanıcının yetkisi olan ilk ekrana yönlendirir. */
 function firstAllowedRoute(permissions: string[]): string {
@@ -24,15 +27,17 @@ function firstAllowedRoute(permissions: string[]): string {
 
 export function LoginPage() {
   const { login } = useAuth();
+  const { locale, locales, changeLanguage, t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
+  const schema = useLoginFormSchema();
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({ resolver: zodResolver(LoginFormSchema) });
+  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -41,7 +46,7 @@ export function LoginPage() {
       const redirectTo = (location.state as { from?: string } | null)?.from ?? firstAllowedRoute(user.permissions);
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : 'Giriş yapılamadı, tekrar deneyin');
+      setFormError(err instanceof ApiError ? t(err.message) : t('auth.error.loginFailed'));
     }
   });
 
@@ -52,13 +57,27 @@ export function LoginPage() {
         <ParticleCanvas className={styles.particleCanvas} />
         <div className={styles.heroContent}>
           <h1 className={styles.heroTitle}>
-            enerjinizi <span className={styles.heroBrand}>inavitas</span> ile yönetin
+            {t('auth.hero.titleBefore')} <span className={styles.heroBrand}>inavitas</span> {t('auth.hero.titleAfter')}
           </h1>
         </div>
       </div>
 
       {/* Sağ Taraf: Tek Parça Glassmorphic Giriş Paneli */}
       <div className={styles.loginSection}>
+        {/* Kullanıcı Türkçe bilmiyorsa giriş ekranını okuyamaz — auth namespace'i PUBLIC_PATHS'te. */}
+        <select
+          className={`select select--compact ${styles.languageSwitcher}`}
+          value={locale}
+          onChange={(e) => changeLanguage(e.target.value)}
+          aria-label={t('settings.language.label')}
+        >
+          {locales.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+
         <div className={styles.formWrap}>
           <div className={styles.brandHeader}>
             <img src="/inv-logo.svg" alt="inavitas" className={styles.brandLogo} />
@@ -73,7 +92,7 @@ export function LoginPage() {
 
             <div className="field">
               <label htmlFor="email" className="field__label">
-                E-posta Adresi
+                {t('auth.action.emailLabel')}
               </label>
               <div className="input--icon-wrap">
                 <FiMail />
@@ -91,7 +110,7 @@ export function LoginPage() {
 
             <div className="field">
               <label htmlFor="password" className="field__label">
-                Parola
+                {t('auth.action.passwordLabel')}
               </label>
               <div className="input--icon-wrap">
                 <FiLock />
@@ -109,7 +128,7 @@ export function LoginPage() {
 
             <button type="submit" disabled={isSubmitting} className={`btn btn--primary ${styles.submit}`}>
               <FiLogIn />
-              {isSubmitting ? 'Giriş yapılıyor…' : 'Giriş Yap'}
+              {isSubmitting ? t('auth.action.signingIn') : t('auth.action.signIn')}
             </button>
           </form>
 
@@ -121,5 +140,3 @@ export function LoginPage() {
     </div>
   );
 }
-
-

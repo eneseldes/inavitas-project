@@ -1,0 +1,130 @@
+@use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-3;
+  margin-bottom: v.$space-3;
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: v.$space-3;
+
+  // Genişlik burada, kontrolün kendi yüksekliği/fontu global .select'ten gelir.
+  :global(.select) {
+    flex: 0 0 12rem;
+  }
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
+  font-size: 0.8125rem;
+  color: v.$color-ink-soft;
+  white-space: nowrap;
+}
+
+.tableWrapper {
+  @include m.card;
+  overflow: auto;
+  max-height: 55vh;
+}
+
+.loadingBox {
+  padding: v.$space-8;
+  text-align: center;
+  color: v.$color-ink-soft;
+}
+
+.emptyCell {
+  text-align: center;
+  padding: v.$space-8;
+  color: v.$color-ink-soft;
+}
+
+.localeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+}
+
+.keyNameRow {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
+}
+
+.keyDescription {
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+  margin-top: 0.125rem;
+}
+
+.cellWrap {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
+}
+
+// Tabloya özgü hücre davranışı — genişlik/odak burada kalır, D21'in
+// yeniden tanımladığı .input/.select global sınıflarla karışmaz.
+.cellInput {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-sm;
+  font-size: v.$control-font-size;
+  font-family: inherit;
+  background: v.$color-surface;
+  color: v.$color-ink;
+  transition: border-color v.$transition-fast, background-color v.$transition-fast, box-shadow v.$transition-fast;
+  @include m.focus-ring;
+
+  &:hover {
+    border-color: v.$color-slate-400;
+  }
+
+  &:focus {
+    border-color: v.$color-brand;
+    background: v.$color-surface;
+  }
+}
+
+.dirty {
+  background: v.$color-warn-surface !important;
+  border-color: v.$color-warn-border !important;
+}
+
+.publishedText {
+  display: block;
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+  margin-top: 0.125rem;
+}
+
+.addLocaleRow {
+  margin-top: v.$space-3;
+}
+
+.addLocaleForm {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+
+  :global(.input) {
+    flex: 0 0 12rem;
+  }
+}
+
+.newKeyForm {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-3;
+}

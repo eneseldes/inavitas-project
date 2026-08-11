@@ -24,8 +24,13 @@ logger.info('Kafka consumer ayakta (outage.created, outage.linked, outage.energi
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
 
+let shuttingDown = false;
+
 /** Servisi güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
   logger.info({ signal }, 'kapanış başlatıldı');
 
   server.close(async (err) => {

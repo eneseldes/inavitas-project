@@ -67,7 +67,8 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       if (options.redirectOnAuthFailure !== false && window.location.pathname !== '/login') {
         window.location.assign('/login');
       }
-      throw new ApiError(401, 'UNAUTHENTICATED', 'Oturum sona erdi, tekrar giriş yapın');
+      // React ağacının dışında — metin değil anahtar üretilir, gösteren taraf t() ile çevirir.
+      throw new ApiError(401, 'UNAUTHENTICATED', 'auth.session.expired');
     }
   }
 

@@ -19,7 +19,8 @@
   border-radius: v.$radius-md;
   padding: v.$space-3 v.$space-4;
   font-size: 0.875rem;
-  color: v.$color-white;
+  // Toast arkaplanı her zaman renkli (marka/kırmızı) — metin temadan bağımsız açık kalmalı.
+  color: v.$color-ink-inverse;
   box-shadow: v.$shadow-lg;
   animation: slide-in v.$transition-base;
 }

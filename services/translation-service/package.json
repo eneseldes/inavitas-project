@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "dotenv -e ../../.env -- drizzle-kit generate",
     "db:migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
+    "db:seed": "dotenv -e ../../.env -- tsx src/db/seed.ts",
     "db:studio": "dotenv -e ../../.env -- drizzle-kit studio"
   },
   "dependencies": {

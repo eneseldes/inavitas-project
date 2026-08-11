@@ -14,8 +14,13 @@ const server = app.listen(config.GATEWAY_PORT, () => {
   logger.info({ port: config.GATEWAY_PORT }, 'gateway ayakta');
 });
 
+let shuttingDown = false;
+
 /** Servisi güvenli bir şekilde kapatır (graceful shutdown). */
 async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
   logger.info({ signal }, 'kapanış başlatıldı');
 
   server.close(async (err) => {

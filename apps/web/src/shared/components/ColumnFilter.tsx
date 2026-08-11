@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { FiFilter } from 'react-icons/fi';
 import { clsx } from 'clsx';
+import { useTranslation } from '../../features/i18n/I18nProvider.tsx';
 import styles from './ColumnFilter.module.scss';
 
 export interface FilterOption {
@@ -34,6 +35,7 @@ const VIEWPORT_MARGIN = 8;
  * Taşma (overflow) sorunlarını önlemek için panel `createPortal` ile gövdeye (`body`) yerleştirilir.
  */
 export function ColumnFilter(props: ColumnFilterProps) {
+  const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -81,7 +83,7 @@ export function ColumnFilter(props: ColumnFilterProps) {
           e.stopPropagation();
           isOpen ? setOpen(false) : openPopover();
         }}
-        title={`${props.label} filtrele`}
+        title={t('common.filter.trigger', { label: props.label })}
         className={clsx(styles.trigger, isActive && styles.triggerActive)}
       >
         <FiFilter />
@@ -99,6 +101,7 @@ export function ColumnFilter(props: ColumnFilterProps) {
 }
 
 function TextFilterBody({ value, onApply, placeholder, onDone }: TextFilterProps & { onDone: () => void }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
 
   return (
@@ -126,7 +129,7 @@ function TextFilterBody({ value, onApply, placeholder, onDone }: TextFilterProps
             onDone();
           }}
         >
-          Temizle
+          {t('common.filter.clear')}
         </button>
         <button
           type="button"
@@ -136,7 +139,7 @@ function TextFilterBody({ value, onApply, placeholder, onDone }: TextFilterProps
             onDone();
           }}
         >
-          Uygula
+          {t('common.filter.apply')}
         </button>
       </div>
     </div>
@@ -144,6 +147,7 @@ function TextFilterBody({ value, onApply, placeholder, onDone }: TextFilterProps
 }
 
 function MultiSelectFilterBody({ value, onApply, options, onDone }: MultiSelectFilterProps & { onDone: () => void }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<string[]>(value);
 
   const toggle = (optionValue: string) => {
@@ -170,7 +174,7 @@ function MultiSelectFilterBody({ value, onApply, options, onDone }: MultiSelectF
             onDone();
           }}
         >
-          Temizle
+          {t('common.filter.clear')}
         </button>
         <button
           type="button"
@@ -180,7 +184,7 @@ function MultiSelectFilterBody({ value, onApply, options, onDone }: MultiSelectF
             onDone();
           }}
         >
-          Uygula
+          {t('common.filter.apply')}
         </button>
       </div>
     </div>

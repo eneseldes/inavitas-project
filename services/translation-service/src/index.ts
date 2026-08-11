@@ -22,7 +22,12 @@ logger.info('Kafka producer bağlandı');
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
 
+let shuttingDown = false;
+
 async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
   logger.info({ signal }, 'kapanış başlatıldı');
 
   server.close(async (err) => {

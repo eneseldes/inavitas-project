@@ -32,12 +32,14 @@ export async function fetchTranslationKeys(params: {
   page?: number;
   pageSize?: number;
   q?: string;
+  onlyMissing?: boolean;
 }): Promise<PageResult<TranslationKeyRow>> {
   const query = new URLSearchParams();
   if (params.namespace) query.set('namespace', params.namespace);
   if (params.page) query.set('page', String(params.page));
   if (params.pageSize) query.set('pageSize', String(params.pageSize));
   if (params.q) query.set('q', params.q);
+  if (params.onlyMissing) query.set('onlyMissing', 'true');
 
   return apiFetch<PageResult<TranslationKeyRow>>(`/api/translations/keys?${query.toString()}`);
 }
@@ -63,5 +65,38 @@ export async function publishTranslations(input?: { namespace?: string }): Promi
   return apiFetch<{ publishedCount: number }>('/api/translations/publish', {
     method: 'POST',
     body: input ?? {},
+  });
+}
+
+export async function createLocale(input: { code: string; name: string; isDefault?: boolean }): Promise<Locale> {
+  return apiFetch<Locale>('/api/translations/locales', {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export async function updateLocaleActive(code: string, isActive: boolean): Promise<Locale> {
+  return apiFetch<Locale>(`/api/translations/locales/${code}`, {
+    method: 'PATCH',
+    body: { isActive },
+  });
+}
+
+export async function deleteTranslationKey(id: string): Promise<void> {
+  await apiFetch<void>(`/api/translations/keys/${id}`, { method: 'DELETE' });
+}
+
+export interface AutoTranslateInput {
+  targetLocale: string;
+  sourceLocale?: string;
+  namespace?: string;
+  keyIds?: string[];
+  onlyMissing?: boolean;
+}
+
+export async function autoTranslateKeys(input: AutoTranslateInput): Promise<{ translatedCount: number }> {
+  return apiFetch<{ translatedCount: number }>('/api/translations/auto-translate', {
+    method: 'POST',
+    body: input,
   });
 }

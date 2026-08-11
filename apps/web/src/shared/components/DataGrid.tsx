@@ -11,6 +11,7 @@ import {
   FiRefreshCw,
 } from 'react-icons/fi';
 import { clsx } from 'clsx';
+import { useTranslation } from '../../features/i18n/I18nProvider.tsx';
 import type { SortDirection } from '../../types/api.ts';
 import { ColumnFilter, type FilterOption } from './ColumnFilter.tsx';
 import styles from './DataGrid.module.scss';
@@ -83,9 +84,11 @@ export function DataGrid<T>({
   isFetching,
   isLoading,
   toolbarActions,
-  emptyMessage = 'Kayıt bulunamadı',
+  emptyMessage,
   onRowClick,
 }: DataGridProps<T>) {
+  const { t } = useTranslation();
+  const resolvedEmptyMessage = emptyMessage ?? t('common.table.empty');
 
   const table = useReactTable({
     data,
@@ -102,7 +105,7 @@ export function DataGrid<T>({
   return (
     <div className={styles.grid}>
       <div className={styles.toolbar}>
-        <button type="button" onClick={onRefresh} title="Yenile" className="icon-btn">
+        <button type="button" onClick={onRefresh} title={t('common.action.refresh')} className="icon-btn">
           <FiRefreshCw className={clsx(isFetching && 'spin')} />
         </button>
         {toolbarActions}
@@ -166,7 +169,7 @@ export function DataGrid<T>({
             {isLoading ? (
               <tr>
                 <td colSpan={columns.length} className={styles.loadingState}>
-                  Yükleniyor…
+                  {t('common.loading')}
                 </td>
               </tr>
             ) : data.length === 0 ? (
@@ -174,7 +177,7 @@ export function DataGrid<T>({
                 <td colSpan={columns.length} className={styles.emptyState}>
                   <div className={styles.emptyStateInner}>
                     <FiInbox className={styles.emptyIcon} />
-                    <div>{emptyMessage}</div>
+                    <div>{resolvedEmptyMessage}</div>
                   </div>
                 </td>
               </tr>
@@ -199,7 +202,7 @@ export function DataGrid<T>({
 
       <div className={styles.footer}>
         <div className={styles.pageSizeGroup}>
-          <span>Sayfa boyutu</span>
+          <span>{t('common.pagination.pageSize')}</span>
           <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className={clsx('select', styles.pageSizeSelect)}>
             {PAGE_SIZE_OPTIONS.map((size) => (
               <option key={size} value={size}>
@@ -214,19 +217,19 @@ export function DataGrid<T>({
         </span>
 
         <div className={styles.pager}>
-          <button type="button" disabled={page <= 1} onClick={() => onPageChange(1)} className="icon-btn icon-btn--sm" title="İlk sayfa">
+          <button type="button" disabled={page <= 1} onClick={() => onPageChange(1)} className="icon-btn icon-btn--sm" title={t('common.pagination.first')}>
             <FiChevronsLeft />
           </button>
-          <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="icon-btn icon-btn--sm" title="Önceki sayfa">
+          <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} className="icon-btn icon-btn--sm" title={t('common.pagination.prev')}>
             <FiChevronLeft />
           </button>
           <span className={styles.pagerCurrent}>
             {page} / {totalPages}
           </span>
-          <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="icon-btn icon-btn--sm" title="Sonraki sayfa">
+          <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} className="icon-btn icon-btn--sm" title={t('common.pagination.next')}>
             <FiChevronRight />
           </button>
-          <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(totalPages)} className="icon-btn icon-btn--sm" title="Son sayfa">
+          <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(totalPages)} className="icon-btn icon-btn--sm" title={t('common.pagination.last')}>
             <FiChevronsRight />
           </button>
         </div>

@@ -5,6 +5,8 @@ import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx
 import { LiveIndicator } from '../../shared/components/LiveIndicator.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
+import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useLabels } from '../i18n/useLabels.ts';
 import type { SortDirection } from '../../types/api.ts';
 import type { Outage, OutageStatus } from '../../types/outage.ts';
 import { CreateOutageDialog } from './CreateOutageDialog.tsx';
@@ -17,6 +19,8 @@ import { useOutageStream } from './useOutageStream.ts';
 
 export function OutageGrid() {
   const { hasPermission } = useAuth();
+  const { t } = useTranslation();
+  const labels = useLabels();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isLive = useOutageStream();
@@ -54,14 +58,14 @@ export function OutageGrid() {
   const { data: relatedOutage } = useOutage(relatedId);
 
   const columns = useMemo(
-    () => buildOutageColumns((workOrderId) => navigate(`/work-orders?relatedWorkOrderId=${workOrderId}`)),
-    [navigate],
+    () => buildOutageColumns(t, labels, (workOrderId) => navigate(`/work-orders?relatedWorkOrderId=${workOrderId}`)),
+    [t, labels, navigate],
   );
 
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <h1 className={styles.title}>Kesintiler</h1>
+        <h1 className={styles.title}>{t('outage.page.title')}</h1>
         <LiveIndicator connected={isLive} />
       </div>
 
@@ -69,10 +73,11 @@ export function OutageGrid() {
         <div className={styles.relatedBanner}>
           {relatedOutage ? (
             <span>
-              İlişkili kesinti: <span className="font-mono">{relatedOutage.id}</span> — <StatusBadge status={relatedOutage.status} /> — GIS: {relatedOutage.gisId}
+              {t('outage.related.label')} <span className="font-mono">{relatedOutage.id}</span> — <StatusBadge status={relatedOutage.status} /> —{' '}
+              {t('outage.related.gisLabel')} {relatedOutage.gisId}
             </span>
           ) : (
-            <span>İlişkili kesinti yükleniyor…</span>
+            <span>{t('outage.related.loading')}</span>
           )}
           <button
             type="button"
@@ -110,11 +115,11 @@ export function OutageGrid() {
         isLoading={isLoading}
         isFetching={isFetching}
         onRowClick={(outage) => setHistoryOutage(outage)}
-        emptyMessage="Kesinti kaydı yok"
+        emptyMessage={t('outage.table.empty')}
         toolbarActions={
           hasPermission('outage:write') && (
             <button type="button" onClick={() => setCreateOpen(true)} className="btn btn--primary">
-              <FiPlus /> Yeni Kesinti
+              <FiPlus /> {t('outage.action.new')}
             </button>
           )
         }
