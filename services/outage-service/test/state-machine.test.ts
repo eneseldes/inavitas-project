@@ -14,12 +14,19 @@ describe('canTransition (outage)', () => {
     expect(canTransition('ENERGIZED', 'ARCHIVED')).toBe(true);
   });
 
-  it.each(['STARTED', 'ENERGIZED', 'ARCHIVED'] as OutageStatus[])(
-    '%s → CANCELLED her zaman izinli',
-    (from) => {
-      expect(canTransition(from, 'CANCELLED')).toBe(true);
-    },
-  );
+  it('ENERGIZED → CANCELLED izinsiz (yalnızca ARCHIVED geçilebilir)', () => {
+    expect(canTransition('ENERGIZED', 'CANCELLED')).toBe(false);
+  });
+
+  it('STARTED → CANCELLED izinli', () => {
+    expect(canTransition('STARTED', 'CANCELLED')).toBe(true);
+  });
+
+  it('ARCHIVED terminal durumdur — hiçbir yere geçilemez (CANCELLED dahil)', () => {
+    for (const to of OUTAGE_STATUSES) {
+      expect(canTransition('ARCHIVED', to)).toBe(false);
+    }
+  });
 
   it('CANCELLED terminal durumdur — hiçbir yere geçilemez', () => {
     for (const to of OUTAGE_STATUSES) {

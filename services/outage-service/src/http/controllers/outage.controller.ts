@@ -91,6 +91,12 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
   if (!current) throw new NotFoundError('Kesinti', id);
 
+  if (current.status === 'ARCHIVED' || current.status === 'CANCELLED') {
+    throw new ConflictError(`${current.status} durumundaki kesinti kilitlidir, verisi değiştirilemez`, [
+      { field: 'status', issue: 'outage_locked' },
+    ]);
+  }
+
   const nextStatus: OutageStatus = body.status ?? (body.endedAt && !current.endedAt ? 'ENERGIZED' : current.status);
 
   if (nextStatus !== current.status && !canTransition(current.status, nextStatus)) {

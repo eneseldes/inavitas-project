@@ -11,6 +11,8 @@ $color-brand-500: #3eb875;
 $color-brand-600: #2ea062;
 $color-brand-900: #145332;
 
+$color-brand: $color-brand-500;
+
 $color-ink: #1f2d24;
 $color-ink-soft: #576b5f;
 $color-hairline: #e2e8f0;
@@ -27,9 +29,16 @@ $color-cyan-50: #ecfeff;
 $color-cyan-700: #0e7490;
 $color-green-50: #f0fdf4;
 $color-green-700: #15803d;
+$color-slate-50: #f8fafc;
 $color-slate-100: #f1f5f9;
+$color-slate-200: #e2e8f0;
 $color-slate-300: #cbd5e1;
+$color-slate-400: #94a3b8;
+$color-slate-500: #64748b;
+$color-slate-600: #475569;
 $color-slate-700: #334155;
+$color-slate-800: #1e293b;
+$color-slate-900: #0f172a;
 
 // --- Boşluk skalası (4px birim) ---
 $space-1: 0.25rem; // 4

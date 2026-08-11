@@ -23,7 +23,7 @@ function formatDate(value: string | null): string {
  */
 export const USER_SELECTABLE_NEXT_STATUSES: Record<OutageStatus, OutageStatus[]> = {
   STARTED: ['CANCELLED'],
-  ENERGIZED: ['ARCHIVED', 'CANCELLED'],
+  ENERGIZED: ['ARCHIVED'],
   ARCHIVED: [],
   CANCELLED: [],
 };

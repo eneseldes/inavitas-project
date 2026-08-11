@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from 'react';
-import { FiChevronLeft, FiChevronRight, FiFileText, FiLogOut, FiZap } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiFileText, FiGlobe, FiLogOut, FiZap } from 'react-icons/fi';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../features/auth/useAuth.tsx';
@@ -16,6 +16,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/outages', label: 'Kesintiler', icon: FiZap, permission: 'outage:read' },
   { to: '/work-orders', label: 'İş Emirleri', icon: FiFileText, permission: 'workorder:read' },
+  { to: '/translations', label: 'Çeviriler', icon: FiGlobe, permission: 'translation:read' },
 ];
 
 /** Ana uygulama düzeni ve gezinti menüsü. Yetkisi olmayan menü öğeleri gizlenir. */

@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
-    include: ['{packages,services}/*/test/**/*.test.ts'],
+    include: ['{packages,services,apps}/*/test/**/*.test.ts'],
     // Altyapı gerektiren testler (Testcontainers) Faz 7'de eklenecek;
     // şu anki testlerin hepsi saf birim testi, paralel çalışabilir.
     environment: 'node',

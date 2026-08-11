@@ -19,7 +19,7 @@ export const NEXT_STATUSES: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   ASSIGNED: ['IN_PROGRESS', 'CANCELLED'],
   IN_PROGRESS: ['ENERGIZED', 'CANCELLED'],
   ENERGIZED: ['DONE', 'CANCELLED'],
-  DONE: ['CANCELLED'],
+  DONE: [],
   CANCELLED: [],
 };
 

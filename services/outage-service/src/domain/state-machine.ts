@@ -7,8 +7,8 @@ export type OutageStatus = (typeof OUTAGE_STATUSES)[number];
 
 const TRANSITIONS: Record<OutageStatus, OutageStatus[]> = {
   STARTED: ['ENERGIZED', 'CANCELLED'],
-  ENERGIZED: ['ARCHIVED', 'CANCELLED'],
-  ARCHIVED: ['CANCELLED'],
+  ENERGIZED: ['ARCHIVED'],
+  ARCHIVED: [],
   CANCELLED: [],
 };
 

@@ -16,12 +16,22 @@ describe('canTransition (work order)', () => {
     expect(canTransition('ENERGIZED', 'DONE')).toBe(true);
   });
 
-  it.each(['STARTED', 'ASSIGNED', 'IN_PROGRESS', 'ENERGIZED', 'DONE'] as WorkOrderStatus[])(
-    '%s → CANCELLED her zaman izinli',
+  it.each(['STARTED', 'ASSIGNED', 'IN_PROGRESS', 'ENERGIZED'] as WorkOrderStatus[])(
+    '%s → CANCELLED izinli',
     (from) => {
       expect(canTransition(from, 'CANCELLED')).toBe(true);
     },
   );
+
+  it('DONE → CANCELLED izinsiz', () => {
+    expect(canTransition('DONE', 'CANCELLED')).toBe(false);
+  });
+
+  it('DONE terminal durumdur — hiçbir yere geçilemez', () => {
+    for (const to of WORK_ORDER_STATUSES) {
+      expect(canTransition('DONE', to)).toBe(false);
+    }
+  });
 
   it('CANCELLED terminal durumdur — hiçbir yere geçilemez', () => {
     for (const to of WORK_ORDER_STATUSES) {
