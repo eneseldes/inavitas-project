@@ -7,7 +7,7 @@ import * as schema from './db/schema.ts';
 const pool = new Pool({ connectionString: config.ACCESS_APP_DATABASE_URL });
 
 // Boşta bekleyen bağlantı kesilmelerinde uygulamanın durmasını engellemek için havuz hata dinleyicisi.
-pool.on('error', (err) => {
+pool.on('error', (err: Error) => {
   console.error('[access-service] Postgres pool hatası (boşta bağlantı kesildi, devam ediliyor):', err.message);
 });
 

@@ -55,6 +55,7 @@ export interface DataGridProps<T> {
   toolbarActions?: ReactNode;
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
+  isRowSelected?: (item: T) => boolean;
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -97,6 +98,7 @@ export function DataGrid<T>({
   toolbarActions,
   emptyMessage,
   onRowClick,
+  isRowSelected,
 }: DataGridProps<T>) {
   const { t } = useTranslation();
   const resolvedEmptyMessage = emptyMessage ?? t('common.table.empty');
@@ -351,7 +353,11 @@ export function DataGrid<T>({
                 </tr>
               ) : (
                 table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} onClick={() => onRowClick?.(row.original)} className={clsx(onRowClick && 'clickable-row')}>
+                  <tr
+                    key={row.id}
+                    onClick={() => onRowClick?.(row.original)}
+                    className={clsx(onRowClick && 'clickable-row', isRowSelected?.(row.original) && 'selected-row')}
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
                     ))}

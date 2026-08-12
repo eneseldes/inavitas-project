@@ -1,10 +1,12 @@
-import { asyncHandler, PERMISSIONS, requirePermission, runReadinessChecks, type AuthedRequest } from '@inavitas/shared';
+import { asyncHandler, runReadinessChecks } from '@inavitas/shared';
 import { sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db.ts';
-import { users } from '../db/schema.ts';
 import { redis } from '../redis.ts';
 import * as authController from './controllers/auth.controller.ts';
+import { buildPermissionRouter } from './controllers/permission.controller.ts';
+import { buildRoleRouter } from './controllers/role.controller.ts';
+import { buildUserRouter } from './controllers/user.controller.ts';
 import { authenticate } from './authenticate.ts';
 
 export function buildRouter(): Router {
@@ -28,32 +30,15 @@ export function buildRouter(): Router {
   );
 
   // --- Kimlik Doğrulama Uç Noktaları ---
-  router.post('/auth/login', asyncHandler<AuthedRequest>(authController.login));
-  router.post('/auth/refresh', asyncHandler<AuthedRequest>(authController.refresh));
-  router.post('/auth/logout', asyncHandler<AuthedRequest>(authController.logout));
+  router.post('/auth/login', asyncHandler(authController.login));
+  router.post('/auth/refresh', asyncHandler(authController.refresh));
+  router.post('/auth/logout', asyncHandler(authController.logout));
+  router.get('/auth/me', authenticate(), asyncHandler(authController.me));
 
-  router.get('/auth/me', authenticate(), asyncHandler<AuthedRequest>(authController.me));
-
-  // --- Kullanıcı Yönetim Uç Noktaları ---
-  router.get(
-    '/users',
-    authenticate(),
-    requirePermission(PERMISSIONS.USER_MANAGE),
-    asyncHandler(async (_req, res) => {
-      const rows = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          fullName: users.fullName,
-          isActive: users.isActive,
-          createdAt: users.createdAt,
-        })
-        .from(users)
-        .orderBy(users.createdAt);
-
-      res.json({ items: rows, total: rows.length });
-    }),
-  );
+  // --- Yönetim Uç Noktaları ---
+  router.use('/users', buildUserRouter());
+  router.use('/roles', buildRoleRouter());
+  router.use('/permissions', buildPermissionRouter());
 
   return router;
 }

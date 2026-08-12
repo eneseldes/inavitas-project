@@ -4,6 +4,7 @@ import { LoginPage } from '../features/auth/LoginPage.tsx';
 import { ProtectedRoute } from '../features/auth/ProtectedRoute.tsx';
 import { useAuth } from '../features/auth/useAuth.tsx';
 import { OutageGrid } from '../features/outages/OutageGrid.tsx';
+import { UserManagementPage } from '../features/user-management/UserManagementPage.tsx';
 import { WorkOrderGrid } from '../features/work-orders/WorkOrderGrid.tsx';
 import { AppShell } from '../shared/components/AppShell.tsx';
 
@@ -44,6 +45,14 @@ export function AppRouter() {
           element={
             <ProtectedRoute permission="workorder:read">
               <WorkOrderGrid />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <ProtectedRoute permission="user:manage">
+              <UserManagementPage />
             </ProtectedRoute>
           }
         />

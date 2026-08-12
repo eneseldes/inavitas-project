@@ -101,6 +101,8 @@ export async function login(email: string, password: string): Promise<LoginResul
     await userRepository.updateLockState(user.id, resetLock());
   }
 
+  await userRepository.touchLastLogin(user.id, now);
+
   return {
     accessToken: signAccessToken(toAuthenticatedUser(user)),
     refreshToken: await issueRefreshToken(user.id),

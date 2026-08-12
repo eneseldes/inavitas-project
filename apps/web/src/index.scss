@@ -318,8 +318,16 @@ button {
     &.clickable-row {
       cursor: pointer;
 
-      &:hover {
+      &:hover:not(.selected-row) {
         background-color: v.$color-row-hover;
+      }
+    }
+
+    &.selected-row {
+      background-color: v.$color-brand-soft-bg;
+
+      &:hover {
+        background-color: v.$color-brand-soft-bg-strong;
       }
     }
   }

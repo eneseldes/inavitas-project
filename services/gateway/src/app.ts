@@ -85,6 +85,8 @@ export function createApp(logger: Logger): Express {
   // outage/work-order/translation servislerine Cookie header'ı iletilmez (yalnızca x-user-* güvenilir).
   app.use(buildProxy('/api/auth/**', SERVICE_TARGETS.access, { '^/api/auth': '/auth' }));
   app.use(buildProxy('/api/users/**', SERVICE_TARGETS.access, { '^/api/users': '/users' }));
+  app.use(buildProxy('/api/roles/**', SERVICE_TARGETS.access, { '^/api/roles': '/roles' }));
+  app.use(buildProxy('/api/permissions/**', SERVICE_TARGETS.access, { '^/api/permissions': '/permissions' }));
   app.use(buildProxy('/api/outages/**', SERVICE_TARGETS.outage, { '^/api/outages': '/outages' }, { forwardCookies: false }));
   app.use(
     buildProxy('/api/work-orders/**', SERVICE_TARGETS.workOrder, { '^/api/work-orders': '/work-orders' }, { forwardCookies: false }),

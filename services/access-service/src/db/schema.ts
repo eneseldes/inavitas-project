@@ -32,6 +32,9 @@ export const users = pgTable('users', {
   failedAttempts: integer('failed_attempts').notNull().default(0),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
 
+  /** En son başarılı girişin zamanı — hiç giriş yapmadıysa null. */
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -42,6 +45,8 @@ export const roles = pgTable('roles', {
     .default(sql`gen_random_uuid()`),
   code: varchar('code', { length: 32 }).notNull().unique(),
   name: varchar('name', { length: 64 }).notNull(),
+  /** Seed'den gelen sistem rolleri silinemez/düzenlenemez. */
+  isSystem: boolean('is_system').notNull().default(false),
 });
 
 /** İzinler tablosu (ör. outage:read, outage:write). */
@@ -50,6 +55,7 @@ export const permissions = pgTable('permissions', {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   code: varchar('code', { length: 64 }).notNull().unique(),
+  description: varchar('description', { length: 128 }),
 });
 
 /** Rol-İzin ilişki tablosu (Çoka-Çok). */

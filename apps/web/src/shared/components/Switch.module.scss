@@ -4,30 +4,39 @@
 .track {
   @include m.clickable;
   position: relative;
-  width: 2rem;
-  height: 1.125rem;
-  padding: 0.125rem;
-  border: 1px solid v.$color-hairline;
-  border-radius: v.$radius-full;
-  background: v.$color-surface-alt;
+  display: inline-flex;
+  align-items: center;
+  width: 2.25rem;
+  height: 1.25rem;
+  padding: 2px;
+  border: 1px solid var(--color-border, v.$color-hairline);
+  border-radius: 9999px;
+  background: var(--color-surface-2, v.$color-surface-alt);
   flex-shrink: 0;
-  @include m.focus-ring;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-accent, v.$color-brand-500);
+  }
 }
 
 .trackOn {
-  background: v.$color-brand-500;
-  border-color: v.$color-brand-500;
+  background: var(--color-accent, v.$color-brand-500);
+  border-color: var(--color-accent, v.$color-brand-500);
 }
 
 .thumb {
   display: block;
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: v.$radius-full;
-  background: v.$color-surface;
-  transition: transform v.$transition-fast;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(0);
 }
 
 .trackOn .thumb {
-  transform: translateX(0.875rem);
+  transform: translateX(1rem);
 }

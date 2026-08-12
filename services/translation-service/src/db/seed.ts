@@ -32,6 +32,7 @@ const SEED_NAMESPACES = [
   { name: 'outage', description: 'Kesinti ekranı ve kesinti enum etiketleri' },
   { name: 'work-order', description: 'İş emri ekranı ve iş emri enum etiketleri' },
   { name: 'settings', description: 'Ayarlar menüsü ve çeviri yönetimi' },
+  { name: 'user-management', description: 'Kullanıcı ve rol yönetimi ekranları' },
 ] as const;
 
 /** [namespace, keyName, tr, en] */
@@ -149,6 +150,52 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'filter.date.before', 'Öncesinde (<=)', 'Before (<=)'],
   ['common', 'filter.date.from', 'Başlangıç', 'From'],
   ['common', 'filter.date.to', 'Bitiş', 'To'],
+
+  // --- Kullanıcı & Rol Yönetimi ---
+  ['user-management', 'page.title', 'Kullanıcılar', 'User Management'],
+  ['user-management', 'segment.users', 'Kullanıcılar', 'Users'],
+  ['user-management', 'segment.roles', 'Roller', 'Roles'],
+
+  ['user-management', 'column.email', 'E-posta', 'Email'],
+  ['user-management', 'column.fullName', 'Ad Soyad', 'Full Name'],
+  ['user-management', 'column.roles', 'Roller', 'Roles'],
+  ['user-management', 'column.status', 'Durum', 'Status'],
+  ['user-management', 'column.createdAt', 'Oluşturulma', 'Created'],
+  ['user-management', 'filter.search', 'Ad veya e-posta ara…', 'Search by name or email…'],
+  ['user-management', 'table.empty', 'Kullanıcı kaydı yok', 'No users found'],
+  ['user-management', 'action.new', 'Yeni Kullanıcı', 'New User'],
+  ['user-management', 'field.email', 'E-posta', 'Email'],
+  ['user-management', 'field.fullName', 'Ad Soyad', 'Full Name'],
+  ['user-management', 'field.password', 'Parola', 'Password'],
+  ['user-management', 'field.roles', 'Roller', 'Roles'],
+  ['user-management', 'field.resetPassword', 'Parola Sıfırla', 'Reset Password'],
+  ['user-management', 'field.resetPasswordHint', 'Boş bırakırsanız değişmez', 'Leave blank to keep unchanged'],
+  ['user-management', 'dialog.create.title', 'Yeni Kullanıcı', 'New User'],
+  ['user-management', 'dialog.edit.title', 'Kullanıcı Düzenle', 'Edit User'],
+  ['user-management', 'toast.createSuccess', 'Kullanıcı oluşturuldu', 'User created'],
+  ['user-management', 'toast.updateSuccess', 'Kullanıcı güncellendi', 'User updated'],
+
+  ['user-management', 'role.column.name', 'Rol Adı', 'Role Name'],
+  ['user-management', 'role.column.permissions', 'İzin Sayısı', 'Permissions'],
+  ['user-management', 'role.column.users', 'Kullanıcı', 'Users'],
+  ['user-management', 'role.table.empty', 'Rol kaydı yok', 'No roles found'],
+  ['user-management', 'role.action.new', 'Yeni Rol', 'New Role'],
+  ['user-management', 'role.badge.system', 'Sistem', 'System'],
+  ['user-management', 'role.badge.systemTooltip', 'Sistem rolleri düzenlenemez veya silinemez', 'System roles cannot be edited or deleted'],
+  ['user-management', 'role.badge.systemNote', 'Bu bir sistem rolüdür. Salt-okunur görüntüleniyor.', 'This is a system role. Displayed as read-only.'],
+  ['user-management', 'role.delete.hasUsers', 'Önce kullanıcıları başka role taşıyın', 'Move users to another role first'],
+  ['user-management', 'role.confirm.delete', '{name} rolünü silmek istediğinize emin misiniz?', 'Are you sure you want to delete the role {name}?'],
+  ['user-management', 'role.dialog.create.title', 'Yeni Rol', 'New Role'],
+  ['user-management', 'role.dialog.edit.title', 'Rol Düzenle', 'Edit Role'],
+  ['user-management', 'role.field.name', 'Rol Adı', 'Role Name'],
+  ['user-management', 'role.field.permissions', 'İzinler', 'Permissions'],
+  ['user-management', 'role.permissionNote', 'Yapılan değişiklikler, kullanıcıların bir sonraki oturum yenilemesinde (token süresi) etkili olur.', 'Changes will take effect for users on their next session refresh (token expiry).'],
+  ['user-management', 'role.toast.createSuccess', 'Rol oluşturuldu', 'Role created'],
+  ['user-management', 'role.toast.updateSuccess', 'Rol güncellendi', 'Role updated'],
+  ['user-management', 'role.toast.deleteSuccess', 'Rol silindi', 'Role deleted'],
+
+  ['common', 'status.active', 'Aktif', 'Active'],
+  ['common', 'status.inactive', 'Pasif', 'Inactive'],
 
   // --- Auth ---
   ['auth', 'validation.email', 'Geçerli bir e-posta adresi girin', 'Enter a valid email address'],

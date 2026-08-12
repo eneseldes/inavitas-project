@@ -1,0 +1,195 @@
+@use '../../../styles/variables' as v;
+@use '../../../styles/mixins' as m;
+
+.panel {
+  @include m.card;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 520px;
+  overflow: hidden;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  height: 100%;
+  color: v.$color-ink-soft;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: v.$color-surface-alt;
+  border-bottom: 1px solid v.$color-hairline;
+}
+
+.headerTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.systemBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: v.$color-warn-surface;
+  color: #ca8a04;
+  border-bottom: 1px solid v.$color-warn-border;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 650px;
+}
+
+.moduleSection {
+  // Flat tree row — no card/box per module.
+}
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chevronBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: v.$color-ink-soft;
+  font-size: 0.8125rem;
+  transition: transform v.$transition-fast;
+  flex-shrink: 0;
+}
+
+.chevronBtnOpen {
+  transform: rotate(90deg);
+}
+
+// Native checkbox is replaced with a custom circle so it matches the
+// design system instead of the browser's default control.
+.checkbox {
+  display: inline-flex;
+  flex-shrink: 0;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.checkboxBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid v.$color-hairline;
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  transition:
+    background v.$transition-fast,
+    border-color v.$transition-fast,
+    color v.$transition-fast;
+
+  svg {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+.checkbox input:checked + .checkboxBox {
+  background: v.$color-brand-500;
+  border-color: v.$color-brand-500;
+  color: v.$color-ink-inverse;
+}
+
+.checkbox input:disabled + .checkboxBox {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.checkbox input:focus-visible + .checkboxBox {
+  outline: none;
+  box-shadow: 0 0 0 2px v.$focus-shadow;
+}
+
+.moduleTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: v.$color-ink;
+}
+
+// Smoothly animated accordion body — grid-rows trick avoids needing a
+// measured pixel height for the transition.
+.permListWrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows v.$transition-base;
+
+  &.permListWrapperOpen {
+    grid-template-rows: 1fr;
+  }
+}
+
+.permListInner {
+  overflow: hidden;
+}
+
+.permList {
+  display: flex;
+  flex-direction: column;
+  // Indent so the item list visibly nests under its module header.
+  padding-left: 24px;
+}
+
+.permRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.permLabel {
+  font-size: 0.875rem;
+  color: v.$color-ink;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

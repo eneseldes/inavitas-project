@@ -28,6 +28,18 @@ const ROLE_NAMES: Record<Role, string> = {
   WORK_ORDER_OPERATOR: 'Saha Personeli',
 };
 
+/** İzin açıklamaları (UI'da rol editöründe gösterilir). */
+const PERMISSION_DESCRIPTIONS: Record<string, string> = {
+  'outage:read': 'Kesinti kayıtlarını görme',
+  'outage:write': 'Kesinti oluşturma ve düzenle',
+  'workorder:read': 'İş emirlerini görme',
+  'workorder:write': 'İş emri oluşturma ve durum güncelleme',
+  'user:manage': 'Kullanıcı ve rol yönetimi',
+  'translation:read': 'Çeviri yönetimini görme',
+  'translation:write': 'Çeviri ekleme ve düzenle',
+  'translation:publish': 'Çeviri yayınlama',
+};
+
 /** Test kullanıcıları — SADECE geliştirme içindir. */
 const SEED_USERS = [
   { email: 'admin@inavitas.com', password: 'Admin123!', fullName: 'Ahmet Yılmaz', role: ROLES.ADMIN },
@@ -41,15 +53,18 @@ async function main(): Promise<void> {
   const permissionCodes = [...new Set(Object.values(ROLE_PERMISSIONS).flat())];
 
   for (const code of permissionCodes) {
-    await db.insert(permissions).values({ code }).onConflictDoNothing({ target: permissions.code });
+    await db
+      .insert(permissions)
+      .values({ code, description: PERMISSION_DESCRIPTIONS[code] })
+      .onConflictDoUpdate({ target: permissions.code, set: { description: PERMISSION_DESCRIPTIONS[code] } });
   }
 
   // 2. Roller ve izin eşlemeleri
   for (const [code, rolePerms] of Object.entries(ROLE_PERMISSIONS) as [Role, readonly string[]][]) {
     const [role] = await db
       .insert(roles)
-      .values({ code, name: ROLE_NAMES[code] })
-      .onConflictDoUpdate({ target: roles.code, set: { name: ROLE_NAMES[code] } })
+      .values({ code, name: ROLE_NAMES[code], isSystem: true })
+      .onConflictDoUpdate({ target: roles.code, set: { name: ROLE_NAMES[code], isSystem: true } })
       .returning();
 
     for (const permissionCode of rolePerms) {

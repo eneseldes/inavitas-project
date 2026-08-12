@@ -1,0 +1,21 @@
+.twoColumn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.rolesList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addRoleBtn {
+  align-self: flex-start;
+}

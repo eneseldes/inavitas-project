@@ -1,0 +1,31 @@
+.splitLayout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  align-items: start;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftGrid {
+  min-width: 0;
+
+  // Action-button column pads rows out to icon-btn's default height —
+  // tighten just this screen's tables without touching the shared DataGrid.
+  :global(.table) td {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  :global(.icon-btn) {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+}
+
+.rightPanel {
+  position: sticky;
+  top: 20px;
+}

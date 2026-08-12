@@ -1,0 +1,13 @@
+.wrap {
+  // Action-button column pads rows out to icon-btn's default height —
+  // tighten just this screen's table without touching the shared DataGrid.
+  :global(.table) td {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  :global(.icon-btn) {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+}
