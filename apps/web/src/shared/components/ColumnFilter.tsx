@@ -10,6 +10,12 @@ export interface FilterOption {
   label: string;
 }
 
+export interface DateFilterValue {
+  operator?: 'between' | 'after' | 'before';
+  from?: string;
+  to?: string;
+}
+
 interface TextFilterProps {
   type: 'text';
   value: string;
@@ -24,7 +30,13 @@ interface MultiSelectFilterProps {
   options: FilterOption[];
 }
 
-export type ColumnFilterProps = (TextFilterProps | MultiSelectFilterProps) & { label: string };
+interface DateFilterProps {
+  type: 'date';
+  value: DateFilterValue;
+  onApply: (value: DateFilterValue) => void;
+}
+
+export type ColumnFilterProps = (TextFilterProps | MultiSelectFilterProps | DateFilterProps) & { label: string };
 
 // .popover'daki `width: 14rem` ile birebir aynı — konum hesabı için gerekiyor.
 const POPOVER_WIDTH = 224;
@@ -41,7 +53,12 @@ export function ColumnFilter(props: ColumnFilterProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  const isActive = props.type === 'text' ? props.value.trim().length > 0 : props.value.length > 0;
+  const isActive =
+    props.type === 'text'
+      ? props.value.trim().length > 0
+      : props.type === 'multiselect'
+        ? props.value.length > 0
+        : Boolean(props.value?.from || props.value?.to);
 
   const openPopover = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -92,7 +109,13 @@ export function ColumnFilter(props: ColumnFilterProps) {
       {isOpen &&
         createPortal(
           <div ref={popoverRef} className={styles.popover} style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}>
-            {props.type === 'text' ? <TextFilterBody {...props} onDone={() => setOpen(false)} /> : <MultiSelectFilterBody {...props} onDone={() => setOpen(false)} />}
+            {props.type === 'text' ? (
+              <TextFilterBody {...props} onDone={() => setOpen(false)} />
+            ) : props.type === 'multiselect' ? (
+              <MultiSelectFilterBody {...props} onDone={() => setOpen(false)} />
+            ) : (
+              <DateFilterBody {...props} onDone={() => setOpen(false)} />
+            )}
           </div>,
           document.body,
         )}
@@ -181,6 +204,69 @@ function MultiSelectFilterBody({ value, onApply, options, onDone }: MultiSelectF
           className="btn btn--primary"
           onClick={() => {
             onApply(draft);
+            onDone();
+          }}
+        >
+          {t('common.filter.apply')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: () => void }) {
+  const { t } = useTranslation();
+  const [operator, setOperator] = useState<'between' | 'after' | 'before'>(value?.operator ?? 'between');
+  const [from, setFrom] = useState(value?.from ?? '');
+  const [to, setTo] = useState(value?.to ?? '');
+
+  return (
+    <div>
+      <div className={styles.dateGroup}>
+        <div className={styles.dateField}>
+          <span className={styles.dateLabel}>{t('common.filter.date.operator', undefined, 'Filtre Modu')}</span>
+          <select className="select select--compact" value={operator} onChange={(e) => setOperator(e.target.value as 'between' | 'after' | 'before')}>
+            <option value="between">{t('common.filter.date.between', undefined, 'Tarihler Arası')}</option>
+            <option value="after">{t('common.filter.date.after', undefined, 'Sonrasında (>=)')}</option>
+            <option value="before">{t('common.filter.date.before', undefined, 'Öncesinde (<=)')}</option>
+          </select>
+        </div>
+
+        {(operator === 'between' || operator === 'after') && (
+          <div className={styles.dateField}>
+            <span className={styles.dateLabel}>{t('common.filter.date.from', undefined, 'Başlangıç')}</span>
+            <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+        )}
+
+        {(operator === 'between' || operator === 'before') && (
+          <div className={styles.dateField}>
+            <span className={styles.dateLabel}>{t('common.filter.date.to', undefined, 'Bitiş')}</span>
+            <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+        )}
+      </div>
+
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            onApply({ operator: 'between', from: '', to: '' });
+            onDone();
+          }}
+        >
+          {t('common.filter.clear')}
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => {
+            onApply({
+              operator,
+              from: operator === 'before' ? '' : from,
+              to: operator === 'after' ? '' : to,
+            });
             onDone();
           }}
         >

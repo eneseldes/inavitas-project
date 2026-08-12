@@ -14,6 +14,7 @@ export interface WorkOrderFilters {
   gisId?: string;
   createdAtFrom?: Date;
   createdAtTo?: Date;
+  origin?: ('USER' | 'SYSTEM')[];
   hasOutage?: boolean;
 }
 
@@ -51,6 +52,13 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
       filters.status.length === 1
         ? eq(workOrders.status, filters.status[0]!)
         : inArray(workOrders.status, filters.status),
+    );
+  }
+  if (filters.origin && filters.origin.length > 0) {
+    conditions.push(
+      filters.origin.length === 1
+        ? eq(workOrders.origin, filters.origin[0]!)
+        : inArray(workOrders.origin, filters.origin),
     );
   }
   if (filters.type) conditions.push(eq(workOrders.type, filters.type));

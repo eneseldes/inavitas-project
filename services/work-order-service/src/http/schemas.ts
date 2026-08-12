@@ -35,6 +35,7 @@ const csv = z
 export const ListWorkOrdersQuery = PaginationQuery.extend({
   sort: z.string().optional(),
   status: csv.pipe(z.array(WorkOrderStatusEnum)).optional(),
+  origin: csv.pipe(z.array(z.enum(['USER', 'SYSTEM']))).optional(),
   type: WorkOrderTypeEnum.optional(),
   gisId: z.string().optional(),
   createdAtFrom: z.string().optional(),

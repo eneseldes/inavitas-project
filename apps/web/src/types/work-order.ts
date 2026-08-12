@@ -29,6 +29,9 @@ export interface WorkOrderFilters {
   status?: WorkOrderStatus[];
   type?: WorkOrderType;
   gisId?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  origin?: ('USER' | 'SYSTEM')[];
   hasOutage?: boolean;
 }
 

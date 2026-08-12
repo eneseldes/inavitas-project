@@ -22,6 +22,9 @@ export interface OutageFilters {
   gisId?: string;
   startedAtFrom?: string;
   startedAtTo?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+  origin?: ('USER' | 'SYSTEM')[];
   hasWorkOrder?: boolean;
 }
 

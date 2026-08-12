@@ -20,6 +20,7 @@ import { CreateWorkOrderBody, ListWorkOrdersQuery, PatchWorkOrderBody } from '..
 function toFilters(query: ListWorkOrdersQuery): WorkOrderFilters {
   return {
     status: query.status,
+    origin: query.origin,
     type: query.type,
     gisId: query.gisId,
     createdAtFrom: query.createdAtFrom ? new Date(query.createdAtFrom) : undefined,

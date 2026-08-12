@@ -83,11 +83,14 @@
   }
 }
 
-.languageSwitcher {
+.topControls {
   position: absolute;
   top: 1.25rem;
   right: 1.25rem;
-  width: auto;
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  z-index: 10;
 }
 
 .formWrap {

@@ -38,6 +38,7 @@ const csv = z
 export const ListOutagesQuery = PaginationQuery.extend({
   sort: z.string().optional(),
   status: csv.pipe(z.array(OutageStatusEnum)).optional(),
+  origin: csv.pipe(z.array(z.enum(['USER', 'SYSTEM']))).optional(),
   gisId: z.string().optional(),
   startedAtFrom: z.string().optional(),
   startedAtTo: z.string().optional(),

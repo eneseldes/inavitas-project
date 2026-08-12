@@ -81,6 +81,25 @@
   margin-top: v.$space-2;
 }
 
+.dateGroup {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+  margin-bottom: v.$space-2;
+}
+
+.dateField {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+}
+
+.dateLabel {
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+  font-weight: 500;
+}
+
 @keyframes pop {
   from {
     opacity: 0;

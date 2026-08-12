@@ -33,6 +33,10 @@ export function buildWorkOrderColumns(
 ): ColumnDef<WorkOrder>[] {
   const statusFilterOptions = WORK_ORDER_STATUSES.map((status) => ({ value: status, label: labels.workOrderStatus(status) }));
   const typeFilterOptions = WORK_ORDER_TYPES.map((type) => ({ value: type, label: labels.workOrderType(type) }));
+  const originFilterOptions = [
+    { value: 'USER', label: labels.origin('USER') },
+    { value: 'SYSTEM', label: labels.origin('SYSTEM') },
+  ];
 
   return [
     {
@@ -53,7 +57,10 @@ export function buildWorkOrderColumns(
       header: t('work-order.column.createdAt'),
       accessorFn: (row) => row.createdAt,
       cell: (ctx) => formatDate(ctx.getValue<string>()),
-      meta: { sortField: 'createdAt' } satisfies ColumnMeta,
+      meta: {
+        sortField: 'createdAt',
+        filter: { field: 'createdAt', type: 'date' },
+      } satisfies ColumnMeta,
     },
     {
       id: 'gisId',
@@ -93,6 +100,9 @@ export function buildWorkOrderColumns(
         const origin = ctx.getValue<WorkOrder['origin']>();
         return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
       },
+      meta: {
+        filter: { field: 'origin', type: 'multiselect', options: originFilterOptions },
+      } satisfies ColumnMeta,
     },
     {
       id: 'outageId',

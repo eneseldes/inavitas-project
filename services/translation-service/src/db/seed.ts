@@ -140,6 +140,15 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'filter.clear', 'Temizle', 'Clear'],
   ['common', 'filter.apply', 'Uygula', 'Apply'],
   ['common', 'filter.trigger', '{label} filtrele', 'Filter {label}'],
+  ['common', 'filter.activeTitle', 'Aktif Filtreler', 'Active Filters'],
+  ['common', 'filter.noActive', 'Aktif filtre bulunmuyor', 'No active filters'],
+  ['common', 'filter.clearAll', 'Tümünü Temizle', 'Clear All'],
+  ['common', 'filter.date.operator', 'Filtre Modu', 'Filter Mode'],
+  ['common', 'filter.date.between', 'Tarihler Arası', 'Between Dates'],
+  ['common', 'filter.date.after', 'Sonrasında (>=)', 'After (>=)'],
+  ['common', 'filter.date.before', 'Öncesinde (<=)', 'Before (<=)'],
+  ['common', 'filter.date.from', 'Başlangıç', 'From'],
+  ['common', 'filter.date.to', 'Bitiş', 'To'],
 
   // --- Auth ---
   ['auth', 'validation.email', 'Geçerli bir e-posta adresi girin', 'Enter a valid email address'],

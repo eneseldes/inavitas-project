@@ -41,77 +41,90 @@ export function buildOutageColumns(
   labels: Labels,
   onOpenWorkOrder: (workOrderId: string) => void,
 ): ColumnDef<Outage>[] {
-  const statusFilterOptions = OUTAGE_STATUSES.map((status) => ({ value: status, label: labels.outageStatus(status) }));
+    const statusFilterOptions = OUTAGE_STATUSES.map((status) => ({ value: status, label: labels.outageStatus(status) }));
+    const originFilterOptions = [
+      { value: 'USER', label: labels.origin('USER') },
+      { value: 'SYSTEM', label: labels.origin('SYSTEM') },
+    ];
 
-  return [
-    {
-      id: 'id',
-      header: 'ID',
-      accessorFn: (row) => row.id,
-      cell: (ctx) => {
-        const id = ctx.getValue<string>();
-        return (
-          <span className="font-mono" title={id}>
-            {id.slice(0, 8)}
-          </span>
-        );
+    return [
+      {
+        id: 'id',
+        header: 'ID',
+        accessorFn: (row) => row.id,
+        cell: (ctx) => {
+          const id = ctx.getValue<string>();
+          return (
+            <span className="font-mono" title={id}>
+              {id.slice(0, 8)}
+            </span>
+          );
+        },
       },
-    },
-    {
-      id: 'createdAt',
-      header: t('outage.column.createdAt'),
-      accessorFn: (row) => row.createdAt,
-      cell: (ctx) => formatDate(ctx.getValue<string>()),
-      meta: { sortField: 'createdAt' } satisfies ColumnMeta,
-    },
-    {
-      id: 'gisId',
-      header: 'GIS ID',
-      accessorFn: (row) => row.gisId,
-      cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
-      meta: {
-        sortField: 'gisId',
-        filter: { field: 'gisId', type: 'text', placeholder: t('common.placeholder.gisIdExample') },
-      } satisfies ColumnMeta,
-    },
-    {
-      id: 'status',
-      header: t('outage.column.status'),
-      accessorFn: (row) => row.status,
-      cell: (ctx) => <StatusBadge status={ctx.getValue<Outage['status']>()} />,
-      meta: {
-        sortField: 'status',
-        filter: { field: 'status', type: 'multiselect', options: statusFilterOptions },
-      } satisfies ColumnMeta,
-    },
-    {
-      id: 'startedAt',
-      header: t('outage.column.startedAt'),
-      accessorFn: (row) => row.startedAt,
-      cell: (ctx) => formatDate(ctx.getValue<string>()),
-      meta: { sortField: 'startedAt' } satisfies ColumnMeta,
-    },
-    {
-      id: 'endedAt',
-      header: t('outage.column.endedAt'),
-      accessorFn: (row) => row.endedAt,
-      cell: (ctx) => formatDate(ctx.getValue<string | null>()),
-    },
-    {
-      id: 'durationMinutes',
-      header: t('outage.column.durationMinutes'),
-      accessorFn: (row) => row.durationMinutes,
-      cell: (ctx) => ctx.getValue<number | null>() ?? '—',
-    },
-    {
-      id: 'origin',
-      header: t('outage.column.origin'),
-      accessorFn: (row) => row.origin,
-      cell: (ctx) => {
-        const origin = ctx.getValue<Outage['origin']>();
-        return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
+      {
+        id: 'createdAt',
+        header: t('outage.column.createdAt'),
+        accessorFn: (row) => row.createdAt,
+        cell: (ctx) => formatDate(ctx.getValue<string>()),
+        meta: {
+          sortField: 'createdAt',
+          filter: { field: 'createdAt', type: 'date' },
+        } satisfies ColumnMeta,
       },
-    },
+      {
+        id: 'gisId',
+        header: 'GIS ID',
+        accessorFn: (row) => row.gisId,
+        cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
+        meta: {
+          sortField: 'gisId',
+          filter: { field: 'gisId', type: 'text', placeholder: t('common.placeholder.gisIdExample') },
+        } satisfies ColumnMeta,
+      },
+      {
+        id: 'status',
+        header: t('outage.column.status'),
+        accessorFn: (row) => row.status,
+        cell: (ctx) => <StatusBadge status={ctx.getValue<Outage['status']>()} />,
+        meta: {
+          sortField: 'status',
+          filter: { field: 'status', type: 'multiselect', options: statusFilterOptions },
+        } satisfies ColumnMeta,
+      },
+      {
+        id: 'startedAt',
+        header: t('outage.column.startedAt'),
+        accessorFn: (row) => row.startedAt,
+        cell: (ctx) => formatDate(ctx.getValue<string>()),
+        meta: {
+          sortField: 'startedAt',
+          filter: { field: 'startedAt', type: 'date' },
+        } satisfies ColumnMeta,
+      },
+      {
+        id: 'endedAt',
+        header: t('outage.column.endedAt'),
+        accessorFn: (row) => row.endedAt,
+        cell: (ctx) => formatDate(ctx.getValue<string | null>()),
+      },
+      {
+        id: 'durationMinutes',
+        header: t('outage.column.durationMinutes'),
+        accessorFn: (row) => row.durationMinutes,
+        cell: (ctx) => ctx.getValue<number | null>() ?? '—',
+      },
+      {
+        id: 'origin',
+        header: t('outage.column.origin'),
+        accessorFn: (row) => row.origin,
+        cell: (ctx) => {
+          const origin = ctx.getValue<Outage['origin']>();
+          return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
+        },
+        meta: {
+          filter: { field: 'origin', type: 'multiselect', options: originFilterOptions },
+        } satisfies ColumnMeta,
+      },
     {
       id: 'workOrderId',
       header: t('outage.column.workOrderId'),

@@ -20,6 +20,7 @@ import { CreateOutageBody, ListOutagesQuery, PatchOutageBody } from '../schemas.
 function toFilters(query: ListOutagesQuery): OutageFilters {
   return {
     status: query.status,
+    origin: query.origin,
     gisId: query.gisId,
     startedAtFrom: query.startedAtFrom ? new Date(query.startedAtFrom) : undefined,
     startedAtTo: query.startedAtTo ? toExclusiveUpperBound(query.startedAtTo) : undefined,

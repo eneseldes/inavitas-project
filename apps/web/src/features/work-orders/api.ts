@@ -17,8 +17,11 @@ function buildQuery({ page, pageSize, sort, filters }: WorkOrdersQuery): string 
   });
 
   if (filters.status?.length) params.set('status', filters.status.join(','));
+  if (filters.origin?.length) params.set('origin', filters.origin.join(','));
   if (filters.type) params.set('type', filters.type);
   if (filters.gisId) params.set('gisId', filters.gisId);
+  if (filters.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom);
+  if (filters.createdAtTo) params.set('createdAtTo', filters.createdAtTo);
   if (filters.hasOutage !== undefined) params.set('hasOutage', String(filters.hasOutage));
 
   return params.toString();

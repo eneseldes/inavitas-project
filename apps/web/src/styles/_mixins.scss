@@ -43,7 +43,8 @@
     box-shadow v.$transition-fast;
 
   &::placeholder {
-    color: v.$color-slate-300;
+    color: v.$color-placeholder;
+    opacity: 1;
   }
 
   @include focus-ring;

@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiLock, FiLogIn, FiMail } from 'react-icons/fi';
+import { FiLock, FiLogIn, FiMail, FiMoon, FiSun } from 'react-icons/fi';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useTheme } from '../theme/ThemeProvider.tsx';
 import styles from './LoginPage.module.scss';
 import { ParticleCanvas } from './ParticleCanvas.tsx';
 import { useAuth } from './useAuth.tsx';
@@ -28,6 +29,7 @@ function firstAllowedRoute(permissions: string[]): string {
 export function LoginPage() {
   const { login } = useAuth();
   const { locale, locales, changeLanguage, t } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [formError, setFormError] = useState<string | null>(null);
@@ -64,19 +66,31 @@ export function LoginPage() {
 
       {/* Sağ Taraf: Tek Parça Glassmorphic Giriş Paneli */}
       <div className={styles.loginSection}>
-        {/* Kullanıcı Türkçe bilmiyorsa giriş ekranını okuyamaz — auth namespace'i PUBLIC_PATHS'te. */}
-        <select
-          className={`select select--compact ${styles.languageSwitcher}`}
-          value={locale}
-          onChange={(e) => changeLanguage(e.target.value)}
-          aria-label={t('settings.language.label')}
-        >
-          {locales.map((l) => (
-            <option key={l.code} value={l.code}>
-              {l.name}
-            </option>
-          ))}
-        </select>
+        {/* Dil seçici ve hemen sağında karanlık mod seçimi */}
+        <div className={styles.topControls}>
+          <select
+            className="select select--compact"
+            value={locale}
+            onChange={(e) => changeLanguage(e.target.value)}
+            aria-label={t('settings.language.label')}
+          >
+            {locales.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="icon-btn icon-btn--sm"
+            title={theme === 'dark' ? t('settings.theme.light', undefined, 'Açık Mod') : t('settings.theme.dark', undefined, 'Karanlık Mod')}
+            aria-label={t('settings.theme.dark')}
+          >
+            {theme === 'dark' ? <FiSun /> : <FiMoon />}
+          </button>
+        </div>
 
         <div className={styles.formWrap}>
           <div className={styles.brandHeader}>

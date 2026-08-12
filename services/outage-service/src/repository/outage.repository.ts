@@ -14,6 +14,7 @@ export interface OutageFilters {
   startedAtTo?: Date;
   createdAtFrom?: Date;
   createdAtTo?: Date;
+  origin?: ('USER' | 'SYSTEM')[];
   hasWorkOrder?: boolean;
 }
 
@@ -50,6 +51,11 @@ function buildConditions(filters: OutageFilters): SQL[] {
   if (filters.status && filters.status.length > 0) {
     conditions.push(
       filters.status.length === 1 ? eq(outages.status, filters.status[0]!) : inArray(outages.status, filters.status),
+    );
+  }
+  if (filters.origin && filters.origin.length > 0) {
+    conditions.push(
+      filters.origin.length === 1 ? eq(outages.origin, filters.origin[0]!) : inArray(outages.origin, filters.origin),
     );
   }
   if (filters.gisId) conditions.push(ilike(outages.gisId, `${filters.gisId}%`));
