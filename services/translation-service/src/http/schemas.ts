@@ -48,16 +48,11 @@ export const PublishBody = z.object({
 });
 export type PublishBody = z.infer<typeof PublishBody>;
 
-export const AutoTranslateBody = z
-  .object({
-    targetLocale: z.string().min(2).max(10),
-    sourceLocale: z.string().optional(),
-    namespace: z.string().optional(),
-    keyIds: z.array(z.string().uuid()).optional(),
-    onlyMissing: z.boolean().optional().default(true),
-  })
-  // İkisi de yoksa yanlışlıkla tüm veritabanını çevirme riski oluşur.
-  .refine((body) => !!body.namespace || (body.keyIds && body.keyIds.length > 0), {
-    message: 'namespace veya keyIds alanlarından en az biri zorunludur',
-  });
+export const AutoTranslateBody = z.object({
+  targetLocale: z.string().min(2).max(10),
+  sourceLocale: z.string().optional(),
+  namespace: z.string().optional(),
+  keyIds: z.array(z.string().uuid()).optional(),
+  onlyMissing: z.boolean().optional().default(true),
+});
 export type AutoTranslateBody = z.infer<typeof AutoTranslateBody>;

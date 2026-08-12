@@ -433,17 +433,21 @@ export async function autoTranslate(req: AuthedRequest, res: Response): Promise<
     throw new ValidationError(`Eşlenemeyen kaynak dil: ${sourceLocale}`);
   }
 
-  // Hedef anahtar kümesi: keyIds modu ("bunu doldur") veya namespace modu ("hepsini doldur").
+  // Hedef anahtar kümesi: keyIds modu ("bunu doldur"), namespace modu veya tümü ("hepsini doldur").
   let targetKeyIds: string[];
   if (body.keyIds && body.keyIds.length > 0) {
     targetKeyIds = body.keyIds;
-  } else {
-    const ns = await repo.findNamespaceByName(body.namespace!);
-    if (!ns) throw new NotFoundError('Namespace', body.namespace!);
+  } else if (body.namespace) {
+    const ns = await repo.findNamespaceByName(body.namespace);
+    if (!ns) throw new NotFoundError('Namespace', body.namespace);
     const rows = await db
       .select({ id: translationKeys.id })
       .from(translationKeys)
       .where(eq(translationKeys.namespaceId, ns.id));
+    targetKeyIds = rows.map((r) => r.id);
+  } else {
+    // Tüm namespace'lerdeki tüm anahtarlar
+    const rows = await db.select({ id: translationKeys.id }).from(translationKeys);
     targetKeyIds = rows.map((r) => r.id);
   }
 

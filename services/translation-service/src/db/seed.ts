@@ -83,7 +83,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['settings', 'translations.newKey', 'Yeni anahtar ekle', 'Add new key'],
   ['settings', 'translations.autoFill', 'Eksikleri yapay zekâ ile doldur', 'Fill missing with AI'],
   ['settings', 'translations.onlyMissing', 'Yalnız eksikleri göster', 'Show only missing'],
-  ['settings', 'translations.machineBadge', 'Makine çevirisi', 'Machine translated'],
   ['settings', 'translations.liveValue', 'Canlı', 'Live'],
   ['settings', 'translations.deleteKey', 'Anahtarı sil', 'Delete key'],
   ['settings', 'translations.deactivateLocale', 'Dili pasifleştir', 'Deactivate language'],
@@ -154,8 +153,8 @@ const SEED_KEYS: [string, string, string, string][] = [
   [
     'auth',
     'forbidden.description',
-    'Bu ekranı görüntülemek için gereken izne sahip değilsiniz. Yanlışlık olduğunu düşünüyorsanız yöneticinizle iletişime geçin.',
-    "You don't have the required permission to view this screen. If you believe this is a mistake, contact your administrator.",
+    'Bu ekranı görüntülemek için izniniz bulunmuyor.',
+    'You do not have permission to view this page.',
   ],
   ['auth', 'forbidden.back', 'Ana sayfaya dön', 'Back to home'],
   ['auth', 'session.expired', 'Oturum sona erdi, tekrar giriş yapın', 'Session expired, please sign in again'],

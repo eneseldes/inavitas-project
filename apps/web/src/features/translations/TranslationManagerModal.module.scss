@@ -34,6 +34,31 @@
   @include m.card;
   overflow: auto;
   max-height: 55vh;
+
+  :global(.table) {
+    width: 100%;
+
+    th,
+    td {
+      &:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: v.$color-surface;
+        min-width: 15rem;
+        border-right: 2px solid v.$color-slate-200;
+      }
+
+      &:not(:first-child) {
+        min-width: 18rem;
+      }
+    }
+
+    thead th:first-child {
+      z-index: 3;
+      background: v.$color-slate-100;
+    }
+  }
 }
 
 .loadingBox {
@@ -55,6 +80,103 @@
   gap: v.$space-2;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
+}
+
+.aiHeaderBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 1.5rem;
+  border: none;
+  background: transparent;
+  color: v.$color-slate-500;
+  opacity: 0.6;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: v.$radius-sm;
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover:not(:disabled) {
+    color: #7c3aed;
+    opacity: 1;
+    background: rgba(124, 58, 237, 0.1);
+    transform: scale(1.12) rotate(8deg);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+}
+
+.aiCellBtn {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 1.25rem;
+  border: none;
+  background: transparent;
+  color: v.$color-slate-400;
+  opacity: 0.45;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-radius: v.$radius-sm;
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover:not(:disabled) {
+    color: #7c3aed;
+    opacity: 0.95;
+    background: rgba(124, 58, 237, 0.1);
+    transform: translateY(-50%) scale(1.15) rotate(8deg);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(-50%) scale(0.92);
+  }
+
+  &:disabled {
+    opacity: 0.15;
+    cursor: not-allowed;
+  }
+}
+
+.cooldown {
+  animation: pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+}
+
 .keyNameRow {
   display: flex;
   align-items: center;
@@ -68,16 +190,17 @@
 }
 
 .cellWrap {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: v.$space-1;
+  width: 100%;
 }
 
 // Tabloya özgü hücre davranışı — genişlik/odak burada kalır, D21'in
 // yeniden tanımladığı .input/.select global sınıflarla karışmaz.
 .cellInput {
   width: 100%;
-  padding: 0.375rem 0.5rem;
+  padding: 0.375rem 1.85rem 0.375rem 0.5rem;
   border: 1px solid v.$color-hairline;
   border-radius: v.$radius-sm;
   font-size: v.$control-font-size;
@@ -109,6 +232,12 @@
   margin-top: 0.125rem;
 }
 
+.unpublished {
+  color: v.$color-ink-soft;
+  opacity: 0.75;
+  font-style: italic;
+}
+
 .addLocaleRow {
   margin-top: v.$space-3;
 }
@@ -127,4 +256,53 @@
   display: flex;
   flex-direction: column;
   gap: v.$space-3;
+}
+
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-3;
+  margin-top: v.$space-3;
+  padding: v.$space-2 v.$space-3;
+  background: v.$color-surface-alt;
+  border-radius: v.$radius-md;
+  border: 1px solid v.$color-hairline;
+  font-size: 0.8125rem;
+  color: v.$color-ink-soft;
+  flex-wrap: wrap;
+}
+
+.paginationInfo {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+
+  strong {
+    color: v.$color-ink;
+  }
+}
+
+.paginationActions {
+  display: flex;
+  align-items: center;
+  gap: v.$space-4;
+  flex-wrap: wrap;
+}
+
+.pageSizeWrap {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+
+  :global(.select) {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+.pageButtons {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
 }
