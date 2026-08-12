@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiCheck, FiPlus, FiSend, FiTrash2, FiX } from 'react-icons/fi';
 import { SiGooglegemini } from 'react-icons/si';
 import { clsx } from 'clsx';
@@ -82,6 +82,18 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
     queryFn: () =>
       fetchTranslationKeys({ namespace: namespace || undefined, page, pageSize, q: debouncedSearch, onlyMissing }),
   });
+
+  const hasDirtyKeys = useMemo(() => {
+    if (!keysData?.items) return false;
+    return keysData.items.some((row) =>
+      localesList.some((loc) => {
+        const trans = row.translations[loc.code];
+        const draft = trans?.draftValue ?? '';
+        const published = trans?.publishedValue ?? '';
+        return draft.trim() !== '' && draft !== published;
+      }),
+    );
+  }, [keysData, localesList]);
 
   const updateMutation = useMutation({
     mutationFn: (input: UpdateTranslationInput) => updateTranslation(input),
@@ -253,7 +265,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
             type="button"
             className="btn btn--primary"
             onClick={() => publishMutation.mutate()}
-            disabled={publishMutation.isPending}
+            disabled={publishMutation.isPending || !hasDirtyKeys}
           >
             <FiSend /> {publishMutation.isPending ? t('settings.translations.publishing') : t('settings.translations.publish')}
           </button>
@@ -372,7 +384,9 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
 
                   {localesList.map((loc) => {
                     const trans = row.translations[loc.code];
-                    const isDirty = trans && trans.publishedValue != null && trans.draftValue !== trans.publishedValue;
+                    const draft = trans?.draftValue ?? '';
+                    const published = trans?.publishedValue ?? '';
+                    const isDirty = draft.trim() !== '' && draft !== published;
 
                     return (
                       <td key={loc.code}>

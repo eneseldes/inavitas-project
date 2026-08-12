@@ -42,12 +42,13 @@ export async function getPublishedBundleRows(
         eq(translationNamespaces.name, namespaceName),
         eq(translations.localeCode, localeCode),
         isNotNull(translations.publishedValue),
+        ne(translations.publishedValue, ''),
       ),
     );
 
   const dict: Dictionary = {};
   for (const r of rows) {
-    if (r.publishedValue !== null) {
+    if (r.publishedValue !== null && r.publishedValue.trim() !== '') {
       dict[r.keyName] = r.publishedValue;
     }
   }
@@ -88,12 +89,13 @@ export async function getPublishedBundleRowsAll(localeCode: string, tx?: Tx): Pr
       and(
         eq(translations.localeCode, localeCode),
         isNotNull(translations.publishedValue),
+        ne(translations.publishedValue, ''),
       ),
     );
 
   const dict: Dictionary = {};
   for (const r of rows) {
-    if (r.publishedValue !== null) {
+    if (r.publishedValue !== null && r.publishedValue.trim() !== '') {
       dict[r.keyName] = r.publishedValue;
     }
   }

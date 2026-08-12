@@ -75,8 +75,7 @@ export async function publishTranslations(
             AND draft_value IS DISTINCT FROM published_value
         `);
 
-        // published_value = draft_value kopyala — niyeti açık SQL, ham Column
-        // referansının .set()'te ne üreteceği belirsiz kalmasın.
+        // published_value = draft_value kopyala — yalnız değişen satırlar güncellenir.
         const updated = await tx
           .update(translations)
           .set({ publishedValue: sql`${translations.draftValue}` })
@@ -84,9 +83,12 @@ export async function publishTranslations(
             and(
               inArray(translations.keyId, keyIds),
               eq(translations.localeCode, loc.code),
+              sql`draft_value IS DISTINCT FROM published_value`,
             ),
           )
           .returning({ id: translations.id });
+
+        if (updated.length === 0) continue;
 
         totalUpdated += updated.length;
 
