@@ -23,6 +23,10 @@ function buildQuery({ page, pageSize, sort, filters }: OutagesQuery): string {
   if (filters.startedAtTo) params.set('startedAtTo', filters.startedAtTo);
   if (filters.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom);
   if (filters.createdAtTo) params.set('createdAtTo', filters.createdAtTo);
+  if (filters.endedAtFrom) params.set('endedAtFrom', filters.endedAtFrom);
+  if (filters.endedAtTo) params.set('endedAtTo', filters.endedAtTo);
+  if (filters.durationMinMinutes !== undefined) params.set('durationMinMinutes', String(filters.durationMinMinutes));
+  if (filters.durationMaxMinutes !== undefined) params.set('durationMaxMinutes', String(filters.durationMaxMinutes));
   if (filters.hasWorkOrder !== undefined) params.set('hasWorkOrder', String(filters.hasWorkOrder));
 
   return params.toString();

@@ -16,11 +16,23 @@ export interface DateFilterValue {
   to?: string;
 }
 
+export interface NumberRangeFilterValue {
+  min?: number;
+  max?: number;
+}
+
 interface TextFilterProps {
   type: 'text';
   value: string;
   onApply: (value: string) => void;
   placeholder?: string;
+}
+
+interface SelectFilterProps {
+  type: 'select';
+  value: string;
+  onApply: (value: string) => void;
+  options: FilterOption[];
 }
 
 interface MultiSelectFilterProps {
@@ -36,7 +48,19 @@ interface DateFilterProps {
   onApply: (value: DateFilterValue) => void;
 }
 
-export type ColumnFilterProps = (TextFilterProps | MultiSelectFilterProps | DateFilterProps) & { label: string };
+interface NumberRangeFilterProps {
+  type: 'numberRange';
+  value: NumberRangeFilterValue;
+  onApply: (value: NumberRangeFilterValue) => void;
+}
+
+export type ColumnFilterProps = (
+  | TextFilterProps
+  | SelectFilterProps
+  | MultiSelectFilterProps
+  | DateFilterProps
+  | NumberRangeFilterProps
+) & { label: string };
 
 // .popover'daki `width: 14rem` ile birebir aynı — konum hesabı için gerekiyor.
 const POPOVER_WIDTH = 224;
@@ -54,11 +78,13 @@ export function ColumnFilter(props: ColumnFilterProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const isActive =
-    props.type === 'text'
+    props.type === 'text' || props.type === 'select'
       ? props.value.trim().length > 0
       : props.type === 'multiselect'
         ? props.value.length > 0
-        : Boolean(props.value?.from || props.value?.to);
+        : props.type === 'numberRange'
+          ? props.value.min !== undefined || props.value.max !== undefined
+          : Boolean(props.value?.from || props.value?.to);
 
   const openPopover = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -111,8 +137,12 @@ export function ColumnFilter(props: ColumnFilterProps) {
           <div ref={popoverRef} className={styles.popover} style={{ top: position.top, left: position.left }} onClick={(e) => e.stopPropagation()}>
             {props.type === 'text' ? (
               <TextFilterBody {...props} onDone={() => setOpen(false)} />
+            ) : props.type === 'select' ? (
+              <SelectFilterBody {...props} onDone={() => setOpen(false)} />
             ) : props.type === 'multiselect' ? (
               <MultiSelectFilterBody {...props} onDone={() => setOpen(false)} />
+            ) : props.type === 'numberRange' ? (
+              <NumberRangeFilterBody {...props} onDone={() => setOpen(false)} />
             ) : (
               <DateFilterBody {...props} onDone={() => setOpen(false)} />
             )}
@@ -142,6 +172,57 @@ function TextFilterBody({ value, onApply, placeholder, onDone }: TextFilterProps
           }
         }}
       />
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            setDraft('');
+            onApply('');
+            onDone();
+          }}
+        >
+          {t('common.filter.clear')}
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => {
+            onApply(draft);
+            onDone();
+          }}
+        >
+          {t('common.filter.apply')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Backend'in tek değer kabul ettiği alanlar için — checkbox listesi yerine radio grubu. */
+function SelectFilterBody({ value, onApply, options, onDone }: SelectFilterProps & { onDone: () => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(value);
+
+  return (
+    <div>
+      <div className={styles.optionList}>
+        <label className={styles.option}>
+          <input type="radio" name="column-select-filter" checked={draft === ''} onChange={() => setDraft('')} />
+          {t('common.filter.any', undefined, 'Tümü')}
+        </label>
+        {options.map((option) => (
+          <label key={option.value} className={styles.option}>
+            <input
+              type="radio"
+              name="column-select-filter"
+              checked={draft === option.value}
+              onChange={() => setDraft(option.value)}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
       <div className={styles.actions}>
         <button
           type="button"
@@ -225,7 +306,7 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
       <div className={styles.dateGroup}>
         <div className={styles.dateField}>
           <span className={styles.dateLabel}>{t('common.filter.date.operator', undefined, 'Filtre Modu')}</span>
-          <select className="select select--compact" value={operator} onChange={(e) => setOperator(e.target.value as 'between' | 'after' | 'before')}>
+          <select className="select" value={operator} onChange={(e) => setOperator(e.target.value as 'between' | 'after' | 'before')}>
             <option value="between">{t('common.filter.date.between', undefined, 'Tarihler Arası')}</option>
             <option value="after">{t('common.filter.date.after', undefined, 'Sonrasında (>=)')}</option>
             <option value="before">{t('common.filter.date.before', undefined, 'Öncesinde (<=)')}</option>
@@ -266,6 +347,55 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
               operator,
               from: operator === 'before' ? '' : from,
               to: operator === 'after' ? '' : to,
+            });
+            onDone();
+          }}
+        >
+          {t('common.filter.apply')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProps & { onDone: () => void }) {
+  const { t } = useTranslation();
+  const [min, setMin] = useState(value?.min !== undefined ? String(value.min) : '');
+  const [max, setMax] = useState(value?.max !== undefined ? String(value.max) : '');
+
+  return (
+    <div>
+      <div className={styles.dateGroup}>
+        <div className={styles.dateField}>
+          <span className={styles.dateLabel}>{t('common.filter.number.min', undefined, 'En az')}</span>
+          <input type="number" className="input" value={min} onChange={(e) => setMin(e.target.value)} />
+        </div>
+        <div className={styles.dateField}>
+          <span className={styles.dateLabel}>{t('common.filter.number.max', undefined, 'En çok')}</span>
+          <input type="number" className="input" value={max} onChange={(e) => setMax(e.target.value)} />
+        </div>
+      </div>
+
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            setMin('');
+            setMax('');
+            onApply({});
+            onDone();
+          }}
+        >
+          {t('common.filter.clear')}
+        </button>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => {
+            onApply({
+              min: min !== '' ? Number(min) : undefined,
+              max: max !== '' ? Number(max) : undefined,
             });
             onDone();
           }}

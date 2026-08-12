@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { FiPlus } from 'react-icons/fi';
-import { DataGrid, type FilterValue } from '../../../shared/components/DataGrid.tsx';
+import { DataGrid } from '../../../shared/components/DataGrid.tsx';
 import { useToast } from '../../../shared/components/Toast.tsx';
+import { useDataGridState } from '../../../shared/hooks/useDataGridState.ts';
 import { ApiError } from '../../../shared/api/errors.ts';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
-import type { SortDirection } from '../../../types/api.ts';
 import type { UserDetail, UserListItem } from '../../../types/user-management.ts';
 import { fetchUser } from '../api.ts';
 import { useRoles } from '../roles/useRoles.ts';
@@ -18,27 +18,16 @@ export function UsersView() {
   const { t } = useTranslation();
   const { show } = useToast();
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [sort, setSort] = useState<{ field: string; dir: SortDirection }>({ field: 'lastLoginAt', dir: 'desc' });
-  const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({ q: '' });
-
   const [modalUser, setModalUser] = useState<UserDetail | null | 'create'>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<UserListItem | null>(null);
 
-  const { data, isLoading, isFetching, refetch } = useUsers({
-    page,
-    pageSize,
-    sort: `${sort.field}:${sort.dir}`,
-    q: (filterValues.q as string) || undefined,
-  });
   const { data: rolesData } = useRoles();
   const patchUser = usePatchUser();
 
-  const handleFilterChange = (field: string, value: FilterValue) => {
-    setFilterValues((prev) => ({ ...prev, [field]: value }));
-    setPage(1);
-  };
+  const roleNameByCode = useMemo(
+    () => Object.fromEntries((rolesData?.items ?? []).map((r) => [r.code, r.name])),
+    [rolesData],
+  );
 
   const handleEdit = async (user: UserListItem) => {
     try {
@@ -64,11 +53,6 @@ export function UsersView() {
     setResetPasswordUser(user);
   };
 
-  const roleNameByCode = useMemo(
-    () => Object.fromEntries((rolesData?.items ?? []).map((r) => [r.code, r.name])),
-    [rolesData],
-  );
-
   const columns = useMemo(
     () =>
       buildUserColumns(t, roleNameByCode, {
@@ -80,22 +64,36 @@ export function UsersView() {
     [t, roleNameByCode],
   );
 
+  const grid = useDataGridState<UserListItem>({ columns, defaultSort: { field: 'lastLoginAt', dir: 'desc' } });
+
+  const query = useMemo(
+    () => ({
+      page: grid.page,
+      pageSize: grid.pageSize,
+      sort: `${grid.sort.field}:${grid.sort.dir}`,
+      ...(grid.queryFilters as { q?: string; email?: string; roles?: string[]; lastLoginAtFrom?: string; lastLoginAtTo?: string }),
+    }),
+    [grid.page, grid.pageSize, grid.sort, grid.queryFilters],
+  );
+
+  const { data, isLoading, isFetching, refetch } = useUsers(query);
+
   return (
     <div className={styles.wrap}>
       <DataGrid<UserListItem>
         columns={columns}
         data={data?.items ?? []}
-        page={data?.page ?? page}
-        pageSize={data?.pageSize ?? pageSize}
+        page={data?.page ?? grid.page}
+        pageSize={data?.pageSize ?? grid.pageSize}
         total={data?.total ?? 0}
         totalPages={data?.totalPages ?? 1}
-        sort={sort}
-        onSortChange={(next) => { setSort(next); setPage(1); }}
-        onPageChange={setPage}
-        onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        sort={grid.sort}
+        onSortChange={grid.onSortChange}
+        onPageChange={grid.onPageChange}
+        onPageSizeChange={grid.onPageSizeChange}
         onRefresh={() => void refetch()}
-        filterValues={filterValues}
-        onFilterChange={handleFilterChange}
+        filterValues={grid.filterValues}
+        onFilterChange={grid.onFilterChange}
         isLoading={isLoading}
         isFetching={isFetching}
         emptyMessage={t('user-management.table.empty', undefined, 'Kullanıcı kaydı bulunamadı')}

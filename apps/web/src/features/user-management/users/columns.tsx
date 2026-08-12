@@ -1,6 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { FiEdit2, FiKey, FiTrash2 } from 'react-icons/fi';
 import type { ColumnMeta } from '../../../shared/components/DataGrid.tsx';
+import type { DateFilterValue } from '../../../shared/components/ColumnFilter.tsx';
 import type { TranslateFn } from '../../i18n/I18nProvider.tsx';
 import type { UserListItem } from '../../../types/user-management.ts';
 
@@ -15,11 +16,23 @@ export function buildUserColumns(
     onResetPassword: (user: UserListItem) => void;
   },
 ): ColumnDef<UserListItem>[] {
+  const roleFilterOptions = Object.entries(roleNameByCode).map(([value, label]) => ({ value, label }));
+
   return [
     {
       id: 'fullName',
       header: t('user-management.column.fullName', undefined, 'Ad Soyad'),
       accessorFn: (row) => row.fullName,
+      meta: {
+        sortField: 'fullName',
+        // Placeholder metni "ad veya e-posta ara" olduğu için sonuç genel arama (`q`) — sadece ad değil.
+        filter: {
+          key: 'q',
+          type: 'text',
+          placeholder: t('user-management.filter.search'),
+          toQuery: (v) => ({ q: (v as string) || undefined }),
+        },
+      } satisfies ColumnMeta,
     },
     {
       id: 'email',
@@ -27,7 +40,12 @@ export function buildUserColumns(
       accessorFn: (row) => row.email,
       meta: {
         sortField: 'email',
-        filter: { field: 'q', type: 'text', placeholder: t('user-management.filter.search') },
+        filter: {
+          key: 'email',
+          type: 'text',
+          placeholder: t('user-management.filter.email', undefined, 'E-posta ara…'),
+          toQuery: (v) => ({ email: (v as string) || undefined }),
+        },
       } satisfies ColumnMeta,
     },
     {
@@ -39,6 +57,14 @@ export function buildUserColumns(
         if (codes.length === 0) return <span className="text-muted">—</span>;
         return <span>{codes.map((code) => roleNameByCode[code] ?? code).join(', ')}</span>;
       },
+      meta: {
+        filter: {
+          key: 'roles',
+          type: 'multiselect',
+          options: roleFilterOptions,
+          toQuery: (v) => ({ roles: (v as string[]).length ? v : undefined }),
+        },
+      } satisfies ColumnMeta,
     },
     {
       id: 'lastLoginAt',
@@ -49,7 +75,17 @@ export function buildUserColumns(
         if (!value) return <span className="text-muted">Hiç giriş yapmadı</span>;
         return dateFormatter.format(new Date(value));
       },
-      meta: { sortField: 'lastLoginAt' } satisfies ColumnMeta,
+      meta: {
+        sortField: 'lastLoginAt',
+        filter: {
+          key: 'lastLoginAt',
+          type: 'date',
+          toQuery: (v) => {
+            const { from, to } = v as DateFilterValue;
+            return { lastLoginAtFrom: from || undefined, lastLoginAtTo: to || undefined };
+          },
+        },
+      } satisfies ColumnMeta,
     },
     {
       id: 'actions',

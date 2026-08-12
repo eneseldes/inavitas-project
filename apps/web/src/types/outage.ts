@@ -24,6 +24,10 @@ export interface OutageFilters {
   startedAtTo?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
+  endedAtFrom?: string;
+  endedAtTo?: string;
+  durationMinMinutes?: number;
+  durationMaxMinutes?: number;
   origin?: ('USER' | 'SYSTEM')[];
   hasWorkOrder?: boolean;
 }

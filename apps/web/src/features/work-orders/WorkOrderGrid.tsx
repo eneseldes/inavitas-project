@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
 import { FiPlus, FiX } from 'react-icons/fi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx';
-import type { DateFilterValue } from '../../shared/components/ColumnFilter.tsx';
+import { DataGrid } from '../../shared/components/DataGrid.tsx';
 import { LiveIndicator } from '../../shared/components/LiveIndicator.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
+import { useDataGridState } from '../../shared/hooks/useDataGridState.ts';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
-import type { SortDirection } from '../../types/api.ts';
-import type { WorkOrder, WorkOrderStatus, WorkOrderType } from '../../types/work-order.ts';
+import type { WorkOrder, WorkOrderFilters } from '../../types/work-order.ts';
 import { CreateWorkOrderDialog } from './CreateWorkOrderDialog.tsx';
 import { WorkOrderDetailSection } from './WorkOrderDetailSection.tsx';
 import { buildWorkOrderColumns } from './columns.tsx';
@@ -25,41 +24,24 @@ export function WorkOrderGrid() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isLive = useWorkOrderStream();
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [sort, setSort] = useState<{ field: string; dir: SortDirection }>({ field: 'createdAt', dir: 'desc' });
-  const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({
-    gisId: '',
-    status: [],
-    type: [],
-    origin: [],
-    createdAt: { operator: 'between', from: '', to: '' },
-  });
+  const columns = useMemo(
+    () => buildWorkOrderColumns(t, labels, (outageId) => navigate(`/outages?relatedOutageId=${outageId}`)),
+    [t, labels, navigate],
+  );
+
+  const grid = useDataGridState<WorkOrder>({ columns, defaultSort: { field: 'createdAt', dir: 'desc' } });
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
 
-  const handleFilterChange = (field: string, value: FilterValue) => {
-    setFilterValues((prev) => ({ ...prev, [field]: value }));
-    setPage(1);
-  };
-
-  const query = useMemo(() => {
-    const createdAtVal = filterValues.createdAt as DateFilterValue | undefined;
-
-    return {
-      page,
-      pageSize,
-      sort,
-      filters: {
-        gisId: (filterValues.gisId as string) || undefined,
-        status: (filterValues.status as WorkOrderStatus[])?.length ? (filterValues.status as WorkOrderStatus[]) : undefined,
-        origin: (filterValues.origin as ('USER' | 'SYSTEM')[])?.length ? (filterValues.origin as ('USER' | 'SYSTEM')[]) : undefined,
-        type: (filterValues.type as WorkOrderType[])?.[0],
-        createdAtFrom: createdAtVal?.from || undefined,
-        createdAtTo: createdAtVal?.to || undefined,
-      },
-    };
-  }, [page, pageSize, sort, filterValues]);
+  const query = useMemo(
+    () => ({
+      page: grid.page,
+      pageSize: grid.pageSize,
+      sort: grid.sort,
+      filters: grid.queryFilters as WorkOrderFilters,
+    }),
+    [grid.page, grid.pageSize, grid.sort, grid.queryFilters],
+  );
 
   const { data, isLoading, isFetching, refetch } = useWorkOrders(query);
 
@@ -80,11 +62,6 @@ export function WorkOrderGrid() {
     }
     return items;
   }, [data?.items, activeWorkOrder]);
-
-  const columns = useMemo(
-    () => buildWorkOrderColumns(t, labels, (outageId) => navigate(`/outages?relatedOutageId=${outageId}`)),
-    [t, labels, navigate],
-  );
 
   const handleBack = () => {
     setSelectedWorkOrderId(null);
@@ -137,23 +114,17 @@ export function WorkOrderGrid() {
         <DataGrid<WorkOrder>
           columns={columns}
           data={data?.items ?? []}
-          page={data?.page ?? page}
-          pageSize={data?.pageSize ?? pageSize}
+          page={data?.page ?? grid.page}
+          pageSize={data?.pageSize ?? grid.pageSize}
           total={data?.total ?? 0}
           totalPages={data?.totalPages ?? 1}
-          sort={sort}
-          onSortChange={(next) => {
-            setSort(next);
-            setPage(1);
-          }}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
+          sort={grid.sort}
+          onSortChange={grid.onSortChange}
+          onPageChange={grid.onPageChange}
+          onPageSizeChange={grid.onPageSizeChange}
           onRefresh={() => void refetch()}
-          filterValues={filterValues}
-          onFilterChange={handleFilterChange}
+          filterValues={grid.filterValues}
+          onFilterChange={grid.onFilterChange}
           isLoading={isLoading}
           isFetching={isFetching}
           onRowClick={(workOrder) => setSelectedWorkOrderId(workOrder.id)}

@@ -14,6 +14,11 @@ export interface OutageFilters {
   startedAtTo?: Date;
   createdAtFrom?: Date;
   createdAtTo?: Date;
+  endedAtFrom?: Date;
+  endedAtTo?: Date;
+  /** Süre (dakika) — `endedAt - startedAt` üzerinden hesaplanır, dolayısıyla yalnızca kapanmış kesintiler eşleşir. */
+  durationMinMinutes?: number;
+  durationMaxMinutes?: number;
   origin?: ('USER' | 'SYSTEM')[];
   hasWorkOrder?: boolean;
 }
@@ -63,6 +68,18 @@ function buildConditions(filters: OutageFilters): SQL[] {
   if (filters.startedAtTo) conditions.push(lt(outages.startedAt, filters.startedAtTo));
   if (filters.createdAtFrom) conditions.push(gte(outages.createdAt, filters.createdAtFrom));
   if (filters.createdAtTo) conditions.push(lt(outages.createdAt, filters.createdAtTo));
+  if (filters.endedAtFrom) conditions.push(gte(outages.endedAt, filters.endedAtFrom));
+  if (filters.endedAtTo) conditions.push(lt(outages.endedAt, filters.endedAtTo));
+  if (filters.durationMinMinutes !== undefined) {
+    conditions.push(
+      sql`ROUND(EXTRACT(EPOCH FROM (${outages.endedAt} - ${outages.startedAt})) / 60) >= ${filters.durationMinMinutes}`,
+    );
+  }
+  if (filters.durationMaxMinutes !== undefined) {
+    conditions.push(
+      sql`ROUND(EXTRACT(EPOCH FROM (${outages.endedAt} - ${outages.startedAt})) / 60) <= ${filters.durationMaxMinutes}`,
+    );
+  }
   if (filters.hasWorkOrder === true) conditions.push(isNotNull(outages.workOrderId));
   if (filters.hasWorkOrder === false) conditions.push(isNull(outages.workOrderId));
 

@@ -1,4 +1,4 @@
-import { asyncHandler, parseSort, PERMISSIONS, requirePermission, type AuthedRequest } from '@inavitas/shared';
+import { asyncHandler, parseSort, PERMISSIONS, requirePermission, toExclusiveUpperBound, type AuthedRequest } from '@inavitas/shared';
 import { Router } from 'express';
 import type { Response } from 'express';
 import * as userRepository from '../../repository/user.repository.ts';
@@ -26,7 +26,14 @@ export function buildUserRouter(): Router {
       const sort = parseSort(query.sort, ['email', 'fullName', 'lastLoginAt'], { field: 'lastLoginAt', dir: 'desc' });
 
       const result = await userRepository.list(
-        { q: query.q, isActive: query.isActive },
+        {
+          q: query.q,
+          isActive: query.isActive,
+          email: query.email,
+          roles: query.roles,
+          lastLoginAtFrom: query.lastLoginAtFrom ? new Date(query.lastLoginAtFrom) : undefined,
+          lastLoginAtTo: query.lastLoginAtTo ? toExclusiveUpperBound(query.lastLoginAtTo) : undefined,
+        },
         { page: query.page, pageSize: query.pageSize },
         sort,
       );

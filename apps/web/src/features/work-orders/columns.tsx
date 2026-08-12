@@ -1,6 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { FiLink } from 'react-icons/fi';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
+import type { DateFilterValue } from '../../shared/components/ColumnFilter.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import type { TranslateFn } from '../i18n/I18nProvider.tsx';
 import type { useLabels } from '../i18n/useLabels.ts';
@@ -40,6 +41,23 @@ export function buildWorkOrderColumns(
 
   return [
     {
+      id: 'createdAt',
+      header: t('work-order.column.createdAt'),
+      accessorFn: (row) => row.createdAt,
+      cell: (ctx) => formatDate(ctx.getValue<string>()),
+      meta: {
+        sortField: 'createdAt',
+        filter: {
+          key: 'createdAt',
+          type: 'date',
+          toQuery: (v) => {
+            const { from, to } = v as DateFilterValue;
+            return { createdAtFrom: from || undefined, createdAtTo: to || undefined };
+          },
+        },
+      } satisfies ColumnMeta,
+    },
+    {
       id: 'id',
       header: 'ID',
       accessorFn: (row) => row.id,
@@ -53,23 +71,18 @@ export function buildWorkOrderColumns(
       },
     },
     {
-      id: 'createdAt',
-      header: t('work-order.column.createdAt'),
-      accessorFn: (row) => row.createdAt,
-      cell: (ctx) => formatDate(ctx.getValue<string>()),
-      meta: {
-        sortField: 'createdAt',
-        filter: { field: 'createdAt', type: 'date' },
-      } satisfies ColumnMeta,
-    },
-    {
       id: 'gisId',
       header: 'GIS ID',
       accessorFn: (row) => row.gisId,
       cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
       meta: {
         sortField: 'gisId',
-        filter: { field: 'gisId', type: 'text', placeholder: t('common.placeholder.gisIdExample') },
+        filter: {
+          key: 'gisId',
+          type: 'text',
+          placeholder: t('common.placeholder.gisIdExample'),
+          toQuery: (v) => ({ gisId: (v as string) || undefined }),
+        },
       } satisfies ColumnMeta,
     },
     {
@@ -79,7 +92,13 @@ export function buildWorkOrderColumns(
       cell: (ctx) => <span>{labels.workOrderType(ctx.getValue<WorkOrder['type']>())}</span>,
       meta: {
         sortField: 'type',
-        filter: { field: 'type', type: 'multiselect', options: typeFilterOptions },
+        // Backend `type` filtresi tek değer kabul eder (bkz. WorkOrderFilters.type) — çoklu seçim yok.
+        filter: {
+          key: 'type',
+          type: 'select',
+          options: typeFilterOptions,
+          toQuery: (v) => ({ type: (v as string) || undefined }),
+        },
       } satisfies ColumnMeta,
     },
     {
@@ -89,7 +108,12 @@ export function buildWorkOrderColumns(
       cell: (ctx) => <StatusBadge status={ctx.getValue<WorkOrder['status']>()} />,
       meta: {
         sortField: 'status',
-        filter: { field: 'status', type: 'multiselect', options: statusFilterOptions },
+        filter: {
+          key: 'status',
+          type: 'multiselect',
+          options: statusFilterOptions,
+          toQuery: (v) => ({ status: (v as string[]).length ? v : undefined }),
+        },
       } satisfies ColumnMeta,
     },
     {
@@ -101,7 +125,12 @@ export function buildWorkOrderColumns(
         return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
       },
       meta: {
-        filter: { field: 'origin', type: 'multiselect', options: originFilterOptions },
+        filter: {
+          key: 'origin',
+          type: 'multiselect',
+          options: originFilterOptions,
+          toQuery: (v) => ({ origin: (v as string[]).length ? v : undefined }),
+        },
       } satisfies ColumnMeta,
     },
     {

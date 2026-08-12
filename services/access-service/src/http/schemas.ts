@@ -9,11 +9,19 @@ export type LoginBody = z.infer<typeof LoginBody>;
 
 // --- Kullanıcı yönetimi ---
 
+const csv = z
+  .string()
+  .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean));
+
 export const ListUsersQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   sort: z.string().optional(),
   q: z.string().optional(),
+  email: z.string().optional(),
+  roles: csv.optional(),
+  lastLoginAtFrom: z.string().optional(),
+  lastLoginAtTo: z.string().optional(),
   isActive: z
     .enum(['true', 'false'])
     .optional()

@@ -44,6 +44,10 @@ export const ListOutagesQuery = PaginationQuery.extend({
   startedAtTo: z.string().optional(),
   createdAtFrom: z.string().optional(),
   createdAtTo: z.string().optional(),
+  endedAtFrom: z.string().optional(),
+  endedAtTo: z.string().optional(),
+  durationMinMinutes: z.coerce.number().int().optional(),
+  durationMaxMinutes: z.coerce.number().int().optional(),
   hasWorkOrder: z.enum(['true', 'false']).optional(),
 });
 export type ListOutagesQuery = z.infer<typeof ListOutagesQuery>;

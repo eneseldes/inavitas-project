@@ -1,15 +1,14 @@
 import { useMemo, useState } from 'react';
 import { FiPlus, FiX } from 'react-icons/fi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { DataGrid, type FilterValue } from '../../shared/components/DataGrid.tsx';
-import type { DateFilterValue } from '../../shared/components/ColumnFilter.tsx';
+import { DataGrid } from '../../shared/components/DataGrid.tsx';
 import { LiveIndicator } from '../../shared/components/LiveIndicator.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
+import { useDataGridState } from '../../shared/hooks/useDataGridState.ts';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
-import type { SortDirection } from '../../types/api.ts';
-import type { Outage, OutageStatus } from '../../types/outage.ts';
+import type { Outage, OutageFilters } from '../../types/outage.ts';
 import { CreateOutageDialog } from './CreateOutageDialog.tsx';
 import { OutageDetailSection } from './OutageDetailSection.tsx';
 import { buildOutageColumns } from './columns.tsx';
@@ -25,43 +24,24 @@ export function OutageGrid() {
   const [searchParams, setSearchParams] = useSearchParams();
   const isLive = useOutageStream();
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [sort, setSort] = useState<{ field: string; dir: SortDirection }>({ field: 'createdAt', dir: 'desc' });
-  const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({
-    gisId: '',
-    status: [],
-    origin: [],
-    createdAt: { operator: 'between', from: '', to: '' },
-    startedAt: { operator: 'between', from: '', to: '' },
-  });
+  const columns = useMemo(
+    () => buildOutageColumns(t, labels, (workOrderId) => navigate(`/work-orders?relatedWorkOrderId=${workOrderId}`)),
+    [t, labels, navigate],
+  );
+
+  const grid = useDataGridState<Outage>({ columns, defaultSort: { field: 'createdAt', dir: 'desc' } });
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [selectedOutageId, setSelectedOutageId] = useState<string | null>(null);
 
-  const handleFilterChange = (field: string, value: FilterValue) => {
-    setFilterValues((prev) => ({ ...prev, [field]: value }));
-    setPage(1);
-  };
-
-  const query = useMemo(() => {
-    const createdAtVal = filterValues.createdAt as DateFilterValue | undefined;
-    const startedAtVal = filterValues.startedAt as DateFilterValue | undefined;
-
-    return {
-      page,
-      pageSize,
-      sort,
-      filters: {
-        gisId: (filterValues.gisId as string) || undefined,
-        status: (filterValues.status as OutageStatus[])?.length ? (filterValues.status as OutageStatus[]) : undefined,
-        origin: (filterValues.origin as ('USER' | 'SYSTEM')[])?.length ? (filterValues.origin as ('USER' | 'SYSTEM')[]) : undefined,
-        createdAtFrom: createdAtVal?.from || undefined,
-        createdAtTo: createdAtVal?.to || undefined,
-        startedAtFrom: startedAtVal?.from || undefined,
-        startedAtTo: startedAtVal?.to || undefined,
-      },
-    };
-  }, [page, pageSize, sort, filterValues]);
+  const query = useMemo(
+    () => ({
+      page: grid.page,
+      pageSize: grid.pageSize,
+      sort: grid.sort,
+      filters: grid.queryFilters as OutageFilters,
+    }),
+    [grid.page, grid.pageSize, grid.sort, grid.queryFilters],
+  );
 
   const { data, isLoading, isFetching, refetch } = useOutages(query);
 
@@ -85,11 +65,6 @@ export function OutageGrid() {
     }
     return items;
   }, [data?.items, activeOutage]);
-
-  const columns = useMemo(
-    () => buildOutageColumns(t, labels, (workOrderId) => navigate(`/work-orders?relatedWorkOrderId=${workOrderId}`)),
-    [t, labels, navigate],
-  );
 
   const handleBack = () => {
     setSelectedOutageId(null);
@@ -142,23 +117,17 @@ export function OutageGrid() {
         <DataGrid<Outage>
           columns={columns}
           data={data?.items ?? []}
-          page={data?.page ?? page}
-          pageSize={data?.pageSize ?? pageSize}
+          page={data?.page ?? grid.page}
+          pageSize={data?.pageSize ?? grid.pageSize}
           total={data?.total ?? 0}
           totalPages={data?.totalPages ?? 1}
-          sort={sort}
-          onSortChange={(next) => {
-            setSort(next);
-            setPage(1);
-          }}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
+          sort={grid.sort}
+          onSortChange={grid.onSortChange}
+          onPageChange={grid.onPageChange}
+          onPageSizeChange={grid.onPageSizeChange}
           onRefresh={() => void refetch()}
-          filterValues={filterValues}
-          onFilterChange={handleFilterChange}
+          filterValues={grid.filterValues}
+          onFilterChange={grid.onFilterChange}
           isLoading={isLoading}
           isFetching={isFetching}
           onRowClick={(outage) => setSelectedOutageId(outage.id)}

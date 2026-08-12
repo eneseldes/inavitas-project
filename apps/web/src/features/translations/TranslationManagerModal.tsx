@@ -449,7 +449,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
             <div className={styles.pageSizeWrap}>
               <span>Satır:</span>
               <select
-                className="select"
+                className="select select--compact"
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));

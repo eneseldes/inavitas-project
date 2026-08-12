@@ -1,6 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { FiLink } from 'react-icons/fi';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
+import type { DateFilterValue, NumberRangeFilterValue } from '../../shared/components/ColumnFilter.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import type { TranslateFn } from '../i18n/I18nProvider.tsx';
 import type { useLabels } from '../i18n/useLabels.ts';
@@ -49,6 +50,23 @@ export function buildOutageColumns(
 
     return [
       {
+        id: 'createdAt',
+        header: t('outage.column.createdAt'),
+        accessorFn: (row) => row.createdAt,
+        cell: (ctx) => formatDate(ctx.getValue<string>()),
+        meta: {
+          sortField: 'createdAt',
+          filter: {
+            key: 'createdAt',
+            type: 'date',
+            toQuery: (v) => {
+              const { from, to } = v as DateFilterValue;
+              return { createdAtFrom: from || undefined, createdAtTo: to || undefined };
+            },
+          },
+        } satisfies ColumnMeta,
+      },
+      {
         id: 'id',
         header: 'ID',
         accessorFn: (row) => row.id,
@@ -62,23 +80,18 @@ export function buildOutageColumns(
         },
       },
       {
-        id: 'createdAt',
-        header: t('outage.column.createdAt'),
-        accessorFn: (row) => row.createdAt,
-        cell: (ctx) => formatDate(ctx.getValue<string>()),
-        meta: {
-          sortField: 'createdAt',
-          filter: { field: 'createdAt', type: 'date' },
-        } satisfies ColumnMeta,
-      },
-      {
         id: 'gisId',
         header: 'GIS ID',
         accessorFn: (row) => row.gisId,
         cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
         meta: {
           sortField: 'gisId',
-          filter: { field: 'gisId', type: 'text', placeholder: t('common.placeholder.gisIdExample') },
+          filter: {
+            key: 'gisId',
+            type: 'text',
+            placeholder: t('common.placeholder.gisIdExample'),
+            toQuery: (v) => ({ gisId: (v as string) || undefined }),
+          },
         } satisfies ColumnMeta,
       },
       {
@@ -88,7 +101,12 @@ export function buildOutageColumns(
         cell: (ctx) => <StatusBadge status={ctx.getValue<Outage['status']>()} />,
         meta: {
           sortField: 'status',
-          filter: { field: 'status', type: 'multiselect', options: statusFilterOptions },
+          filter: {
+            key: 'status',
+            type: 'multiselect',
+            options: statusFilterOptions,
+            toQuery: (v) => ({ status: (v as string[]).length ? v : undefined }),
+          },
         } satisfies ColumnMeta,
       },
       {
@@ -98,7 +116,14 @@ export function buildOutageColumns(
         cell: (ctx) => formatDate(ctx.getValue<string>()),
         meta: {
           sortField: 'startedAt',
-          filter: { field: 'startedAt', type: 'date' },
+          filter: {
+            key: 'startedAt',
+            type: 'date',
+            toQuery: (v) => {
+              const { from, to } = v as DateFilterValue;
+              return { startedAtFrom: from || undefined, startedAtTo: to || undefined };
+            },
+          },
         } satisfies ColumnMeta,
       },
       {
@@ -106,12 +131,32 @@ export function buildOutageColumns(
         header: t('outage.column.endedAt'),
         accessorFn: (row) => row.endedAt,
         cell: (ctx) => formatDate(ctx.getValue<string | null>()),
+        meta: {
+          filter: {
+            key: 'endedAt',
+            type: 'date',
+            toQuery: (v) => {
+              const { from, to } = v as DateFilterValue;
+              return { endedAtFrom: from || undefined, endedAtTo: to || undefined };
+            },
+          },
+        } satisfies ColumnMeta,
       },
       {
         id: 'durationMinutes',
         header: t('outage.column.durationMinutes'),
         accessorFn: (row) => row.durationMinutes,
         cell: (ctx) => ctx.getValue<number | null>() ?? '—',
+        meta: {
+          filter: {
+            key: 'duration',
+            type: 'numberRange',
+            toQuery: (v) => {
+              const { min, max } = v as NumberRangeFilterValue;
+              return { durationMinMinutes: min, durationMaxMinutes: max };
+            },
+          },
+        } satisfies ColumnMeta,
       },
       {
         id: 'origin',
@@ -122,7 +167,12 @@ export function buildOutageColumns(
           return <span className={origin === 'SYSTEM' ? undefined : 'text-muted'}>{labels.origin(origin)}</span>;
         },
         meta: {
-          filter: { field: 'origin', type: 'multiselect', options: originFilterOptions },
+          filter: {
+            key: 'origin',
+            type: 'multiselect',
+            options: originFilterOptions,
+            toQuery: (v) => ({ origin: (v as string[]).length ? v : undefined }),
+          },
         } satisfies ColumnMeta,
       },
     {

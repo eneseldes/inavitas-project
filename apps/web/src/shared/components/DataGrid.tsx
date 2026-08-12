@@ -16,16 +16,18 @@ import {
 import { clsx } from 'clsx';
 import { useTranslation } from '../../features/i18n/I18nProvider.tsx';
 import type { SortDirection } from '../../types/api.ts';
-import { ColumnFilter, type DateFilterValue, type FilterOption } from './ColumnFilter.tsx';
+import { ColumnFilter, type DateFilterValue, type FilterOption, type NumberRangeFilterValue } from './ColumnFilter.tsx';
 import styles from './DataGrid.module.scss';
 
 /** Sıralanabilir/filtrelenebilir kolonlar bu meta şekliyle tanımlanır. */
 export interface ColumnFilterConfig {
-  /** Backend filtre query param adı (SORTABLE_FIELDS/filtre alanlarıyla eşleşir). */
-  field: string;
-  type: 'text' | 'multiselect' | 'date';
+  /** `filterValues` sözlüğündeki anahtar ve `onFilterChange`'e iletilen alan adı. */
+  key: string;
+  type: 'text' | 'select' | 'multiselect' | 'date' | 'numberRange';
   options?: FilterOption[];
   placeholder?: string;
+  /** Filtre değerini backend query parçalarına çevirir (bir alan birden fazla query param'a açılabilir, ör. tarih aralığı). */
+  toQuery: (value: FilterValue) => Record<string, unknown>;
 }
 
 export interface ColumnMeta {
@@ -33,7 +35,7 @@ export interface ColumnMeta {
   filter?: ColumnFilterConfig;
 }
 
-export type FilterValue = string | string[] | DateFilterValue;
+export type FilterValue = string | string[] | DateFilterValue | NumberRangeFilterValue;
 
 export interface DataGridProps<T> {
   columns: ColumnDef<T>[];
@@ -42,14 +44,15 @@ export interface DataGridProps<T> {
   pageSize: number;
   total: number;
   totalPages: number;
-  sort: { field: string; dir: SortDirection };
-  onSortChange: (sort: { field: string; dir: SortDirection }) => void;
+  /** Sıralama desteklemeyen tablolarda (ör. sabit listeler) atlanabilir. */
+  sort?: { field: string; dir: SortDirection };
+  onSortChange?: (sort: { field: string; dir: SortDirection }) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onRefresh: () => void;
-  /** Sütun filtre ikonlarının o an uyguladığı değerler — alan adına göre. */
+  /** Sütun filtre ikonlarının o an uyguladığı değerler — filtre anahtarına göre. */
   filterValues: Record<string, FilterValue>;
-  onFilterChange: (field: string, value: FilterValue) => void;
+  onFilterChange: (key: string, value: FilterValue) => void;
   isFetching?: boolean;
   isLoading?: boolean;
   toolbarActions?: ReactNode;
@@ -67,7 +70,7 @@ function headerLabel(header: unknown): string {
 }
 
 interface ActiveFilterItem {
-  field: string;
+  key: string;
   label: string;
   displayValue: string;
   emptyValue: FilterValue;
@@ -128,19 +131,25 @@ export function DataGrid<T>({
       const filterConfig = meta?.filter;
       if (!filterConfig) return;
 
-      const label = headerLabel(header.column.columnDef.header) || filterConfig.field;
-      const val = filterValues[filterConfig.field];
+      const label = headerLabel(header.column.columnDef.header) || filterConfig.key;
+      const val = filterValues[filterConfig.key];
 
       if (filterConfig.type === 'text') {
         const textVal = (val as string) ?? '';
         if (textVal.trim().length > 0) {
-          activeFilters.push({ field: filterConfig.field, label, displayValue: textVal, emptyValue: '' });
+          activeFilters.push({ key: filterConfig.key, label, displayValue: textVal, emptyValue: '' });
+        }
+      } else if (filterConfig.type === 'select') {
+        const selectVal = (val as string) ?? '';
+        if (selectVal.length > 0) {
+          const displayValue = filterConfig.options?.find((o) => o.value === selectVal)?.label ?? selectVal;
+          activeFilters.push({ key: filterConfig.key, label, displayValue, emptyValue: '' });
         }
       } else if (filterConfig.type === 'multiselect') {
         const arrVal = (val as string[]) ?? [];
         if (arrVal.length > 0) {
           const displayLabels = arrVal.map((v) => filterConfig.options?.find((o) => o.value === v)?.label ?? v);
-          activeFilters.push({ field: filterConfig.field, label, displayValue: displayLabels.join(', '), emptyValue: [] });
+          activeFilters.push({ key: filterConfig.key, label, displayValue: displayLabels.join(', '), emptyValue: [] });
         }
       } else if (filterConfig.type === 'date') {
         const dateVal = val as DateFilterValue | undefined;
@@ -156,11 +165,22 @@ export function DataGrid<T>({
             displayValue = `${dateVal.from || ''} – ${dateVal.to || ''}`;
           }
           activeFilters.push({
-            field: filterConfig.field,
+            key: filterConfig.key,
             label,
             displayValue,
             emptyValue: { operator: 'between', from: '', to: '' },
           });
+        }
+      } else if (filterConfig.type === 'numberRange') {
+        const rangeVal = val as NumberRangeFilterValue | undefined;
+        if (rangeVal?.min !== undefined || rangeVal?.max !== undefined) {
+          const displayValue =
+            rangeVal.min !== undefined && rangeVal.max !== undefined
+              ? `${rangeVal.min} – ${rangeVal.max}`
+              : rangeVal.min !== undefined
+                ? `>= ${rangeVal.min}`
+                : `<= ${rangeVal.max}`;
+          activeFilters.push({ key: filterConfig.key, label, displayValue, emptyValue: {} });
         }
       }
     });
@@ -242,14 +262,14 @@ export function DataGrid<T>({
               <>
                 <ul className={styles.activeFilterList}>
                   {activeFilters.map((item) => (
-                    <li key={item.field} className={styles.activeFilterItem}>
+                    <li key={item.key} className={styles.activeFilterItem}>
                       <div className={styles.activeFilterText}>
                         <span className={styles.activeFilterLabel}>{item.label}:</span>
                         <span className={styles.activeFilterValue}>{item.displayValue}</span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => onFilterChange(item.field, item.emptyValue)}
+                        onClick={() => onFilterChange(item.key, item.emptyValue)}
                         className={styles.removeFilterBtn}
                         title={t('common.filter.clear', undefined, 'Filtreyi temizle')}
                       >
@@ -262,7 +282,7 @@ export function DataGrid<T>({
                   type="button"
                   className={clsx('btn btn--ghost', styles.clearAllBtn)}
                   onClick={() => {
-                    activeFilters.forEach((item) => onFilterChange(item.field, item.emptyValue));
+                    activeFilters.forEach((item) => onFilterChange(item.key, item.emptyValue));
                     setFilterMenuOpen(false);
                   }}
                 >
@@ -284,48 +304,82 @@ export function DataGrid<T>({
                     const meta = header.column.columnDef.meta as ColumnMeta | undefined;
                     const sortField = meta?.sortField;
                     const filterConfig = meta?.filter;
-                    const isSorted = sortField === sort.field;
+                    const isSortable = Boolean(sortField && onSortChange);
+                    const isSorted = isSortable && sortField === sort?.field;
                     const label = headerLabel(header.column.columnDef.header);
 
+                    const triggerSort = () => {
+                      if (!isSortable || !sortField) return;
+                      onSortChange!({ field: sortField, dir: isSorted && sort?.dir === 'asc' ? 'desc' : 'asc' });
+                    };
+
                     return (
-                      <th key={header.id}>
+                      <th
+                        key={header.id}
+                        className={clsx(isSortable && styles.sortableHeader)}
+                        onClick={isSortable ? triggerSort : undefined}
+                        onKeyDown={
+                          isSortable
+                            ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  triggerSort();
+                                }
+                              }
+                            : undefined
+                        }
+                        tabIndex={isSortable ? 0 : undefined}
+                        role={isSortable ? 'button' : undefined}
+                        aria-sort={isSortable ? (isSorted ? (sort?.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                      >
                         <div className={styles.thContent}>
-                          {sortField ? (
-                            <button
-                              type="button"
-                              onClick={() => onSortChange({ field: sortField, dir: isSorted && sort.dir === 'asc' ? 'desc' : 'asc' })}
-                              className={styles.sortTrigger}
-                            >
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                              {isSorted ? sort.dir === 'asc' ? <FiChevronUp className={styles.sortIcon} /> : <FiChevronDown className={styles.sortIcon} /> : null}
-                            </button>
-                          ) : (
-                            <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                          )}
+                          <span className={styles.thLabel}>
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            {isSortable && (
+                              <span className={clsx(styles.sortIcon, isSorted && styles.sortIconActive)}>
+                                {sort?.dir === 'asc' ? <FiChevronUp /> : <FiChevronDown />}
+                              </span>
+                            )}
+                          </span>
 
                           {filterConfig &&
                             (filterConfig.type === 'text' ? (
                               <ColumnFilter
                                 type="text"
                                 label={label}
-                                value={(filterValues[filterConfig.field] as string) ?? ''}
-                                onApply={(value) => onFilterChange(filterConfig.field, value)}
+                                value={(filterValues[filterConfig.key] as string) ?? ''}
+                                onApply={(value) => onFilterChange(filterConfig.key, value)}
                                 placeholder={filterConfig.placeholder}
+                              />
+                            ) : filterConfig.type === 'select' ? (
+                              <ColumnFilter
+                                type="select"
+                                label={label}
+                                value={(filterValues[filterConfig.key] as string) ?? ''}
+                                onApply={(value) => onFilterChange(filterConfig.key, value)}
+                                options={filterConfig.options ?? []}
                               />
                             ) : filterConfig.type === 'multiselect' ? (
                               <ColumnFilter
                                 type="multiselect"
                                 label={label}
-                                value={(filterValues[filterConfig.field] as string[]) ?? []}
-                                onApply={(value) => onFilterChange(filterConfig.field, value)}
+                                value={(filterValues[filterConfig.key] as string[]) ?? []}
+                                onApply={(value) => onFilterChange(filterConfig.key, value)}
                                 options={filterConfig.options ?? []}
+                              />
+                            ) : filterConfig.type === 'numberRange' ? (
+                              <ColumnFilter
+                                type="numberRange"
+                                label={label}
+                                value={(filterValues[filterConfig.key] as NumberRangeFilterValue) ?? {}}
+                                onApply={(value) => onFilterChange(filterConfig.key, value)}
                               />
                             ) : (
                               <ColumnFilter
                                 type="date"
                                 label={label}
-                                value={(filterValues[filterConfig.field] as DateFilterValue) ?? { operator: 'between' }}
-                                onApply={(value) => onFilterChange(filterConfig.field, value)}
+                                value={(filterValues[filterConfig.key] as DateFilterValue) ?? { operator: 'between' }}
+                                onApply={(value) => onFilterChange(filterConfig.key, value)}
                               />
                             ))}
                         </div>
@@ -372,7 +426,7 @@ export function DataGrid<T>({
       <div className={styles.footer}>
         <div className={styles.pageSizeGroup}>
           <span>{t('common.pagination.pageSize')}</span>
-          <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className={clsx('select', styles.pageSizeSelect)}>
+          <select value={pageSize} onChange={(e) => onPageSizeChange(Number(e.target.value))} className="select select--compact">
             {PAGE_SIZE_OPTIONS.map((size) => (
               <option key={size} value={size}>
                 {size}

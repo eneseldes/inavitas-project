@@ -17,6 +17,10 @@ export interface UsersQuery {
   pageSize: number;
   sort?: string;
   q?: string;
+  email?: string;
+  roles?: string[];
+  lastLoginAtFrom?: string;
+  lastLoginAtTo?: string;
   isActive?: boolean;
 }
 
@@ -27,6 +31,10 @@ function buildUserQuery(q: UsersQuery): string {
   });
   if (q.sort) params.set('sort', q.sort);
   if (q.q) params.set('q', q.q);
+  if (q.email) params.set('email', q.email);
+  if (q.roles?.length) params.set('roles', q.roles.join(','));
+  if (q.lastLoginAtFrom) params.set('lastLoginAtFrom', q.lastLoginAtFrom);
+  if (q.lastLoginAtTo) params.set('lastLoginAtTo', q.lastLoginAtTo);
   if (q.isActive !== undefined) params.set('isActive', String(q.isActive));
   return params.toString();
 }

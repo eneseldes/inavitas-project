@@ -26,6 +26,10 @@ function toFilters(query: ListOutagesQuery): OutageFilters {
     startedAtTo: query.startedAtTo ? toExclusiveUpperBound(query.startedAtTo) : undefined,
     createdAtFrom: query.createdAtFrom ? new Date(query.createdAtFrom) : undefined,
     createdAtTo: query.createdAtTo ? toExclusiveUpperBound(query.createdAtTo) : undefined,
+    endedAtFrom: query.endedAtFrom ? new Date(query.endedAtFrom) : undefined,
+    endedAtTo: query.endedAtTo ? toExclusiveUpperBound(query.endedAtTo) : undefined,
+    durationMinMinutes: query.durationMinMinutes,
+    durationMaxMinutes: query.durationMaxMinutes,
     hasWorkOrder: query.hasWorkOrder === undefined ? undefined : query.hasWorkOrder === 'true',
   };
 }

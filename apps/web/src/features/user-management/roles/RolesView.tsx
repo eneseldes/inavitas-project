@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import { FiEdit2, FiPlus, FiTrash2 } from 'react-icons/fi';
 import type { ColumnDef } from '@tanstack/react-table';
-import { DataGrid } from '../../../shared/components/DataGrid.tsx';
+import { DataGrid, type ColumnMeta } from '../../../shared/components/DataGrid.tsx';
 import { ApiError } from '../../../shared/api/errors.ts';
 import { useToast } from '../../../shared/components/Toast.tsx';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
+import type { SortDirection } from '../../../types/api.ts';
 import type { RoleListItem } from '../../../types/user-management.ts';
 import { PermissionsPanel } from './PermissionsPanel.tsx';
 import { RoleFormModal } from './RoleFormModal.tsx';
 import { useDeleteRole, usePermissions, useRoles } from './useRoles.ts';
 import styles from './RolesView.module.scss';
 
+/** Roller uçtan uca (sayfalamasız) çekilir — filtre/sıralama burada, tarayıcıda yapılır. */
 export function RolesView() {
   const { t } = useTranslation();
   const { show } = useToast();
@@ -21,6 +23,8 @@ export function RolesView() {
 
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [modalRole, setModalRole] = useState<RoleListItem | null | 'create'>(null);
+  const [nameFilter, setNameFilter] = useState('');
+  const [sort, setSort] = useState<{ field: string; dir: SortDirection }>({ field: 'name', dir: 'asc' });
 
   const handleDelete = async (role: RoleListItem) => {
     if (role.isSystem) return;
@@ -40,8 +44,23 @@ export function RolesView() {
     }
   };
 
-  const roles = rolesData?.items ?? [];
+  const roles = useMemo(() => rolesData?.items ?? [], [rolesData]);
   const permissions = permsData?.items ?? [];
+
+  const filteredSortedRoles = useMemo(() => {
+    const q = nameFilter.trim().toLowerCase();
+    const filtered = q ? roles.filter((r) => r.name.toLowerCase().includes(q)) : roles;
+
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const field = sort.field as 'name' | 'userCount' | 'permissionCount';
+      const av = a[field];
+      const bv = b[field];
+      if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv) * dir;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return 0;
+    });
+  }, [roles, nameFilter, sort]);
 
   // Default selection to first role if available and none selected
   const activeSelectedRoleId = selectedRoleId ?? (roles.length > 0 ? roles[0].id : null);
@@ -63,18 +82,30 @@ export function RolesView() {
             </div>
           );
         },
+        meta: {
+          sortField: 'name',
+          filter: {
+            key: 'name',
+            type: 'text',
+            placeholder: t('user-management.role.filter.namePlaceholder', undefined, 'Rol adı ara…'),
+            // Filtre/sıralama sunucuya değil, doğrudan tarayıcıdaki listeye uygulanır (bkz. filteredSortedRoles).
+            toQuery: () => ({}),
+          },
+        } satisfies ColumnMeta,
       },
       {
         id: 'userCount',
         header: t('user-management.role.column.users', undefined, 'Kullanıcı'),
         accessorFn: (row) => row.userCount,
         cell: (ctx) => <span className="text-muted">{ctx.getValue<number>()}</span>,
+        meta: { sortField: 'userCount' } satisfies ColumnMeta,
       },
       {
         id: 'permissionCount',
         header: t('user-management.role.column.permissions', undefined, 'İzin'),
         accessorFn: (row) => row.permissionCount,
         cell: (ctx) => <span className="text-muted">{ctx.getValue<number>()}</span>,
+        meta: { sortField: 'permissionCount' } satisfies ColumnMeta,
       },
       {
         id: 'actions',
@@ -127,18 +158,20 @@ export function RolesView() {
       <div className={styles.leftGrid}>
         <DataGrid<RoleListItem>
           columns={columns}
-          data={roles}
+          data={filteredSortedRoles}
           page={1}
-          pageSize={100}
-          total={roles.length}
+          pageSize={Math.max(100, filteredSortedRoles.length)}
+          total={filteredSortedRoles.length}
           totalPages={1}
-          sort={{ field: 'name', dir: 'asc' }}
-          onSortChange={() => {}}
+          sort={sort}
+          onSortChange={setSort}
           onPageChange={() => {}}
           onPageSizeChange={() => {}}
           onRefresh={() => void refetch()}
-          filterValues={{}}
-          onFilterChange={() => {}}
+          filterValues={{ name: nameFilter }}
+          onFilterChange={(key, value) => {
+            if (key === 'name') setNameFilter(value as string);
+          }}
           isLoading={isLoading}
           onRowClick={(role) => setSelectedRoleId(role.id)}
           isRowSelected={(role) => role.id === activeSelectedRoleId}

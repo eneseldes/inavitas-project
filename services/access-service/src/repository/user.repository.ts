@@ -1,4 +1,4 @@
-import { and, count, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, count, eq, exists, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { permissions, rolePermissions, roles, userRoles, users } from '../db/schema.ts';
 import type { LockState } from '../domain/lockout.ts';
@@ -30,6 +30,10 @@ export interface UserListItem {
 
 export interface ListFilters {
   q?: string;
+  email?: string;
+  roles?: string[];
+  lastLoginAtFrom?: Date;
+  lastLoginAtTo?: Date;
   isActive?: boolean;
 }
 
@@ -122,6 +126,18 @@ export async function list(
     filters.q
       ? or(ilike(users.fullName, `%${filters.q}%`), ilike(users.email, `%${filters.q}%`))
       : undefined,
+    filters.email ? ilike(users.email, `%${filters.email}%`) : undefined,
+    filters.lastLoginAtFrom ? gte(users.lastLoginAt, filters.lastLoginAtFrom) : undefined,
+    filters.lastLoginAtTo ? lt(users.lastLoginAt, filters.lastLoginAtTo) : undefined,
+    filters.roles && filters.roles.length > 0
+      ? exists(
+          db
+            .select({ one: sql`1` })
+            .from(userRoles)
+            .innerJoin(roles, eq(roles.id, userRoles.roleId))
+            .where(and(eq(userRoles.userId, users.id), inArray(roles.code, filters.roles))),
+        )
+      : undefined,
   );
 
   const [{ total }] = await db
@@ -129,15 +145,24 @@ export async function list(
     .from(users)
     .where(where);
 
+  const orderBy =
+    sort.field === 'email'
+      ? sort.dir === 'asc'
+        ? [users.email]
+        : [sql`${users.email} desc`]
+      : sort.field === 'fullName'
+        ? sort.dir === 'asc'
+          ? [users.fullName]
+          : [sql`${users.fullName} desc`]
+        : // Hiç giriş yapmamış kullanıcılar (null) sıralama yönünden bağımsız
+          // her zaman en sona düşer.
+          sort.dir === 'asc'
+          ? [sql`${users.lastLoginAt} asc nulls last`]
+          : [sql`${users.lastLoginAt} desc nulls last`];
+
   const rows = await db.query.users.findMany({
     where,
-    orderBy: sort.field === 'email'
-      ? sort.dir === 'asc' ? [users.email] : [sql`${users.email} desc`]
-      // Hiç giriş yapmamış kullanıcılar (null) sıralama yönünden bağımsız
-      // her zaman en sona düşer.
-      : sort.dir === 'asc'
-        ? [sql`${users.lastLoginAt} asc nulls last`]
-        : [sql`${users.lastLoginAt} desc nulls last`],
+    orderBy,
     limit: pageSize,
     offset,
     with: { userRoles: { with: { role: true } } },
