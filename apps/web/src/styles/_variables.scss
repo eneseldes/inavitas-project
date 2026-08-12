@@ -1,6 +1,4 @@
 // Tasarım token'ları — tüm SCSS dosyaları bunu `@use` eder.
-// Ortak/paylaşılan her değer BURADA yaşar; component dosyalarında ham renk/
-// boşluk değeri YAZILMAZ, hep bu değişkenler üzerinden gidilir.
 
 // --- Renkler — Açık, ferah ve yumuşak pastel yeşil paleti ---
 $color-brand-50: #f0fdf4;
@@ -32,6 +30,29 @@ $color-row-hover: var(--c-row-hover);
 $color-glass-surface: var(--c-glass-surface);
 $color-glass-border: var(--c-glass-border);
 $shadow-ambient: var(--c-shadow-ambient);
+
+// Tema-farkında "soluk" durum renkleri
+$color-brand-soft-bg: var(--c-brand-soft-bg);
+$color-brand-soft-bg-strong: var(--c-brand-soft-bg-strong);
+$color-brand-soft-border: var(--c-brand-soft-border);
+$color-brand-soft-ink: var(--c-brand-soft-ink);
+$color-danger-soft-bg: var(--c-danger-soft-bg);
+$color-danger-soft-ink: var(--c-danger-soft-ink);
+$focus-shadow: var(--c-focus-shadow);
+
+$color-badge-gray-bg: var(--c-badge-gray-bg);
+$color-badge-gray-ink: var(--c-badge-gray-ink);
+$color-badge-blue-bg: var(--c-badge-blue-bg);
+$color-badge-blue-ink: var(--c-badge-blue-ink);
+$color-badge-cyan-bg: var(--c-badge-cyan-bg);
+$color-badge-cyan-ink: var(--c-badge-cyan-ink);
+$color-badge-green-bg: var(--c-badge-green-bg);
+$color-badge-green-ink: var(--c-badge-green-ink);
+$color-badge-red-bg: var(--c-badge-red-bg);
+$color-badge-red-ink: var(--c-badge-red-ink);
+
+$color-ai-accent: var(--c-ai-accent);
+$color-ai-accent-soft: var(--c-ai-accent-soft);
 
 $color-red-50: #fef2f2;
 $color-red-100: #fee2e2;

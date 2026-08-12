@@ -48,6 +48,12 @@ button:disabled {
   cursor: not-allowed;
 }
 
+// Tarayıcı varsayılanı (sistem mavisi) koyu modda sırıtıyordu.
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: v.$color-brand-500;
+}
+
 // Tarayıcı varsayılan <button> stilini (kenarlık, arkaplan, font) SIFIRLA.
 // Bunu yapmazsak her yeni "çıplak" buton (`.trigger` gibi kendi border'ını
 // tanımlamayan) UA stylesheet'inin çirkin "2px outset" kenarlığını miras
@@ -94,7 +100,7 @@ button {
   color: v.$color-ink-soft;
 
   &:hover:not(:disabled) {
-    background: v.$color-slate-100;
+    background: v.$color-surface-alt;
     color: v.$color-ink;
   }
 }
@@ -105,7 +111,7 @@ button {
   color: v.$color-ink-soft;
 
   &:hover:not(:disabled) {
-    background: v.$color-slate-100;
+    background: v.$color-surface-alt;
     color: v.$color-ink;
   }
 }
@@ -126,14 +132,14 @@ button {
   @include m.focus-ring;
 
   &:hover:not(:disabled) {
-    background: v.$color-slate-100;
+    background: v.$color-surface-alt;
     color: v.$color-ink;
   }
 
   &.icon-btn--active {
-    background: v.$color-brand-50;
-    border-color: v.$color-brand-400;
-    color: v.$color-brand-500;
+    background: v.$color-brand-soft-bg;
+    border-color: v.$color-brand-soft-border;
+    color: v.$color-brand-soft-ink;
   }
 }
 
@@ -209,8 +215,8 @@ button {
 
 .form-error-banner {
   border-radius: v.$radius-md;
-  background: v.$color-red-50;
-  color: v.$color-red-700;
+  background: v.$color-danger-soft-bg;
+  color: v.$color-danger-soft-ink;
   padding: v.$space-2 v.$space-3;
   font-size: 0.8125rem;
   margin-bottom: v.$space-3;
@@ -235,24 +241,24 @@ button {
 }
 
 .badge--gray {
-  background: v.$color-slate-100;
-  color: v.$color-slate-700;
+  background: v.$color-badge-gray-bg;
+  color: v.$color-badge-gray-ink;
 }
 .badge--blue {
-  background: v.$color-blue-50;
-  color: v.$color-blue-700;
+  background: v.$color-badge-blue-bg;
+  color: v.$color-badge-blue-ink;
 }
 .badge--cyan {
-  background: v.$color-cyan-50;
-  color: v.$color-cyan-700;
+  background: v.$color-badge-cyan-bg;
+  color: v.$color-badge-cyan-ink;
 }
 .badge--green {
-  background: v.$color-green-50;
-  color: v.$color-green-700;
+  background: v.$color-badge-green-bg;
+  color: v.$color-badge-green-ink;
 }
 .badge--red {
-  background: v.$color-red-50;
-  color: v.$color-red-700;
+  background: v.$color-badge-red-bg;
+  color: v.$color-badge-red-ink;
 }
 
 // --- Bağlantı (tıklanabilir metin) --------------------------------------
@@ -293,7 +299,7 @@ button {
   }
 
   thead th {
-    background: v.$color-slate-100;
+    background: v.$color-surface-alt;
     color: v.$color-ink-soft;
     font-weight: 500;
     font-size: 0.75rem;

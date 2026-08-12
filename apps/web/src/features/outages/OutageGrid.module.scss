@@ -24,8 +24,8 @@
   align-items: center;
   justify-content: space-between;
   border-radius: v.$radius-lg;
-  border: 1px solid v.$color-brand-100;
-  background: v.$color-brand-50;
+  border: 1px solid v.$color-brand-soft-border;
+  background: v.$color-brand-soft-bg;
   padding: v.$space-3 v.$space-4;
   font-size: 0.875rem;
 }
@@ -40,7 +40,7 @@
   color: v.$color-ink-soft;
 
   &:hover {
-    background: v.$color-brand-100;
+    background: v.$color-brand-soft-bg-strong;
     color: v.$color-ink;
   }
 }

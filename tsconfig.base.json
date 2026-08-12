@@ -1,58 +1,31 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
 
-  // Bu dosya hiçbir şey derlemez. Sadece ortak ayarları tutar; her paketin
-  // kendi tsconfig.json'ı bunu "extends" ile devralır.
   "compilerOptions": {
-    // --- Hedef ortam ---
-    // Node 22 çalıştıracağız. ES2022 tüm modern JS özelliklerini kapsıyor
-    // ve Node 22 hepsini destekliyor.
     "target": "ES2022",
     "lib": ["ES2022"],
 
-    // Tüm paketler ESM ("type": "module"). DİKKAT: "type" alanı kökten
-    // devralınmaz — packages/* ve services/* içindeki her package.json'da
-    // ayrıca yazılı olmalı, yoksa o paket sessizce CommonJS sayılır.
-    // NodeNext resolution, modern paketlerin "exports" alanını doğru okur —
-    // eski "node" ayarı okuyamıyor ve "modül bulunamadı" hatası veriyor.
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 
-    // ESM'de göreli import'lar uzantı ister. Bu ayar sayesinde kaynakta
-    // doğal olanı yazarsın — import './topics.ts' — derleyici çıktıda bunu
-    // './topics.js'e çevirir. tsx ve Vite de .ts uzantısını çözer; yani aynı
-    // satır hem geliştirmede hem derlenmiş halde doğru çalışır.
     "rewriteRelativeImportExtensions": true,
 
-    // Node global'lerini (console, process, Buffer) tanıt. Açıkça yazmak,
-    // otomatik @types taramasına güvenmekten hem hızlı hem güvenilir.
     "types": ["node"],
 
-    // --- Tip güvenliği: projenin en değerli ayarı ---
-    // strict, aslında 8 ayrı ayarı birden açar. En önemlisi
-    // strictNullChecks: bir değer null/undefined olabiliyorsa, kontrol
-    // etmeden kullanmana izin vermez.
     "strict": true,
 
-    // strict'in kapsamadığı, sürtünmesi düşük ek kontroller:
-    "noImplicitOverride": true, // sınıfta metot ezerken "override" yazmaya zorlar
-    "noFallthroughCasesInSwitch": true, // switch'te "break" unutmayı yakalar
-    "forceConsistentCasingInFileNames": true, // macOS/Linux dosya adı farkı sorunu
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true, 
+    "forceConsistentCasingInFileNames": true,
 
-    // --- Birlikte çalışabilirlik ---
-    "esModuleInterop": true, // "import express from 'express'" çalışsın
-    "resolveJsonModule": true, // JSON dosyası import edilebilsin
-    "skipLibCheck": true, // node_modules içindeki .d.ts'leri kontrol etme (hız)
-    "isolatedModules": true, // tsx/tsup/esbuild dosyaları tek tek derler; buna uy
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
 
-    // --- Çıktı ---
-    // outDir ve rootDir BİLEREK burada yok. "extends" içindeki göreli yollar
-    // bu dosyaya göre çözülür, extend eden pakete göre değil — buraya
-    // "dist" yazsaydık altı paket de kökteki tek bir dist/ klasörüne yazardı.
-    // Bu yüzden her paket kendi tsconfig.json'ında tanımlıyor.
-    "declaration": true, // .d.ts üret (paketler birbirinin tipini görsün)
-    "declarationMap": true, // editörde "go to definition" .ts kaynağına gitsin
-    "sourceMap": true // hata yığınları .ts satırlarını göstersin
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
 
   "exclude": ["node_modules", "dist"]

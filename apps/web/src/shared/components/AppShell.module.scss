@@ -100,8 +100,8 @@
   white-space: nowrap;
 
   &:hover {
-    background: v.$color-brand-50;
-    color: v.$color-brand-600;
+    background: v.$color-brand-soft-bg;
+    color: v.$color-brand-soft-ink;
   }
 }
 
@@ -133,10 +133,10 @@
   }
 }
 
-/* Ferah pastel yeşil zemin + sol kenar vurucu çizgi */
+/* Soluk marka zemin + sol kenar vurucu çizgi */
 .navItemActive {
-  background: v.$color-brand-50;
-  color: v.$color-brand-600;
+  background: v.$color-brand-soft-bg;
+  color: v.$color-brand-soft-ink;
   font-weight: 600;
 
   &::before {
@@ -186,9 +186,9 @@
   width: 2rem;
   height: 2rem;
   border-radius: v.$radius-full;
-  background: v.$color-brand-100;
-  color: v.$color-brand-600;
-  border: 1px solid v.$color-brand-200;
+  background: v.$color-brand-soft-bg-strong;
+  color: v.$color-brand-soft-ink;
+  border: 1px solid v.$color-brand-soft-border;
   font-size: 0.8125rem;
   font-weight: 700;
   flex-shrink: 0;
@@ -249,8 +249,8 @@
   color: v.$color-ink-soft;
 
   &:hover {
-    background: v.$color-red-50;
-    color: v.$color-red-600;
+    background: v.$color-danger-soft-bg;
+    color: v.$color-danger-soft-ink;
   }
 }
 
@@ -277,9 +277,9 @@
     transform v.$transition-fast;
 
   &:hover {
-    background: v.$color-brand-50;
-    color: v.$color-brand-600;
-    border-color: v.$color-brand-200;
+    background: v.$color-brand-soft-bg;
+    color: v.$color-brand-soft-ink;
+    border-color: v.$color-brand-soft-border;
     transform: scale(1.1);
   }
 }

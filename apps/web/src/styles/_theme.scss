@@ -2,6 +2,7 @@
 // _variables.scss buradaki custom property'lere referans verir; component
 // SCSS dosyaları hiçbir değişiklik olmadan v.$color-* kullanmaya devam eder.
 :root {
+  color-scheme: light;
   --c-bg: #f8fafc;
   --c-surface: #ffffff;
   --c-surface-alt: #f1f5f9;
@@ -18,23 +19,78 @@
   // Renkli (marka) arkaplan üzerindeki metin — temadan bağımsız sabit kalır.
   --c-ink-inverse: #ffffff;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+  // Soluk marka zemin — aktif nav, dirty hücre, ikon-aktif durumları.
+  --c-brand-soft-bg: #f0fdf4;
+  --c-brand-soft-bg-strong: #dcfce7;
+  --c-brand-soft-border: #bbf7d0;
+  --c-brand-soft-ink: #2ea062;
+
+  --c-danger-soft-bg: #fef2f2;
+  --c-danger-soft-ink: #b91c1c;
+
+  --c-focus-shadow: rgba(62, 184, 117, 0.25);
+
+  --c-badge-gray-bg: #f1f5f9;
+  --c-badge-gray-ink: #334155;
+  --c-badge-blue-bg: #eff6ff;
+  --c-badge-blue-ink: #1d4ed8;
+  --c-badge-cyan-bg: #ecfeff;
+  --c-badge-cyan-ink: #0e7490;
+  --c-badge-green-bg: #f0fdf4;
+  --c-badge-green-ink: #15803d;
+  --c-badge-red-bg: #fef2f2;
+  --c-badge-red-ink: #b91c1c;
+
+  // Çeviri yöneticisindeki AI aksiyon ikonları.
+  --c-ai-accent: #7c3aed;
+  --c-ai-accent-soft: rgba(124, 58, 237, 0.1);
 }
 
+// Nötr gri tonlarında koyu tema — lacivert/mavimsi değil, "Claude"vari
+// premium bir gri ölçek (ama birebir aynısı değil).
 :root[data-theme='dark'] {
-  --c-bg: #0f172a;
-  --c-surface: #1e293b;
-  --c-surface-alt: #334155;
-  --c-ink: #e2e8f0;
-  --c-ink-soft: #94a3b8;
-  --c-hairline: #334155;
+  color-scheme: dark;
+  --c-bg: #1c1c1c;
+  --c-surface: #242424;
+  --c-surface-alt: #2e2e2e;
+  --c-ink: #eaeaea;
+  --c-ink-soft: #a0a0a0;
+  --c-hairline: #3a3a3a;
   --c-overlay: rgba(0, 0, 0, 0.6);
-  --c-warn-surface: #422006;
-  --c-warn-border: #a16207;
-  --c-row-hover: rgba(255, 255, 255, 0.06);
-  --c-glass-surface: rgba(30, 41, 59, 0.78);
-  --c-glass-border: rgba(51, 65, 85, 0.7);
-  --c-shadow-ambient: rgba(0, 0, 0, 0.4);
+  --c-warn-surface: #3a2e14;
+  --c-warn-border: #8a6a1e;
+  --c-row-hover: rgba(255, 255, 255, 0.05);
+  --c-glass-surface: rgba(36, 36, 36, 0.78);
+  --c-glass-border: rgba(58, 58, 58, 0.7);
+  --c-shadow-ambient: rgba(0, 0, 0, 0.5);
   --c-ink-inverse: #ffffff;
   // Koyu zeminde siyah gölge görünmez; opaklık artırılır.
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+  // Pastel dolgular koyu zeminde ışıldar — bunun yerine şeffaf, koyulaştırılmış
+  // marka/tehlike tonları kullanılır; metin okunabilirlik için açılır.
+  --c-brand-soft-bg: rgba(62, 184, 117, 0.14);
+  --c-brand-soft-bg-strong: rgba(62, 184, 117, 0.22);
+  --c-brand-soft-border: rgba(62, 184, 117, 0.35);
+  --c-brand-soft-ink: #6cd99a;
+
+  --c-danger-soft-bg: rgba(220, 38, 38, 0.18);
+  --c-danger-soft-ink: #f87171;
+
+  --c-focus-shadow: rgba(62, 184, 117, 0.35);
+
+  --c-badge-gray-bg: rgba(255, 255, 255, 0.08);
+  --c-badge-gray-ink: #cbd5e1;
+  --c-badge-blue-bg: rgba(59, 130, 246, 0.16);
+  --c-badge-blue-ink: #93c5fd;
+  --c-badge-cyan-bg: rgba(6, 182, 212, 0.16);
+  --c-badge-cyan-ink: #67e8f9;
+  --c-badge-green-bg: rgba(34, 197, 94, 0.16);
+  --c-badge-green-ink: #86efac;
+  --c-badge-red-bg: rgba(239, 68, 68, 0.16);
+  --c-badge-red-ink: #fca5a5;
+
+  --c-ai-accent: #a78bfa;
+  --c-ai-accent-soft: rgba(167, 139, 250, 0.16);
 }
