@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { SelectField, TextField } from '../../shared/components/form';
 import { ApiError } from '../../shared/api/errors.ts';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
@@ -31,6 +32,7 @@ export function CreateWorkOrderDialog({ onClose }: { onClose: () => void }) {
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
+    mode: 'onSubmit',
     defaultValues: { type: 'BASIC_WORK' },
   });
 
@@ -49,27 +51,15 @@ export function CreateWorkOrderDialog({ onClose }: { onClose: () => void }) {
       <form onSubmit={onSubmit} noValidate>
         {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-        <div className="field">
-          <label htmlFor="gisId" className="field__label">
-            {t('work-order.dialog.create.gisIdLabel')}
-          </label>
-          <input id="gisId" placeholder="CB-1024" className="input" {...register('gisId')} />
-          {errors.gisId && <p className="field__error">{errors.gisId.message}</p>}
-        </div>
+        <TextField label={t('work-order.dialog.create.gisIdLabel')} error={errors.gisId?.message} {...register('gisId')} />
 
-        <div className="field">
-          <label htmlFor="type" className="field__label">
-            {t('work-order.dialog.create.typeLabel')}
-          </label>
-          <select id="type" className="select" {...register('type')}>
-            {WORK_ORDER_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {labels.workOrderType(type)}
-              </option>
-            ))}
-          </select>
-          {errors.type && <p className="field__error">{errors.type.message}</p>}
-        </div>
+        <SelectField label={t('work-order.dialog.create.typeLabel')} error={errors.type?.message} {...register('type')}>
+          {WORK_ORDER_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {labels.workOrderType(type)}
+            </option>
+          ))}
+        </SelectField>
 
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn--ghost">

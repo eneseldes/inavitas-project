@@ -69,6 +69,14 @@
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  // overflow-y:auto + overflow-x:visible birlikte çalışmaz (biri auto olunca
+  // diğeri de auto'ya döner) — bu yüzden overflow-x:hidden korunuyor ama
+  // input'ların focus halkası (box-shadow 2px) kırpılmasın diye yatay pay.
+  // Üstte de pay var: floating-label'lar odaklandığında/hatalıyken input'un
+  // üst kenarının YARISI kadar dışarı taşar (bkz. `.floating-field--floated`)
+  // — ilk alan modalın en tepesindeyse bu taşma scroll kabının üst sınırında
+  // kırpılabilir.
+  padding: 8px 4px 0;
 }
 
 @keyframes fade-in {

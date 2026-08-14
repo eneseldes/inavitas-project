@@ -59,6 +59,10 @@ $color-red-50: #fef2f2;
 $color-red-100: #fee2e2;
 $color-red-600: #dc2626;
 $color-red-700: #b91c1c;
+// Form doğrulama hatası rengi — marka yeşiliyle aynı doygunlukta (S50%),
+// ama daha açık (L60%) pastelimsi bir kırmızı. $color-red-600 saf/koyu
+// kaldığı için form hata state'lerinde KULLANILMAZ.
+$color-error: #cc6666;
 $color-blue-50: #eff6ff;
 $color-blue-700: #1d4ed8;
 $color-cyan-50: #ecfeff;
@@ -86,7 +90,8 @@ $space-6: 1.5rem; // 24
 $space-8: 2rem; // 32
 
 // --- Standart form kontrol boyutları ---
-$control-height: 2rem; // 32px — input/select/button ortak yüksekliği
+$control-height: 2rem;
+$control-height-lg: 2.2rem; 
 $control-padding-x: 0.625rem;
 $control-font-size: 0.8125rem;
 $control-radius: 0.375rem;

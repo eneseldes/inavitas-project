@@ -175,7 +175,16 @@ button {
 
 .field__error {
   font-size: 0.75rem;
-  color: v.$color-red-600;
+  color: v.$color-error;
+}
+
+.field__hint--strong {
+  color: v.$color-ink;
+  font-weight: 500;
+}
+
+.field--error .field__label {
+  color: v.$color-error;
 }
 
 // STANDART input/select — tüm formlarda (login, oluşturma/güncelleme
@@ -184,6 +193,28 @@ button {
 .select {
   @include m.control-base;
   width: 100%;
+}
+
+.input--textarea {
+  height: auto;
+  padding-top: v.$space-2;
+  padding-bottom: v.$space-2;
+  resize: vertical;
+}
+
+.floating-field textarea.input--textarea {
+  padding-top: 1.1rem;
+}
+
+.input--error,
+.select--error {
+  border-color: v.$color-error;
+  border-width: 2px;
+
+  &:focus-visible {
+    box-shadow: none;
+    border-color: v.$color-error;
+  }
 }
 
 // İkonlu input (login formundaki e-posta/parola gibi) — yükseklik/padding-y
@@ -204,6 +235,186 @@ button {
     pointer-events: none;
     font-size: 0.9em;
   }
+}
+
+// --- Floating-label form alanı ------------------------------------------
+//
+// `Field` bileşeni (shared/components/form) tarafından üretilir. Floated
+// durumu (`--floated`) CSS `:placeholder-shown` ile DEĞİL, JS ile (kontrolün
+// value'su + focus state okunarak) yönetilir — çünkü <select> ve
+// datetime-local/date input'lar her zaman bir değere sahiptir ve
+// `:placeholder-shown` bunlarda hiç eşleşmez.
+.floating-field {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-bottom: v.$space-3;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.floating-field__control-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.floating-field .input,
+.floating-field .select {
+  // Simetrik padding — metin her zaman dikey ortalı kalır. Floated label
+  // input içinde yer kaplamaz, border çizgisinin ÜSTÜNDE oturur (bkz. altta),
+  // bu yüzden metin için ayrı bir üst boşluk ayrılmasına gerek yok.
+  height: v.$control-height-lg;
+  padding: 0 v.$control-padding-x;
+  border-width: 1px;
+  transition:
+    border-color v.$transition-base,
+    border-width v.$transition-base;
+
+  // Native placeholder gizli — floating label onun yerini alıyor; ikisi
+  // aynı anda görünürse üst üste biner.
+  &::placeholder {
+    color: transparent;
+  }
+
+  // Global focus-ring (box-shadow parlaması) bu alanlarda İSTENMİYOR —
+  // yalnızca border rengi/kalınlığı değişsin.
+  &:focus-visible {
+    box-shadow: none;
+    border-width: 2px;
+    border-color: v.$color-brand-500;
+  }
+}
+
+// Hatalı alan: focus'tan BAĞIMSIZ olarak her zaman kalın kırmızı kenarlık.
+// Yukarıdaki `.floating-field .input`/`:focus-visible` kurallarıyla aynı
+// özgüllükte olduğundan (2-3 sınıf) kaynak sırasında SONRA gelmesi gerekiyor.
+.floating-field .input--error,
+.floating-field .select--error {
+  border-width: 2px;
+  border-color: v.$color-error;
+}
+
+.floating-field .input--error:focus-visible,
+.floating-field .select--error:focus-visible {
+  border-color: v.$color-error;
+}
+
+.floating-field--icon .input,
+.floating-field--icon .select {
+  padding-left: 1.875rem;
+}
+
+.floating-field__icon {
+  position: absolute;
+  left: v.$control-padding-x;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  color: v.$color-ink-soft;
+  pointer-events: none;
+  font-size: 0.9em;
+  line-height: 1;
+  z-index: 1;
+  transition: color v.$transition-base;
+}
+
+.floating-field--focused .floating-field__icon {
+  color: v.$color-brand-500;
+}
+
+.floating-field--error .floating-field__icon {
+  color: v.$color-error;
+}
+
+.floating-field__label {
+  position: absolute;
+  left: v.$control-padding-x;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: v.$control-font-size;
+  color: v.$color-placeholder;
+  pointer-events: none;
+  padding: 0 0.25rem;
+  transition: all v.$transition-base;
+  max-width: calc(100% - #{v.$control-padding-x} * 2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.floating-field--icon .floating-field__label {
+  left: 1.875rem;
+}
+
+// Parola alanı: göster/gizle butonu için input'un sağında yer aç.
+.floating-field__control-inline {
+  position: relative;
+  width: 100%;
+}
+
+.floating-field__toggle-input {
+  padding-right: 2.25rem;
+}
+
+.floating-field__toggle {
+  @include m.clickable;
+  position: absolute;
+  right: v.$control-padding-x;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: v.$color-ink-soft;
+  z-index: 1;
+
+  &:hover {
+    color: v.$color-ink;
+  }
+}
+
+.floating-field--floated .floating-field__label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: v.$color-ink-soft;
+  background: v.$color-surface;
+  margin-left: -0.25rem;
+}
+
+.floating-field--focused.floating-field--floated .floating-field__label {
+  color: v.$color-brand-500;
+}
+
+.floating-field--error .floating-field__label {
+  color: v.$color-error;
+}
+
+// Hata durumu focus rengini HER ZAMAN ezer — yukarıdaki
+// `--focused.--floated` kuralı iki sınıf birleşimiyle eşit özgüllükte
+// olduğundan, kaynak sırasında SONRA gelen bu kural (üç sınıf, daha yüksek
+// özgüllük) kazanır ve label kırmızı kalır.
+.floating-field--focused.floating-field--error .floating-field__label {
+  color: v.$color-error;
+}
+
+.floating-field__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: v.$color-ink-soft;
+}
+
+.floating-field__error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: v.$color-error;
 }
 
 .form-actions {

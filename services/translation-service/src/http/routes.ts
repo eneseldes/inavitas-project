@@ -47,6 +47,12 @@ export function buildRouter(): Router {
     asyncHandler<AuthedRequest>(controller.createLocale),
   );
 
+  router.get(
+    '/translations/provider-languages',
+    requirePermission(PERMISSIONS.TRANSLATION_PUBLISH),
+    asyncHandler<AuthedRequest>(controller.getProviderLanguagesHandler),
+  );
+
   router.patch(
     '/translations/locales/:code',
     requirePermission(PERMISSIONS.TRANSLATION_PUBLISH),

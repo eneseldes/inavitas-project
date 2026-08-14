@@ -21,6 +21,21 @@
   justify-content: space-between;
   gap: v.$space-2;
   padding: v.$space-2;
+
+  // Etiket sabit kalsın, sıkışan taraf select olsun.
+  > span {
+    flex-shrink: 0;
+  }
+}
+
+// `<select>`'in native (tarayıcı/işletim sistemine göre değişen) minimum
+// içerik genişliği flex konteynerin `justify-content: space-between`
+// hesaplamasını yok sayıp panel dışına taşabiliyordu — `min-width: 0` flex
+// item'ın gerçekten küçülmesine izin verir, `max-width` panel sınırını garanti eder.
+.item select {
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 1;
 }
 
 .divider {

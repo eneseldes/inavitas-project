@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FiFilter } from 'react-icons/fi';
 import { clsx } from 'clsx';
 import { useTranslation } from '../../features/i18n/I18nProvider.tsx';
+import { Field, SelectInput, TextInput } from './form';
 import styles from './ColumnFilter.module.scss';
 
 export interface FilterOption {
@@ -153,25 +154,29 @@ export function ColumnFilter(props: ColumnFilterProps) {
   );
 }
 
-function TextFilterBody({ value, onApply, placeholder, onDone }: TextFilterProps & { onDone: () => void }) {
+function TextFilterBody({ value, onApply, label, onDone }: TextFilterProps & { label: string; onDone: () => void }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
 
   return (
     <div>
-      <input
-        autoFocus
-        className="input"
-        value={draft}
-        placeholder={placeholder}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            onApply(draft);
-            onDone();
-          }
-        }}
-      />
+      <Field label={label} floated={focused || draft !== ''} focused={focused} htmlFor="column-filter-text">
+        <TextInput
+          id="column-filter-text"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onApply(draft);
+              onDone();
+            }
+          }}
+        />
+      </Field>
       <div className={styles.actions}>
         <button
           type="button"
@@ -300,31 +305,56 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
   const [operator, setOperator] = useState<'between' | 'after' | 'before'>(value?.operator ?? 'between');
   const [from, setFrom] = useState(value?.from ?? '');
   const [to, setTo] = useState(value?.to ?? '');
+  const [operatorFocused, setOperatorFocused] = useState(false);
+  const [fromFocused, setFromFocused] = useState(false);
+  const [toFocused, setToFocused] = useState(false);
 
   return (
     <div>
       <div className={styles.dateGroup}>
-        <div className={styles.dateField}>
-          <span className={styles.dateLabel}>{t('common.filter.date.operator', undefined, 'Filtre Modu')}</span>
-          <select className="select" value={operator} onChange={(e) => setOperator(e.target.value as 'between' | 'after' | 'before')}>
+        <Field
+          label={t('common.filter.date.operator', undefined, 'Filtre Modu')}
+          floated
+          focused={operatorFocused}
+          htmlFor="column-filter-date-operator"
+        >
+          <SelectInput
+            id="column-filter-date-operator"
+            value={operator}
+            onChange={(e) => setOperator(e.target.value as 'between' | 'after' | 'before')}
+            onFocus={() => setOperatorFocused(true)}
+            onBlur={() => setOperatorFocused(false)}
+          >
             <option value="between">{t('common.filter.date.between', undefined, 'Tarihler Arası')}</option>
             <option value="after">{t('common.filter.date.after', undefined, 'Sonrasında (>=)')}</option>
             <option value="before">{t('common.filter.date.before', undefined, 'Öncesinde (<=)')}</option>
-          </select>
-        </div>
+          </SelectInput>
+        </Field>
 
         {(operator === 'between' || operator === 'after') && (
-          <div className={styles.dateField}>
-            <span className={styles.dateLabel}>{t('common.filter.date.from', undefined, 'Başlangıç')}</span>
-            <input type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
+          <Field label={t('common.filter.date.from', undefined, 'Başlangıç')} floated focused={fromFocused} htmlFor="column-filter-date-from">
+            <TextInput
+              id="column-filter-date-from"
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              onFocus={() => setFromFocused(true)}
+              onBlur={() => setFromFocused(false)}
+            />
+          </Field>
         )}
 
         {(operator === 'between' || operator === 'before') && (
-          <div className={styles.dateField}>
-            <span className={styles.dateLabel}>{t('common.filter.date.to', undefined, 'Bitiş')}</span>
-            <input type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
+          <Field label={t('common.filter.date.to', undefined, 'Bitiş')} floated focused={toFocused} htmlFor="column-filter-date-to">
+            <TextInput
+              id="column-filter-date-to"
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              onFocus={() => setToFocused(true)}
+              onBlur={() => setToFocused(false)}
+            />
+          </Field>
         )}
       </div>
 
@@ -362,18 +392,42 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
   const { t } = useTranslation();
   const [min, setMin] = useState(value?.min !== undefined ? String(value.min) : '');
   const [max, setMax] = useState(value?.max !== undefined ? String(value.max) : '');
+  const [minFocused, setMinFocused] = useState(false);
+  const [maxFocused, setMaxFocused] = useState(false);
 
   return (
     <div>
       <div className={styles.dateGroup}>
-        <div className={styles.dateField}>
-          <span className={styles.dateLabel}>{t('common.filter.number.min', undefined, 'En az')}</span>
-          <input type="number" className="input" value={min} onChange={(e) => setMin(e.target.value)} />
-        </div>
-        <div className={styles.dateField}>
-          <span className={styles.dateLabel}>{t('common.filter.number.max', undefined, 'En çok')}</span>
-          <input type="number" className="input" value={max} onChange={(e) => setMax(e.target.value)} />
-        </div>
+        <Field
+          label={t('common.filter.number.min', undefined, 'En az')}
+          floated={minFocused || min !== ''}
+          focused={minFocused}
+          htmlFor="column-filter-number-min"
+        >
+          <TextInput
+            id="column-filter-number-min"
+            type="number"
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
+            onFocus={() => setMinFocused(true)}
+            onBlur={() => setMinFocused(false)}
+          />
+        </Field>
+        <Field
+          label={t('common.filter.number.max', undefined, 'En çok')}
+          floated={maxFocused || max !== ''}
+          focused={maxFocused}
+          htmlFor="column-filter-number-max"
+        >
+          <TextInput
+            id="column-filter-number-max"
+            type="number"
+            value={max}
+            onChange={(e) => setMax(e.target.value)}
+            onFocus={() => setMaxFocused(true)}
+            onBlur={() => setMaxFocused(false)}
+          />
+        </Field>
       </div>
 
       <div className={styles.actions}>

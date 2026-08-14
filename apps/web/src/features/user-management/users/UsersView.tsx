@@ -5,6 +5,7 @@ import { useToast } from '../../../shared/components/Toast.tsx';
 import { useDataGridState } from '../../../shared/hooks/useDataGridState.ts';
 import { ApiError } from '../../../shared/api/errors.ts';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
+import { useLabels } from '../../i18n/useLabels.ts';
 import type { UserDetail, UserListItem } from '../../../types/user-management.ts';
 import { fetchUser } from '../api.ts';
 import { useRoles } from '../roles/useRoles.ts';
@@ -16,6 +17,7 @@ import styles from './UsersView.module.scss';
 
 export function UsersView() {
   const { t } = useTranslation();
+  const labels = useLabels();
   const { show } = useToast();
 
   const [modalUser, setModalUser] = useState<UserDetail | null | 'create'>(null);
@@ -25,7 +27,8 @@ export function UsersView() {
   const patchUser = usePatchUser();
 
   const roleNameByCode = useMemo(
-    () => Object.fromEntries((rolesData?.items ?? []).map((r) => [r.code, r.name])),
+    () => Object.fromEntries((rolesData?.items ?? []).map((r) => [r.code, labels.roleName(r)])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [rolesData],
   );
 
@@ -39,7 +42,16 @@ export function UsersView() {
   };
 
   const handleDelete = async (user: UserListItem) => {
-    if (!confirm(`${user.fullName} (${user.email}) kullanıcısını silmek istediğinize emin misiniz?`)) return;
+    if (
+      !confirm(
+        t(
+          'user-management.confirm.delete',
+          { fullName: user.fullName, email: user.email },
+          `${user.fullName} (${user.email}) kullanıcısını silmek istediğinize emin misiniz?`,
+        ),
+      )
+    )
+      return;
     try {
       await patchUser.mutateAsync({ id: user.id, isActive: false });
       show('success', t('user-management.toast.userDeleted', undefined, 'Kullanıcı silindi'));

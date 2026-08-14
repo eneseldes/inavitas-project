@@ -184,6 +184,17 @@ export async function listActiveLocales(tx?: Tx) {
   return client(tx).select().from(locales).where(eq(locales.isActive, true));
 }
 
+/** Bir dilin sağlayıcı (DeepL) kodunu döner — atanmamışsa undefined (o dilde AI çeviri devre dışıdır). */
+export async function getProviderCode(localeCode: string, tx?: Tx): Promise<string | undefined> {
+  const rows = await client(tx)
+    .select({ providerCode: locales.providerCode })
+    .from(locales)
+    .where(eq(locales.code, localeCode))
+    .limit(1);
+
+  return rows[0]?.providerCode ?? undefined;
+}
+
 /** Tüm namespace'leri listeler. */
 export async function listNamespaces(tx?: Tx) {
   return client(tx).select().from(translationNamespaces);

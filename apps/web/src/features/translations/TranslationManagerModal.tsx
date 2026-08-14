@@ -15,6 +15,7 @@ import {
   deleteTranslationKey,
   fetchLocales,
   fetchNamespaces,
+  fetchProviderLanguages,
   fetchTranslationKeys,
   publishTranslations,
   updateLocaleActive,
@@ -22,6 +23,18 @@ import {
 } from '../i18n/api.ts';
 import { useDebounce } from '../../shared/hooks/useDebounce.ts';
 import styles from './TranslationManagerModal.module.scss';
+
+/**
+ * DeepL kodunu ('NL', 'EN-GB', 'ES-419') uygulama locale koduna çevirir. Projedeki
+ * tüm mevcut diller xx-XX kalıbında (tr-TR, en-US, de-DE) — DeepL'in bölgesiz
+ * verdiği kodlarda (örn. 'FI') bölge, dilin kendisi tekrarlanarak türetilir
+ * ('fi-FI'), aksi halde mevcut dillerle eşleşmeyip filtre çalışmaz.
+ */
+function deriveLocaleCode(providerCode: string): string {
+  const [lang, region] = providerCode.split('-');
+  const regionCode = region && /^[A-Za-z]{2}$/.test(region) ? region.toUpperCase() : lang.toUpperCase();
+  return `${lang.toLowerCase()}-${regionCode}`;
+}
 
 /** Ayarlar popover'ından açılan çeviri yönetim modalı. */
 export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
@@ -40,7 +53,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
   const debouncedSearch = useDebounce(search, 300);
   const [onlyMissing, setOnlyMissing] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const pageSize = 100;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isAddLocaleOpen, setIsAddLocaleOpen] = useState(false);
 
@@ -48,8 +61,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
   const [newKeyName, setNewKeyName] = useState('');
   const [newDesc, setNewDesc] = useState('');
 
-  const [newLocaleCode, setNewLocaleCode] = useState('');
-  const [newLocaleName, setNewLocaleName] = useState('');
+  const [newProviderCode, setNewProviderCode] = useState('');
 
   // "İkinci tıkla onay" — confirm()/alert() kullanılmaz. Yalnız bekleyen tek
   // silme/pasifleştirme işlemi olabilir, id ile takip edilir.
@@ -59,6 +71,17 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
 
   const { data: localesList = [] } = useQuery({ queryKey: ['translation-locales'], queryFn: fetchLocales });
   const { data: namespacesList = [] } = useQuery({ queryKey: ['translation-namespaces'], queryFn: fetchNamespaces });
+  const { data: providerLanguages } = useQuery({
+    queryKey: ['translation-provider-languages'],
+    queryFn: fetchProviderLanguages,
+    enabled: canPublish && isAddLocaleOpen,
+  });
+
+  // Zaten eklenmiş dilleri dropdown'dan çıkar — aynı dili iki kez eklemeye çalışmasın.
+  const addableProviderLanguages = useMemo(() => {
+    const existingCodes = new Set(localesList.map((loc) => loc.code));
+    return (providerLanguages?.target ?? []).filter((lang) => !existingCodes.has(deriveLocaleCode(lang.code)));
+  }, [providerLanguages, localesList]);
 
   const prevLocalesCountRef = useRef(localesList.length);
 
@@ -127,14 +150,21 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
   });
 
   const addLocaleMutation = useMutation({
-    mutationFn: () => createLocale({ code: newLocaleCode, name: newLocaleName }),
+    mutationFn: () => {
+      const lang = addableProviderLanguages.find((l) => l.code === newProviderCode);
+      if (!lang) throw new Error(t('settings.translations.toast.localeAddFailed'));
+      return createLocale({ code: deriveLocaleCode(lang.code), name: lang.name, providerCode: lang.code });
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['translation-locales'] });
       void queryClient.invalidateQueries({ queryKey: ['translation-keys'] });
+      // Navbar/login dil seçici `['i18n','locales']` sorgusunu ayrı bir
+      // `staleTime: Infinity` query ile tutuyor — bunu da geçersiz kılmazsak
+      // yeni dil sayfa yenilenene kadar seçicide görünmez.
+      void queryClient.invalidateQueries({ queryKey: ['i18n'] });
       toast.show('success', t('settings.translations.toast.localeAdded'));
       setIsAddLocaleOpen(false);
-      setNewLocaleCode('');
-      setNewLocaleName('');
+      setNewProviderCode('');
     },
     onError: (err: Error) => toast.show('error', err.message || t('settings.translations.toast.localeAddFailed')),
   });
@@ -188,6 +218,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
     mutationFn: (code: string) => updateLocaleActive(code, false),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['translation-locales'] });
+      void queryClient.invalidateQueries({ queryKey: ['i18n'] });
       toast.show('success', t('settings.translations.toast.localeDeactivated'));
       setConfirmingLocaleCode(null);
     },
@@ -441,29 +472,14 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
         <div className={styles.paginationBar}>
           <div className={styles.paginationInfo}>
             <span>
-              Toplam <strong>{keysData.total}</strong> çeviri anahtarı (Sayfa {keysData.page} / {keysData.totalPages})
+              <strong>
+                {(keysData.page - 1) * pageSize + 1}-{Math.min(keysData.page * pageSize, keysData.total)}
+              </strong>{' '}
+              / {keysData.total}
             </span>
           </div>
 
           <div className={styles.paginationActions}>
-            <div className={styles.pageSizeWrap}>
-              <span>Satır:</span>
-              <select
-                className="select select--compact"
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-              >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={250}>250</option>
-                <option value={1000}>Tümü (1000)</option>
-              </select>
-            </div>
-
             <div className={styles.pageButtons}>
               <button
                 type="button"
@@ -496,20 +512,22 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
                 addLocaleMutation.mutate();
               }}
             >
-              <input
-                className="input"
-                placeholder={t('settings.translations.localeCodePlaceholder')}
-                value={newLocaleCode}
-                onChange={(e) => setNewLocaleCode(e.target.value)}
+              <select
+                className="select"
+                value={newProviderCode}
+                onChange={(e) => setNewProviderCode(e.target.value)}
+                disabled={!addableProviderLanguages.length}
                 required
-              />
-              <input
-                className="input"
-                placeholder={t('settings.translations.localeNamePlaceholder')}
-                value={newLocaleName}
-                onChange={(e) => setNewLocaleName(e.target.value)}
-                required
-              />
+              >
+                <option value="" disabled>
+                  {addableProviderLanguages.length ? 'Dil seçin…' : 'Eklenebilecek dil kalmadı'}
+                </option>
+                {addableProviderLanguages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name} ({lang.code})
+                  </option>
+                ))}
+              </select>
               <button type="submit" className="btn btn--primary" disabled={addLocaleMutation.isPending}>
                 {t('common.action.add')}
               </button>

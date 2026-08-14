@@ -3,6 +3,17 @@ export interface Locale {
   name: string;
   isDefault: boolean;
   isActive: boolean;
+  providerCode?: string | null;
+}
+
+export interface ProviderLanguage {
+  code: string;
+  name: string;
+}
+
+export interface ProviderLanguages {
+  source: ProviderLanguage[];
+  target: ProviderLanguage[];
 }
 
 export interface TranslationNamespace {

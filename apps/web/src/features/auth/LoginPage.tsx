@@ -5,6 +5,7 @@ import { FiLock, FiLogIn, FiMail, FiMoon, FiSun } from 'react-icons/fi';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
+import { PasswordField, TextField } from '../../shared/components/form';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useTheme } from '../theme/ThemeProvider.tsx';
 import styles from './LoginPage.module.scss';
@@ -39,7 +40,7 @@ export function LoginPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema) });
+  } = useForm<z.infer<typeof schema>>({ resolver: zodResolver(schema), mode: 'onSubmit' });
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -104,41 +105,22 @@ export function LoginPage() {
               </div>
             )}
 
-            <div className="field">
-              <label htmlFor="email" className="field__label">
-                {t('auth.action.emailLabel')}
-              </label>
-              <div className="input--icon-wrap">
-                <FiMail />
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="username"
-                  placeholder="admin@inavitas.com"
-                  className="input"
-                  {...register('email')}
-                />
-              </div>
-              {errors.email && <p className="field__error">{errors.email.message}</p>}
-            </div>
+            <TextField
+              label={t('auth.action.emailLabel')}
+              type="email"
+              autoComplete="username"
+              leadingIcon={<FiMail />}
+              error={errors.email?.message}
+              {...register('email')}
+            />
 
-            <div className="field">
-              <label htmlFor="password" className="field__label">
-                {t('auth.action.passwordLabel')}
-              </label>
-              <div className="input--icon-wrap">
-                <FiLock />
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  className="input"
-                  {...register('password')}
-                />
-              </div>
-              {errors.password && <p className="field__error">{errors.password.message}</p>}
-            </div>
+            <PasswordField
+              label={t('auth.action.passwordLabel')}
+              autoComplete="current-password"
+              leadingIcon={<FiLock />}
+              error={errors.password?.message}
+              {...register('password')}
+            />
 
             <button type="submit" disabled={isSubmitting} className={`btn btn--primary ${styles.submit}`}>
               <FiLogIn />

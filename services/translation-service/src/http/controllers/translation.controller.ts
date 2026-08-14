@@ -22,9 +22,9 @@ import {
 } from '../../db/schema.ts';
 import type { Dictionary } from '../../domain/bundle.ts';
 import { ALL_NAMESPACES, buildEtag } from '../../domain/cache-key.ts';
-import { toProviderLocale } from '../../domain/locale-mapping.ts';
 import * as repo from '../../repository/translation.repository.ts';
 import { getProvider } from '../../services/auto-translate/index.ts';
+import { getProviderLanguages, isValidProviderTargetCode } from '../../services/auto-translate/deepl-languages.ts';
 import * as cache from '../../services/cache.service.ts';
 import { publishTranslations } from '../../services/publish.service.ts';
 import {
@@ -119,6 +119,10 @@ export async function createLocale(req: AuthedRequest, res: Response): Promise<v
   const body = CreateLocaleBody.parse(req.body);
   const actor = req.user?.email ?? 'system';
 
+  if (body.providerCode && !(await isValidProviderTargetCode(body.providerCode, req.log))) {
+    throw new ValidationError(`DeepL bu sağlayıcı kodunu desteklemiyor: ${body.providerCode}`);
+  }
+
   const newLocale = await db.transaction(async (tx) => {
     if (body.isDefault) {
       // Tek varsayılan dil kısıtı (uq_single_default_locale) ihlal edilmesin diye
@@ -128,7 +132,13 @@ export async function createLocale(req: AuthedRequest, res: Response): Promise<v
 
     const [created] = await tx
       .insert(locales)
-      .values({ code: body.code, name: body.name, isDefault: body.isDefault ?? false, isActive: true })
+      .values({
+        code: body.code,
+        name: body.name,
+        isDefault: body.isDefault ?? false,
+        isActive: true,
+        providerCode: body.providerCode,
+      })
       .returning();
 
     // Yeni dil için tüm namespace'lerde v0 bundle versiyonu açılır — aksi halde
@@ -363,8 +373,21 @@ export async function updateLocale(req: AuthedRequest, res: Response): Promise<v
     throw new ConflictError('Varsayılan dil pasifleştirilemez');
   }
 
-  const [updated] = await db.update(locales).set({ isActive: body.isActive }).where(eq(locales.code, code)).returning();
+  const [updated] = await db
+    .update(locales)
+    .set({
+      isActive: body.isActive,
+      ...(body.providerCode !== undefined ? { providerCode: body.providerCode } : {}),
+    })
+    .where(eq(locales.code, code))
+    .returning();
   res.json(updated);
+}
+
+/** DeepL'in desteklediği dil listesini döner (admin dropdown'ı için, haftalık cache). */
+export async function getProviderLanguagesHandler(req: AuthedRequest, res: Response): Promise<void> {
+  const languages = await getProviderLanguages(req.log);
+  res.json(languages);
 }
 
 /** Taslak çeviri değerini günceller (iyimser kilitleme / version zorunlu). */
@@ -422,13 +445,13 @@ export async function updateTranslation(req: AuthedRequest, res: Response): Prom
 export async function autoTranslate(req: AuthedRequest, res: Response): Promise<void> {
   const body = AutoTranslateBody.parse(req.body);
 
-  const targetProviderLocale = toProviderLocale(body.targetLocale);
+  const targetProviderLocale = await repo.getProviderCode(body.targetLocale);
   if (!targetProviderLocale) {
     throw new ValidationError(`Eşlenemeyen hedef dil: ${body.targetLocale}`);
   }
 
   const sourceLocale = body.sourceLocale ?? (await repo.getDefaultLocaleCode());
-  const sourceProviderLocale = toProviderLocale(sourceLocale);
+  const sourceProviderLocale = await repo.getProviderCode(sourceLocale);
   if (!sourceProviderLocale) {
     throw new ValidationError(`Eşlenemeyen kaynak dil: ${sourceLocale}`);
   }

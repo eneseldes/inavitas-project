@@ -2,6 +2,7 @@ import { apiFetch } from '../../shared/api/client.ts';
 import type {
   CreateKeyInput,
   Locale,
+  ProviderLanguages,
   TranslationKeyRow,
   TranslationNamespace,
   TranslationValueRow,
@@ -68,11 +69,20 @@ export async function publishTranslations(input?: { namespace?: string }): Promi
   });
 }
 
-export async function createLocale(input: { code: string; name: string; isDefault?: boolean }): Promise<Locale> {
+export async function createLocale(input: {
+  code: string;
+  name: string;
+  isDefault?: boolean;
+  providerCode?: string;
+}): Promise<Locale> {
   return apiFetch<Locale>('/api/translations/locales', {
     method: 'POST',
     body: input,
   });
+}
+
+export async function fetchProviderLanguages(): Promise<ProviderLanguages> {
+  return apiFetch<ProviderLanguages>('/api/translations/provider-languages');
 }
 
 export async function updateLocaleActive(code: string, isActive: boolean): Promise<Locale> {

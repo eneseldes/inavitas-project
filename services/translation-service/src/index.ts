@@ -5,6 +5,7 @@ import { disconnectDb } from './db.ts';
 import { connectKafka, disconnectKafka } from './kafka.ts';
 import { startOutboxPoller, type OutboxPollerHandle } from './kafka/outbox-poller.ts';
 import { disconnectRedis } from './redis.ts';
+import { warmProviderLanguageCache } from './services/auto-translate/deepl-languages.ts';
 
 const logger = await createLogger({
   service: 'translation-service',
@@ -21,6 +22,8 @@ await connectKafka();
 logger.info('Kafka producer bağlandı');
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
+
+void warmProviderLanguageCache(logger);
 
 let shuttingDown = false;
 

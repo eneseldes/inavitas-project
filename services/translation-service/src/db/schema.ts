@@ -22,6 +22,9 @@ export const locales = pgTable(
     name: varchar('name', { length: 64 }).notNull(),
     isDefault: boolean('is_default').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
+    // DeepL'in bu dil için beklediği kod (örn. 'FI', 'EN-US') — otomatik çeviri
+    // için gerekli, boşsa o dilde AI çeviri devre dışı kalır (elle girilir).
+    providerCode: varchar('provider_code', { length: 16 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

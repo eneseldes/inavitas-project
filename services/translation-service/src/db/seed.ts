@@ -22,8 +22,8 @@ const pool = new Pool({ connectionString });
 const db = drizzle(pool);
 
 const SEED_LOCALES = [
-  { code: 'tr-TR', name: 'Türkçe', isDefault: true, isActive: true },
-  { code: 'en-US', name: 'English', isDefault: false, isActive: true },
+  { code: 'tr-TR', name: 'Türkçe', isDefault: true, isActive: true, providerCode: 'TR' },
+  { code: 'en-US', name: 'English', isDefault: false, isActive: true, providerCode: 'EN-US' },
 ] as const;
 
 const SEED_NAMESPACES = [
@@ -59,8 +59,11 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'enum.origin.USER', 'Kullanıcı', 'User'],
   ['common', 'enum.origin.SYSTEM', 'Sistem', 'System'],
 
-  ['common', 'enum.role.ADMIN', 'Sistem Yöneticisi', 'System Administrator'],
-  ['common', 'enum.role.OUTAGE_OPERATOR', 'Kesinti Yöneticisi', 'Outage Operator'],
+  // tr-TR değerleri access-service seed'indeki ROLE_NAMES ile bilerek AYNI
+  // tutulur (bkz. services/access-service/src/db/seed.ts) — aksi halde bu
+  // anahtar kullanılmaya başlandığında Türkçe arayüzde metin değişmiş görünür.
+  ['common', 'enum.role.ADMIN', 'Yönetici', 'System Administrator'],
+  ['common', 'enum.role.OUTAGE_OPERATOR', 'Kesinti Operatörü', 'Outage Operator'],
   ['common', 'enum.role.WORK_ORDER_OPERATOR', 'Saha Personeli', 'Field Operator'],
 
   // --- Ortak aksiyonlar ---
@@ -70,6 +73,9 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'action.creating', 'Oluşturuluyor…', 'Creating…'],
   ['common', 'action.cancel', 'İptal', 'Cancel'],
   ['common', 'action.close', 'Kapat', 'Close'],
+  ['common', 'action.edit', 'Düzenle', 'Edit'],
+  ['common', 'action.delete', 'Sil', 'Delete'],
+  ['common', 'action.selectAll', 'Tümünü seç', 'Select all'],
   ['common', 'loading', 'Yükleniyor…', 'Loading…'],
   ['common', 'table.empty', 'Kayıt bulunamadı', 'No records found'],
   ['common', 'error.unexpected', 'Beklenmeyen bir hata oluştu', 'An unexpected error occurred'],
@@ -152,7 +158,7 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'filter.date.to', 'Bitiş', 'To'],
 
   // --- Kullanıcı & Rol Yönetimi ---
-  ['user-management', 'page.title', 'Kullanıcılar', 'User Management'],
+  ['user-management', 'page.title', 'Kullanıcı Yönetimi', 'User Management'],
   ['user-management', 'segment.users', 'Kullanıcılar', 'Users'],
   ['user-management', 'segment.roles', 'Roller', 'Roles'],
 
@@ -161,38 +167,73 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'column.roles', 'Roller', 'Roles'],
   ['user-management', 'column.status', 'Durum', 'Status'],
   ['user-management', 'column.createdAt', 'Oluşturulma', 'Created'],
+  ['user-management', 'column.actions', 'İşlemler', 'Actions'],
+  ['user-management', 'column.lastLoginAt', 'Son Giriş', 'Last Login'],
+  ['user-management', 'column.neverLoggedIn', 'Hiç giriş yapmadı', 'Never logged in'],
   ['user-management', 'filter.search', 'Ad veya e-posta ara…', 'Search by name or email…'],
+  ['user-management', 'filter.email', 'E-posta ara…', 'Search by email…'],
   ['user-management', 'table.empty', 'Kullanıcı kaydı yok', 'No users found'],
   ['user-management', 'action.new', 'Yeni Kullanıcı', 'New User'],
   ['user-management', 'field.email', 'E-posta', 'Email'],
   ['user-management', 'field.fullName', 'Ad Soyad', 'Full Name'],
   ['user-management', 'field.password', 'Parola', 'Password'],
+  ['user-management', 'field.passwordHint', 'En az 8 karakter', 'At least 8 characters'],
   ['user-management', 'field.roles', 'Roller', 'Roles'],
+  ['user-management', 'field.addRole', 'Yeni rol alanı ekle', 'Add new role row'],
   ['user-management', 'field.resetPassword', 'Parola Sıfırla', 'Reset Password'],
   ['user-management', 'field.resetPasswordHint', 'Boş bırakırsanız değişmez', 'Leave blank to keep unchanged'],
+  ['user-management', 'field.resetPasswordDescription', 'kullanıcısı için yeni bir parola belirleyin.', 'set a new password for this user.'],
   ['user-management', 'dialog.create.title', 'Yeni Kullanıcı', 'New User'],
   ['user-management', 'dialog.edit.title', 'Kullanıcı Düzenle', 'Edit User'],
   ['user-management', 'toast.createSuccess', 'Kullanıcı oluşturuldu', 'User created'],
   ['user-management', 'toast.updateSuccess', 'Kullanıcı güncellendi', 'User updated'],
+  ['user-management', 'toast.userDeleted', 'Kullanıcı silindi', 'User deleted'],
+  ['user-management', 'toast.passwordResetSuccess', 'Parola başarıyla sıfırlandı', 'Password reset successfully'],
+  ['user-management', 'confirm.delete', '{fullName} ({email}) kullanıcısını silmek istediğinize emin misiniz?', 'Are you sure you want to delete user {fullName} ({email})?'],
+  ['user-management', 'validation.emailInvalid', 'Geçerli bir e-posta girin', 'Enter a valid email'],
+  ['user-management', 'validation.fullNameRequired', 'Ad soyad zorunludur', 'Full name is required'],
+  ['user-management', 'validation.passwordMin', 'Parola en az 8 karakter olmalı', 'Password must be at least 8 characters'],
+  ['user-management', 'validation.rolesRequired', 'En az bir rol seçilmeli', 'At least one role must be selected'],
 
   ['user-management', 'role.column.name', 'Rol Adı', 'Role Name'],
   ['user-management', 'role.column.permissions', 'İzin Sayısı', 'Permissions'],
   ['user-management', 'role.column.users', 'Kullanıcı', 'Users'],
   ['user-management', 'role.table.empty', 'Rol kaydı yok', 'No roles found'],
   ['user-management', 'role.action.new', 'Yeni Rol', 'New Role'],
+  ['user-management', 'role.filter.namePlaceholder', 'Rol adı ara…', 'Search by role name…'],
   ['user-management', 'role.badge.system', 'Sistem', 'System'],
   ['user-management', 'role.badge.systemTooltip', 'Sistem rolleri düzenlenemez veya silinemez', 'System roles cannot be edited or deleted'],
   ['user-management', 'role.badge.systemNote', 'Bu bir sistem rolüdür. Salt-okunur görüntüleniyor.', 'This is a system role. Displayed as read-only.'],
   ['user-management', 'role.delete.hasUsers', 'Önce kullanıcıları başka role taşıyın', 'Move users to another role first'],
+  ['user-management', 'role.delete.systemBlocked', 'Sistem rolleri silinemez', 'System roles cannot be deleted'],
   ['user-management', 'role.confirm.delete', '{name} rolünü silmek istediğinize emin misiniz?', 'Are you sure you want to delete the role {name}?'],
   ['user-management', 'role.dialog.create.title', 'Yeni Rol', 'New Role'],
   ['user-management', 'role.dialog.edit.title', 'Rol Düzenle', 'Edit Role'],
   ['user-management', 'role.field.name', 'Rol Adı', 'Role Name'],
   ['user-management', 'role.field.permissions', 'İzinler', 'Permissions'],
+  ['user-management', 'role.validation.nameRequired', 'Rol adı zorunludur', 'Role name is required'],
   ['user-management', 'role.permissionNote', 'Yapılan değişiklikler, kullanıcıların bir sonraki oturum yenilemesinde (token süresi) etkili olur.', 'Changes will take effect for users on their next session refresh (token expiry).'],
+  ['user-management', 'role.permissionsPanel.emptyState', 'İzinlerini düzenlemek için soldaki tablodan bir rol seçin.', 'Select a role from the table on the left to edit its permissions.'],
+  ['user-management', 'role.permissionsTitle', '{name} İzinleri', '{name} Permissions'],
+  ['user-management', 'role.module.outage', 'Kesinti Yönetimi', 'Outage Management'],
+  ['user-management', 'role.module.workorder', 'İş Emri Yönetimi', 'Work Order Management'],
+  ['user-management', 'role.module.user', 'Kullanıcı & Rol Yönetimi', 'User & Role Management'],
+  ['user-management', 'role.module.translation', 'Çeviri Yönetimi', 'Translation Management'],
+  ['user-management', 'role.module.generic', '{module} Modülü', '{module} Module'],
   ['user-management', 'role.toast.createSuccess', 'Rol oluşturuldu', 'Role created'],
   ['user-management', 'role.toast.updateSuccess', 'Rol güncellendi', 'Role updated'],
   ['user-management', 'role.toast.deleteSuccess', 'Rol silindi', 'Role deleted'],
+
+  // İzin açıklamaları — kaynak: services/access-service/src/db/seed.ts PERMISSION_DESCRIPTIONS
+  // (tr-TR değerleri o dosyayla bilerek AYNI tutulur, bkz. yukarıdaki not).
+  ['user-management', 'permission.outage.read', 'Kesinti kayıtlarını görme', 'View outage records'],
+  ['user-management', 'permission.outage.write', 'Kesinti oluşturma ve düzenle', 'Create and edit outages'],
+  ['user-management', 'permission.workorder.read', 'İş emirlerini görme', 'View work orders'],
+  ['user-management', 'permission.workorder.write', 'İş emri oluşturma ve durum güncelleme', 'Create work orders and update status'],
+  ['user-management', 'permission.user.manage', 'Kullanıcı ve rol yönetimi', 'Manage users and roles'],
+  ['user-management', 'permission.translation.read', 'Çeviri yönetimini görme', 'View translation management'],
+  ['user-management', 'permission.translation.write', 'Çeviri ekleme ve düzenle', 'Add and edit translations'],
+  ['user-management', 'permission.translation.publish', 'Çeviri yayınlama', 'Publish translations'],
 
   ['common', 'status.active', 'Aktif', 'Active'],
   ['common', 'status.inactive', 'Pasif', 'Inactive'],

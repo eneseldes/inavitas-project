@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { clsx } from 'clsx';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { ApiError } from '../../../shared/api/errors.ts';
 import { Modal } from '../../../shared/components/Modal.tsx';
 import { useToast } from '../../../shared/components/Toast.tsx';
+import { PasswordField } from '../../../shared/components/form';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
 import type { UserListItem } from '../../../types/user-management.ts';
+import styles from './ResetPasswordModal.module.scss';
 import { useResetPassword } from './useUsers.ts';
 
 interface ResetPasswordModalProps {
@@ -11,75 +16,64 @@ interface ResetPasswordModalProps {
   onClose: () => void;
 }
 
+function useResetPasswordSchema(minMessage: string) {
+  return z.object({
+    password: z.string().min(8, minMessage),
+  });
+}
+
 export function ResetPasswordModal({ user, onClose }: ResetPasswordModalProps) {
   const { show } = useToast();
   const { t } = useTranslation();
   const resetPassword = useResetPassword();
+  const schema = useResetPasswordSchema(t('user-management.validation.passwordMin', undefined, 'Parola en az 8 karakter olmalı'));
 
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    mode: 'onSubmit',
+    defaultValues: { password: '' },
+  });
 
-  const isValid = password.length >= 8;
-
-  const handleSubmit = async () => {
-    if (!isValid) return;
-    setError(null);
-    setSubmitting(true);
+  const onSubmit = handleSubmit(async (values) => {
     try {
-      await resetPassword.mutateAsync({ id: user.id, password });
+      await resetPassword.mutateAsync({ id: user.id, password: values.password });
       show('success', t('user-management.toast.passwordResetSuccess', undefined, 'Parola başarıyla sıfırlandı'));
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? t(err.message) : t('common.error.unexpected'));
-    } finally {
-      setSubmitting(false);
+      setError('root', { message: err instanceof ApiError ? t(err.message) : t('common.error.unexpected') });
     }
-  };
+  });
 
   return (
-    <Modal
-      title={t('user-management.field.resetPassword', undefined, 'Parola Sıfırla')}
-      onClose={onClose}
-      size="md"
-    >
-      {error && <div className="form-error-banner">{error}</div>}
+    <Modal title={t('user-management.field.resetPassword', undefined, 'Parola Sıfırla')} onClose={onClose} size="md">
+      <form onSubmit={onSubmit} noValidate>
+        {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-      <div style={{ marginBottom: '16px' }}>
-        <p className="text-muted" style={{ margin: 0, fontSize: '0.9rem' }}>
-          <strong>{user.fullName}</strong> ({user.email}) kullanıcısı için yeni bir parola belirleyin.
+        <p className={clsx('text-muted', styles.description)}>
+          <strong>{user.fullName}</strong> ({user.email}) {t('user-management.field.resetPasswordDescription', undefined, 'kullanıcısı için yeni bir parola belirleyin.')}
         </p>
-      </div>
 
-      <div className="field">
-        <label htmlFor="rpm-password" className="field__label">
-          {t('user-management.field.password', undefined, 'Yeni Parola')}
-        </label>
-        <input
-          id="rpm-password"
-          className="input"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="En az 8 karakter"
+        <PasswordField
+          label={t('user-management.field.password', undefined, 'Yeni Parola')}
+          hint={t('user-management.field.passwordHint', undefined, 'En az 8 karakter')}
+          error={errors.password?.message}
+          {...register('password')}
         />
-      </div>
 
-      <div className="form-actions">
-        <button type="button" onClick={onClose} className="btn btn--ghost">
-          {t('common.action.cancel', undefined, 'İptal')}
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!isValid || isSubmitting}
-          className="btn btn--primary"
-        >
-          {isSubmitting
-            ? t('common.action.saving', undefined, 'Kaydediliyor…')
-            : t('common.action.save', undefined, 'Kaydet')}
-        </button>
-      </div>
+        <div className="form-actions">
+          <button type="button" onClick={onClose} className="btn btn--ghost">
+            {t('common.action.cancel', undefined, 'İptal')}
+          </button>
+          <button type="submit" disabled={isSubmitting} className="btn btn--primary">
+            {isSubmitting ? t('common.action.saving', undefined, 'Kaydediliyor…') : t('common.action.save', undefined, 'Kaydet')}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

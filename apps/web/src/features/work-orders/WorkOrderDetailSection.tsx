@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { FiArrowRight, FiLink } from 'react-icons/fi';
+import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import { DetailSectionLayout, type TabConfig } from '../../shared/components/DetailSectionLayout.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { SelectField } from '../../shared/components/form';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
@@ -70,6 +74,12 @@ export function WorkOrderDetailSection({
   );
 }
 
+function useWorkOrderStatusSchema(requiredMessage: string) {
+  return z.object({
+    nextStatus: z.string().min(1, requiredMessage),
+  });
+}
+
 /** İş emri detay ve durum atama sekmesi. */
 function WorkOrderDetailTab({
   workOrder,
@@ -85,32 +95,30 @@ function WorkOrderDetailTab({
   const patchWorkOrder = usePatchWorkOrder();
 
   const options = NEXT_STATUSES[workOrder.status] || [];
-  const [nextStatus, setNextStatus] = useState<WorkOrderStatus | ''>('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = useState(false);
+  const schema = useWorkOrderStatusSchema(t('work-order.dialog.edit.selectTransition'));
 
-  useEffect(() => {
-    setNextStatus('');
-    setError(null);
-  }, [workOrder]);
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    mode: 'onSubmit',
+    defaultValues: { nextStatus: '' },
+  });
 
-  const hasChanges = nextStatus !== '';
-
-  const onSubmit = async () => {
-    if (!nextStatus) return;
-
-    setSubmitting(true);
-    setError(null);
+  const onSubmit = handleSubmit(async (values) => {
     try {
+      const nextStatus = values.nextStatus as WorkOrderStatus;
       await patchWorkOrder.mutateAsync({ id: workOrder.id, status: nextStatus, version: workOrder.version });
       show('success', t('work-order.toast.statusChanged', { status: labels.workOrderStatus(nextStatus) }));
-      setNextStatus('');
+      reset({ nextStatus: '' });
     } catch (err) {
-      setError(err instanceof ApiError ? t(err.message) : t('work-order.toast.updateError'));
-    } finally {
-      setSubmitting(false);
+      setError('root', { message: err instanceof ApiError ? t(err.message) : t('work-order.toast.updateError') });
     }
-  };
+  });
 
   return (
     <div>
@@ -172,48 +180,30 @@ function WorkOrderDetailTab({
       <div style={{ marginTop: '1rem' }}>
         <h3 className={styles.sectionTitle}>{t('work-order.detail.statusAssignmentTitle', undefined, 'Durum Atama & Güncelleme')}</h3>
 
-        {hasPermission('workorder:write') ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void onSubmit();
-            }}
-            noValidate
-            className={styles.form}
-          >
-            {error && <div className="form-error-banner">{error}</div>}
+        {hasPermission('workorder:write') ? options.length > 0 ? (
+          <form onSubmit={onSubmit} noValidate className={styles.form}>
+            {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-            <div className="field">
-              <label htmlFor="nextStatus" className="field__label">
-                {t('work-order.dialog.edit.nextStatusLabel')}
-              </label>
-              {options.length > 0 ? (
-                <select
-                  id="nextStatus"
-                  className="select"
-                  value={nextStatus}
-                  onChange={(e) => setNextStatus(e.target.value as WorkOrderStatus)}
-                >
-                  <option value="" disabled>
-                    {t('work-order.dialog.edit.selectTransition')}
-                  </option>
-                  {options.map((status) => (
-                    <option key={status} value={status}>
-                      {labels.workOrderStatus(status)}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="field__hint">{t('work-order.dialog.edit.noTransitions')}</p>
-              )}
-            </div>
+            <SelectField label={t('work-order.dialog.edit.nextStatusLabel')} error={errors.nextStatus?.message} {...register('nextStatus')}>
+              <option value="">{t('work-order.dialog.edit.selectTransition')}</option>
+              {options.map((status) => (
+                <option key={status} value={status}>
+                  {labels.workOrderStatus(status)}
+                </option>
+              ))}
+            </SelectField>
 
             <div className="form-actions">
-              <button type="submit" disabled={!hasChanges || isSubmitting} className="btn btn--primary">
+              <button type="submit" disabled={isSubmitting || !isDirty} className="btn btn--primary">
                 {isSubmitting ? t('common.action.saving') : t('common.action.save')}
               </button>
             </div>
           </form>
+        ) : (
+          <div className="field">
+            <span className="field__label">{t('work-order.dialog.edit.nextStatusLabel')}</span>
+            <p className="field__hint">{t('work-order.dialog.edit.noTransitions')}</p>
+          </div>
         ) : (
           <p className="text-muted">{t('common.readOnly', undefined, 'Salt okunur modadasınız.')}</p>
         )}

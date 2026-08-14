@@ -34,11 +34,15 @@ export const CreateLocaleBody = z.object({
   code: z.string().regex(/^[a-z]{2}(-[A-Z]{2})?$/),
   name: z.string().min(1).max(64),
   isDefault: z.boolean().optional(),
+  // DeepL dropdown'ından seçilen kod (örn. 'FI') — boş bırakılırsa o dilde AI çeviri kapalı kalır.
+  providerCode: z.string().min(1).max(16).optional(),
 });
 export type CreateLocaleBody = z.infer<typeof CreateLocaleBody>;
 
 export const UpdateLocaleBody = z.object({
   isActive: z.boolean(),
+  // Verilirse (null dahil) providerCode günceller — atlanırsa dokunulmaz.
+  providerCode: z.string().min(1).max(16).nullable().optional(),
 });
 export type UpdateLocaleBody = z.infer<typeof UpdateLocaleBody>;
 

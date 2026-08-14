@@ -6,6 +6,7 @@ import { ApiError } from '../../shared/api/errors.ts';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { Field, SelectInput, TextField } from '../../shared/components/form';
 import { isoToDateTimeLocalInput } from '../../shared/datetime.ts';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
@@ -41,18 +42,22 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
   const schema = makeSchema(outage.startedAt, t('outage.validation.endedAtBeforeStarted'));
   const options = USER_SELECTABLE_NEXT_STATUSES[outage.status] || [];
   const [nextStatus, setNextStatus] = useState<OutageStatus | ''>('');
+  const [statusFocused, setStatusFocused] = useState(false);
 
   const {
     register,
     handleSubmit,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
+    mode: 'onSubmit',
     defaultValues: {
       endedAt: isoToDateTimeLocalInput(outage.endedAt),
     },
   });
+
+  const hasChanges = isDirty || nextStatus !== '';
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -95,25 +100,22 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
       <form onSubmit={onSubmit} noValidate>
         {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-        <div className="field">
-          <label htmlFor="endedAt" className="field__label">
-            {t('outage.dialog.create.endedAtLabel')}
-            <span className="field__hint"> {t('outage.dialog.edit.endedAtHint', { status: labels.outageStatus('ENERGIZED') })}</span>
-          </label>
-          <input id="endedAt" type="datetime-local" className="input" {...register('endedAt')} />
-          {errors.endedAt && <p className="field__error">{errors.endedAt.message}</p>}
-        </div>
+        <TextField
+          label={t('outage.dialog.create.endedAtLabel')}
+          type="datetime-local"
+          hint={t('outage.dialog.edit.endedAtHint', { status: labels.outageStatus('ENERGIZED') })}
+          error={errors.endedAt?.message}
+          {...register('endedAt')}
+        />
 
-        <div className="field">
-          <label htmlFor="nextStatus" className="field__label">
-            {t('outage.dialog.edit.nextStatusLabel')}
-          </label>
-          {options.length > 0 ? (
-            <select
+        {options.length > 0 ? (
+          <Field label={t('outage.dialog.edit.nextStatusLabel')} floated focused={statusFocused} htmlFor="nextStatus">
+            <SelectInput
               id="nextStatus"
-              className="select"
               value={nextStatus}
               onChange={(e) => setNextStatus(e.target.value as OutageStatus)}
+              onFocus={() => setStatusFocused(true)}
+              onBlur={() => setStatusFocused(false)}
             >
               <option value="" disabled>
                 {t('outage.dialog.edit.selectTransition')}
@@ -123,17 +125,20 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
                   {labels.outageStatus(status)}
                 </option>
               ))}
-            </select>
-          ) : (
+            </SelectInput>
+          </Field>
+        ) : (
+          <div className="field">
+            <span className="field__label">{t('outage.dialog.edit.nextStatusLabel')}</span>
             <p className="field__hint">{t('outage.dialog.edit.noTransitions')}</p>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn--ghost">
             {t('common.action.cancel')}
           </button>
-          <button type="submit" disabled={isSubmitting} className="btn btn--primary">
+          <button type="submit" disabled={isSubmitting || !hasChanges} className="btn btn--primary">
             {isSubmitting ? t('common.action.saving') : t('common.action.save')}
           </button>
         </div>

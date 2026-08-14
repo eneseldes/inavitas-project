@@ -29,7 +29,6 @@ export function buildUserColumns(
         filter: {
           key: 'q',
           type: 'text',
-          placeholder: t('user-management.filter.search'),
           toQuery: (v) => ({ q: (v as string) || undefined }),
         },
       } satisfies ColumnMeta,
@@ -43,7 +42,6 @@ export function buildUserColumns(
         filter: {
           key: 'email',
           type: 'text',
-          placeholder: t('user-management.filter.email', undefined, 'E-posta ara…'),
           toQuery: (v) => ({ email: (v as string) || undefined }),
         },
       } satisfies ColumnMeta,
@@ -72,7 +70,7 @@ export function buildUserColumns(
       accessorFn: (row) => row.lastLoginAt,
       cell: (ctx) => {
         const value = ctx.getValue<string | null>();
-        if (!value) return <span className="text-muted">Hiç giriş yapmadı</span>;
+        if (!value) return <span className="text-muted">{t('user-management.column.neverLoggedIn', undefined, 'Hiç giriş yapmadı')}</span>;
         return dateFormatter.format(new Date(value));
       },
       meta: {

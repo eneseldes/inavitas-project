@@ -5,6 +5,7 @@ import { DataGrid, type ColumnMeta } from '../../../shared/components/DataGrid.t
 import { ApiError } from '../../../shared/api/errors.ts';
 import { useToast } from '../../../shared/components/Toast.tsx';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
+import { useLabels } from '../../i18n/useLabels.ts';
 import type { SortDirection } from '../../../types/api.ts';
 import type { RoleListItem } from '../../../types/user-management.ts';
 import { PermissionsPanel } from './PermissionsPanel.tsx';
@@ -15,6 +16,7 @@ import styles from './RolesView.module.scss';
 /** Roller uçtan uca (sayfalamasız) çekilir — filtre/sıralama burada, tarayıcıda yapılır. */
 export function RolesView() {
   const { t } = useTranslation();
+  const labels = useLabels();
   const { show } = useToast();
 
   const { data: rolesData, isLoading, refetch } = useRoles();
@@ -29,10 +31,10 @@ export function RolesView() {
   const handleDelete = async (role: RoleListItem) => {
     if (role.isSystem) return;
     if (role.userCount > 0) {
-      show('error', t('user-management.role.delete.hasUsers', undefined, 'Önce bu roldeki kullanıcıları başka role taşıyın'));
+      show('error', t('user-management.role.delete.hasUsers', undefined, 'Önce kullanıcıları başka role taşıyın'));
       return;
     }
-    if (!confirm(`${role.name} rolünü silmek istediğinize emin misiniz?`)) return;
+    if (!confirm(t('user-management.role.confirm.delete', { name: role.name }, `${role.name} rolünü silmek istediğinize emin misiniz?`))) return;
 
     try {
       await deleteRole.mutateAsync(role.id);
@@ -75,9 +77,9 @@ export function RolesView() {
           const role = ctx.row.original;
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontWeight: 500 }}>{role.name}</span>
+              <span style={{ fontWeight: 500 }}>{labels.roleName(role)}</span>
               {role.isSystem && (
-                <span className="badge badge--gray">Sistem</span>
+                <span className="badge badge--gray">{t('user-management.role.badge.system', undefined, 'Sistem')}</span>
               )}
             </div>
           );
@@ -109,7 +111,7 @@ export function RolesView() {
       },
       {
         id: 'actions',
-        header: 'İşlemler',
+        header: t('user-management.column.actions', undefined, 'İşlemler'),
         cell: (ctx) => {
           const role = ctx.row.original;
           return (
@@ -117,7 +119,7 @@ export function RolesView() {
               <button
                 type="button"
                 className="icon-btn icon-btn--sm"
-                title="Rol Adını Düzenle"
+                title={t('common.action.edit', undefined, 'Düzenle')}
                 onClick={(e) => {
                   e.stopPropagation();
                   setModalRole(role);
@@ -130,10 +132,10 @@ export function RolesView() {
                 className="icon-btn icon-btn--sm"
                 title={
                   role.isSystem
-                    ? 'Sistem rolleri silinemez'
+                    ? t('user-management.role.delete.systemBlocked', undefined, 'Sistem rolleri silinemez')
                     : role.userCount > 0
-                    ? 'Kullanıcısı olan rol silinemez'
-                    : 'Sil'
+                    ? t('user-management.role.delete.hasUsers', undefined, 'Önce kullanıcıları başka role taşıyın')
+                    : t('common.action.delete', undefined, 'Sil')
                 }
                 disabled={role.isSystem || role.userCount > 0}
                 onClick={(e) => {

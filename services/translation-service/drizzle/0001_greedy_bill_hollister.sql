@@ -1,0 +1,1 @@
+ALTER TABLE "locales" ADD COLUMN "provider_code" varchar(16);

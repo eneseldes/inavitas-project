@@ -1,4 +1,4 @@
-import { count, eq, sql } from 'drizzle-orm';
+import { count, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { permissions, rolePermissions, roles, userRoles } from '../db/schema.ts';
 
@@ -66,16 +66,10 @@ export async function findById(id: string): Promise<RoleDetail | null> {
 /** Kod listesine göre rolleri getirir (doğrulama için). */
 export async function findByCodes(codes: string[]): Promise<{ id: string; code: string }[]> {
   if (codes.length === 0) return [];
-  const rows = await db
+  return db
     .select({ id: roles.id, code: roles.code })
     .from(roles)
-    .where(sql`${roles.code} = ANY(${sql.raw(`ARRAY[${codes.map(() => '?').join(',')}]`)})`)
-  // Drizzle inArray kullanımı:
-  ;
-
-  // inArray yerine manuel filtreleme
-  const all = await db.select({ id: roles.id, code: roles.code }).from(roles);
-  return all.filter((r) => codes.includes(r.code));
+    .where(inArray(roles.code, codes));
 }
 
 /** Yeni rol oluşturur ve izinlerini atar (transaction). */

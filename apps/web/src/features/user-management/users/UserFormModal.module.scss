@@ -1,19 +1,35 @@
+@use '../../../styles/variables' as v;
+
 .twoColumn {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
+.rolesHeading {
+  display: block;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: v.$color-ink;
+  margin-bottom: v.$space-2;
+}
+
 .rolesList {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-bottom: v.$space-2;
 }
 
 .roleRow {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.roleSelect {
+  flex: 1;
+  min-width: 0;
 }
 
 .addRoleBtn {

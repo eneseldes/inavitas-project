@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { SelectField } from '../../shared/components/form';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
 import type { WorkOrder, WorkOrderStatus } from '../../types/work-order.ts';
@@ -11,6 +14,12 @@ import styles from './EditWorkOrderDialog.module.scss';
 import { usePatchWorkOrder } from './useWorkOrders.ts';
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
+
+function useEditWorkOrderSchema(requiredMessage: string) {
+  return z.object({
+    nextStatus: z.string().min(1, requiredMessage),
+  });
+}
 
 interface EditWorkOrderDialogProps {
   workOrder: WorkOrder;
@@ -28,27 +37,30 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
   const { show } = useToast();
   const { t } = useTranslation();
   const labels = useLabels();
-  const [nextStatus, setNextStatus] = useState<WorkOrderStatus | ''>('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setSubmitting] = useState(false);
-
   const options = NEXT_STATUSES[workOrder.status];
+  const schema = useEditWorkOrderSchema(t('work-order.dialog.edit.selectTransition'));
 
-  const onSubmit = async () => {
-    if (!nextStatus) return;
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    mode: 'onSubmit',
+    defaultValues: { nextStatus: '' },
+  });
 
-    setSubmitting(true);
-    setError(null);
+  const onSubmit = handleSubmit(async (values) => {
     try {
+      const nextStatus = values.nextStatus as WorkOrderStatus;
       await patchWorkOrder.mutateAsync({ id: workOrder.id, status: nextStatus, version: workOrder.version });
       show('success', t('work-order.toast.statusChanged', { status: labels.workOrderStatus(nextStatus) }));
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? t(err.message) : t('work-order.toast.updateError'));
-    } finally {
-      setSubmitting(false);
+      setError('root', { message: err instanceof ApiError ? t(err.message) : t('work-order.toast.updateError') });
     }
-  };
+  });
 
   return (
     <Modal title={t('work-order.dialog.edit.title')} onClose={onClose}>
@@ -81,36 +93,42 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
         </div>
       </div>
 
-      {error && <div className="form-error-banner">{error}</div>}
+      {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-      <div className="field">
-        <label htmlFor="nextStatus" className="field__label">
-          {t('work-order.dialog.edit.nextStatusLabel')}
-        </label>
-        {options.length > 0 ? (
-          <select id="nextStatus" className="select" value={nextStatus} onChange={(e) => setNextStatus(e.target.value as WorkOrderStatus)}>
-            <option value="" disabled>
-              {t('work-order.dialog.edit.selectTransition')}
-            </option>
+      {options.length > 0 ? (
+        <form onSubmit={onSubmit} noValidate>
+          <SelectField label={t('work-order.dialog.edit.nextStatusLabel')} error={errors.nextStatus?.message} {...register('nextStatus')}>
+            <option value="">{t('work-order.dialog.edit.selectTransition')}</option>
             {options.map((status) => (
               <option key={status} value={status}>
                 {labels.workOrderStatus(status)}
               </option>
             ))}
-          </select>
-        ) : (
-          <p className="field__hint">{t('work-order.dialog.edit.noTransitions')}</p>
-        )}
-      </div>
+          </SelectField>
 
-      <div className="form-actions">
-        <button type="button" onClick={onClose} className="btn btn--ghost">
-          {t('common.action.cancel')}
-        </button>
-        <button type="button" onClick={onSubmit} disabled={!nextStatus || isSubmitting} className="btn btn--primary">
-          {isSubmitting ? t('common.action.saving') : t('common.action.save')}
-        </button>
-      </div>
+          <div className="form-actions">
+            <button type="button" onClick={onClose} className="btn btn--ghost">
+              {t('common.action.cancel')}
+            </button>
+            <button type="submit" disabled={isSubmitting || !isDirty} className="btn btn--primary">
+              {isSubmitting ? t('common.action.saving') : t('common.action.save')}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="field">
+            <span className="field__label">{t('work-order.dialog.edit.nextStatusLabel')}</span>
+            <p className="field__hint">{t('work-order.dialog.edit.noTransitions')}</p>
+          </div>
+
+          <div className="form-actions">
+            <button type="button" onClick={onClose} className="btn btn--ghost">
+              {t('common.action.cancel')}
+            </button>
+          </div>
+        </>
+      )}
     </Modal>
   );
 }

@@ -7,6 +7,7 @@ import { ApiError } from '../../shared/api/errors.ts';
 import { DetailSectionLayout, type TabConfig } from '../../shared/components/DetailSectionLayout.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { Field, SelectInput, TextField } from '../../shared/components/form';
 import { isoToDateTimeLocalInput } from '../../shared/datetime.ts';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
@@ -103,6 +104,7 @@ function OutageDetailTab({
   const locked = isLocked(outage.status);
   const options = USER_SELECTABLE_NEXT_STATUSES[outage.status] || [];
   const [nextStatus, setNextStatus] = useState<OutageStatus | ''>('');
+  const [statusFocused, setStatusFocused] = useState(false);
 
   const schema = makeSchema(outage.startedAt, t('outage.validation.endedAtBeforeStarted'));
 
@@ -114,6 +116,7 @@ function OutageDetailTab({
     formState: { errors, isSubmitting, isDirty },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
+    mode: 'onSubmit',
     defaultValues: {
       endedAt: isoToDateTimeLocalInput(outage.endedAt),
     },
@@ -214,28 +217,22 @@ function OutageDetailTab({
           <form onSubmit={onSubmit} noValidate className={styles.form}>
             {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-            <div className="field">
-              <label htmlFor="endedAt" className="field__label">
-                {t('outage.dialog.create.endedAtLabel')}
-                <span className="field__hint">
-                  {' '}
-                  {t('outage.dialog.edit.endedAtHint', { status: labels.outageStatus('ENERGIZED') })}
-                </span>
-              </label>
-              <input id="endedAt" type="datetime-local" className="input" {...register('endedAt')} />
-              {errors.endedAt && <p className="field__error">{errors.endedAt.message}</p>}
-            </div>
+            <TextField
+              label={t('outage.dialog.create.endedAtLabel')}
+              type="datetime-local"
+              hint={t('outage.dialog.edit.endedAtHint', { status: labels.outageStatus('ENERGIZED') })}
+              error={errors.endedAt?.message}
+              {...register('endedAt')}
+            />
 
-            <div className="field">
-              <label htmlFor="nextStatus" className="field__label">
-                {t('outage.dialog.edit.nextStatusLabel')}
-              </label>
-              {options.length > 0 ? (
-                <select
+            {options.length > 0 ? (
+              <Field label={t('outage.dialog.edit.nextStatusLabel')} floated focused={statusFocused} htmlFor="nextStatus">
+                <SelectInput
                   id="nextStatus"
-                  className="select"
                   value={nextStatus}
                   onChange={(e) => setNextStatus(e.target.value as OutageStatus)}
+                  onFocus={() => setStatusFocused(true)}
+                  onBlur={() => setStatusFocused(false)}
                 >
                   <option value="" disabled>
                     {t('outage.dialog.edit.selectTransition')}
@@ -245,14 +242,17 @@ function OutageDetailTab({
                       {labels.outageStatus(status)}
                     </option>
                   ))}
-                </select>
-              ) : (
+                </SelectInput>
+              </Field>
+            ) : (
+              <div className="field">
+                <span className="field__label">{t('outage.dialog.edit.nextStatusLabel')}</span>
                 <p className="field__hint">{t('outage.dialog.edit.noTransitions')}</p>
-              )}
-            </div>
+              </div>
+            )}
 
             <div className="form-actions">
-              <button type="submit" disabled={!hasChanges || isSubmitting} className="btn btn--primary">
+              <button type="submit" disabled={isSubmitting || !hasChanges} className="btn btn--primary">
                 {isSubmitting ? t('common.action.saving') : t('common.action.save')}
               </button>
             </div>

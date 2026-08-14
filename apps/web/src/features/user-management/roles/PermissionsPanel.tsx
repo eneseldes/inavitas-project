@@ -4,11 +4,12 @@ import { clsx } from 'clsx';
 import { ApiError } from '../../../shared/api/errors.ts';
 import { useToast } from '../../../shared/components/Toast.tsx';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
+import { useLabels } from '../../i18n/useLabels.ts';
 import type { PermissionItem } from '../../../types/user-management.ts';
 import { useRole, useSetRolePermissions } from './useRoles.ts';
 import styles from './PermissionsPanel.module.scss';
 
-const MODULE_LABELS: Record<string, string> = {
+const MODULE_LABEL_FALLBACKS: Record<string, string> = {
   outage: 'Kesinti Yönetimi',
   workorder: 'İş Emri Yönetimi',
   user: 'Kullanıcı & Rol Yönetimi',
@@ -22,6 +23,7 @@ interface PermissionsPanelProps {
 
 export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps) {
   const { t } = useTranslation();
+  const labels = useLabels();
   const { show } = useToast();
 
   const { data: roleDetail, isLoading: isRoleLoading } = useRole(roleId ?? undefined);
@@ -63,6 +65,13 @@ export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps)
     }
     return map;
   }, [permissions]);
+
+  const moduleLabel = (prefix: string) => {
+    const fallback = MODULE_LABEL_FALLBACKS[prefix];
+    return fallback
+      ? t(`user-management.role.module.${prefix}`, undefined, fallback)
+      : t('user-management.role.module.generic', { module: prefix.toUpperCase() }, `${prefix.toUpperCase()} Modülü`);
+  };
 
   const toggleModuleOpen = (prefix: string) => {
     setOpenModules((prev) => ({ ...prev, [prefix]: !prev[prefix] }));
@@ -114,7 +123,7 @@ export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps)
     return (
       <div className={styles.panel}>
         <div className={styles.emptyState}>
-          <p>İzinlerini düzenlemek için soldaki tablodan bir rol seçin.</p>
+          <p>{t('user-management.role.permissionsPanel.emptyState', undefined, 'İzinlerini düzenlemek için soldaki tablodan bir rol seçin.')}</p>
         </div>
       </div>
     );
@@ -134,10 +143,16 @@ export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps)
     <div className={styles.panel}>
       <div className={styles.header}>
         <div className={styles.headerTitleGroup}>
-          <h3 className={styles.title}>{roleDetail?.name} İzinleri</h3>
+          <h3 className={styles.title}>
+            {t(
+              'user-management.role.permissionsTitle',
+              { name: roleDetail ? labels.roleName(roleDetail) : '' },
+              `${roleDetail?.name} İzinleri`,
+            )}
+          </h3>
           {isReadOnly && (
             <span className="badge badge--gray" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              <FiLock size={12} /> Sistem Rolü
+              <FiLock size={12} /> {t('user-management.role.badge.system', undefined, 'Sistem')}
             </span>
           )}
         </div>
@@ -147,19 +162,19 @@ export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps)
           disabled={!isDirty || isSubmitting || isReadOnly}
           onClick={handleSave}
         >
-          {isSubmitting ? 'Kaydediliyor…' : 'Kaydet'}
+          {isSubmitting ? t('common.action.saving', undefined, 'Kaydediliyor…') : t('common.action.save', undefined, 'Kaydet')}
         </button>
       </div>
 
       {isReadOnly && (
         <div className={styles.systemBanner}>
-          <FiLock style={{ flexShrink: 0 }} /> Sistem rolleri varsayılan izinlere sahiptir, yetkileri değiştirilemez.
+          <FiLock style={{ flexShrink: 0 }} /> {t('user-management.role.badge.systemNote', undefined, 'Bu bir sistem rolüdür. Salt-okunur görüntüleniyor.')}
         </div>
       )}
 
       <div className={styles.body}>
         {Array.from(groupedModules.entries()).map(([prefix, perms]) => {
-          const moduleTitle = MODULE_LABELS[prefix] ?? `${prefix.toUpperCase()} Modülü`;
+          const moduleTitle = moduleLabel(prefix);
           const checkedCount = perms.filter((p) => checkedPerms.has(p.code)).length;
           const allChecked = perms.length > 0 && checkedCount === perms.length;
           const isOpen = openModules[prefix] ?? false;
@@ -184,7 +199,7 @@ export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps)
                 <label
                   className={styles.checkbox}
                   onClick={(e) => toggleModuleAll(perms, e)}
-                  title="Tümünü seç"
+                  title={t('common.action.selectAll', undefined, 'Tümünü seç')}
                 >
                   <input
                     type="checkbox"
@@ -205,7 +220,11 @@ export function PermissionsPanel({ roleId, permissions }: PermissionsPanelProps)
                 <div className={styles.permListInner}>
                   <div className={styles.permList}>
                     {perms.map((perm) => {
-                      const labelText = perm.description || perm.code;
+                      const labelText = t(
+                        `user-management.permission.${perm.code.replace(':', '.')}`,
+                        undefined,
+                        perm.description || perm.code,
+                      );
                       const isChecked = checkedPerms.has(perm.code);
 
                       return (

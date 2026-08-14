@@ -89,7 +89,6 @@ export function buildOutageColumns(
           filter: {
             key: 'gisId',
             type: 'text',
-            placeholder: t('common.placeholder.gisIdExample'),
             toQuery: (v) => ({ gisId: (v as string) || undefined }),
           },
         } satisfies ColumnMeta,

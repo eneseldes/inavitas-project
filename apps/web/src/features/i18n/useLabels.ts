@@ -11,5 +11,10 @@ export function useLabels() {
     workOrderType: (ty: WorkOrderType) => t(`work-order.enum.type.${ty}`),
     origin: (o: 'USER' | 'SYSTEM') => t(`common.enum.origin.${o}`),
     roles: (r?: string[]) => (r?.length ? r.map((x) => t(`common.enum.role.${x}`)).join(', ') : ''),
+    // Sistem rolleri sabit bir enum'dur (ADMIN/OUTAGE_OPERATOR/WORK_ORDER_OPERATOR) ve
+    // çeviri anahtarı üzerinden gösterilir; özel (admin tarafından yazılan) roller
+    // serbest metin olduğundan olduğu gibi gösterilir.
+    roleName: (role: { code: string; name: string; isSystem: boolean }) =>
+      role.isSystem ? t(`common.enum.role.${role.code}`, undefined, role.name) : role.name,
   };
 }

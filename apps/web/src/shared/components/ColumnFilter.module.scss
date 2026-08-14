@@ -84,20 +84,9 @@
 .dateGroup {
   display: flex;
   flex-direction: column;
-  gap: v.$space-2;
-  margin-bottom: v.$space-2;
-}
-
-.dateField {
-  display: flex;
-  flex-direction: column;
-  gap: v.$space-1;
-}
-
-.dateLabel {
-  font-size: 0.75rem;
-  color: v.$color-ink-soft;
-  font-weight: 500;
+  // Alanlar arası boşluk `.floating-field`in kendi margin-bottom'undan gelir
+  // (son alanda otomatik sıfırlanır) — burada ekstra gap gerekmiyor.
+  margin-bottom: v.$space-1;
 }
 
 @keyframes pop {
