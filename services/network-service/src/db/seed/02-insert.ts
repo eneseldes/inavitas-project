@@ -172,12 +172,18 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
   await db.execute(sql`CREATE INDEX IF NOT EXISTS components_dm_id_idx ON network.components (dm_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS components_transformer_id_idx ON network.components (transformer_id);`);
 
+  // pg_trgm — `q` ad araması (GET /network/components) ILIKE '%...%' sorgusunu hızlandırır.
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS components_name_trgm_idx ON network.components USING GIN (name gin_trgm_ops);`);
+
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_from_id_idx ON network.topology_edges (from_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_to_id_idx ON network.topology_edges (to_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_component_id_idx ON network.topology_edges (component_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_ring_id_idx ON network.topology_edges (ring_id);`);
 
   await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_parent_id_idx ON customer.customers (parent_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_tm_id_idx ON customer.customers (tm_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_feeder_id_idx ON customer.customers (feeder_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_dm_id_idx ON customer.customers (dm_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_transformer_id_idx ON customer.customers (transformer_id);`);
 
   await db.execute(sql`CREATE INDEX IF NOT EXISTS customer_pii_wiring_id_idx ON customer.customer_pii (wiring_id);`);

@@ -234,6 +234,9 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'permission.translation.read', 'Çeviri yönetimini görme', 'View translation management'],
   ['user-management', 'permission.translation.write', 'Çeviri ekleme ve düzenle', 'Add and edit translations'],
   ['user-management', 'permission.translation.publish', 'Çeviri yayınlama', 'Publish translations'],
+  ['user-management', 'permission.network.read', 'Şebeke ve idari birim verilerini görme', 'View network and administrative unit data'],
+  ['user-management', 'permission.customer.read', 'Abone verilerini görme (PII hariç)', 'View customer data (excluding PII)'],
+  ['user-management', 'permission.customer.read-pii', 'Abone tesisat/sözleşme numarasını görme', 'View customer wiring/contract numbers'],
 
   ['common', 'status.active', 'Aktif', 'Active'],
   ['common', 'status.inactive', 'Pasif', 'Inactive'],

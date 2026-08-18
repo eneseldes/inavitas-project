@@ -38,6 +38,9 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'translation:read': 'Çeviri yönetimini görme',
   'translation:write': 'Çeviri ekleme ve düzenle',
   'translation:publish': 'Çeviri yayınlama',
+  'network:read': 'Şebeke ve idari birim verilerini görme',
+  'customer:read': 'Abone verilerini görme (PII hariç)',
+  'customer:read-pii': 'Abone tesisat/sözleşme numarasını görme',
 };
 
 /** Test kullanıcıları — SADECE geliştirme içindir. */

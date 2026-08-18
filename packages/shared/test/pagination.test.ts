@@ -45,7 +45,7 @@ describe('parseSort', () => {
 });
 
 describe('toExclusiveUpperBound', () => {
-  it('tarih-only değere bir gün ekler (roadmap Faz 2 tuzağı)', () => {
+  it('tarih-only değere bir gün ekler', () => {
     const bound = toExclusiveUpperBound('2026-01-31');
     expect(bound.toISOString()).toBe('2026-02-01T00:00:00.000Z');
   });
