@@ -29,4 +29,10 @@ export default defineConfig({
       generateScopedName: '[name]__[local]__[hash:base64:5]',
     },
   },
+  optimizeDeps: {
+    // esbuild'in ön-derlemesi maplibre-gl'in `import.meta.url`'e göre kurduğu worker
+    // dosya yolunu bozar (`.vite/deps/maplibre-gl-worker.mjs` hiç üretilmez, tile'lar
+    // sonsuza dek "loading"da kalır) — paket ön-derlemeden hariç tutulur.
+    exclude: ['maplibre-gl'],
+  },
 })

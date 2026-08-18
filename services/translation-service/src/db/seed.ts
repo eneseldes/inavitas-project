@@ -33,6 +33,8 @@ const SEED_NAMESPACES = [
   { name: 'work-order', description: 'İş emri ekranı ve iş emri enum etiketleri' },
   { name: 'settings', description: 'Ayarlar menüsü ve çeviri yönetimi' },
   { name: 'user-management', description: 'Kullanıcı ve rol yönetimi ekranları' },
+  { name: 'network', description: 'Şebeke elemanı enum etiketleri' },
+  { name: 'map', description: 'Harita ekranı' },
 ] as const;
 
 /** [namespace, keyName, tr, en] */
@@ -333,6 +335,87 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['work-order', 'dialog.edit.selectTransition', 'Geçiş seç…', 'Select transition…'],
   ['work-order', 'dialog.edit.noTransitions', 'Bu durumdan başka bir duruma geçiş yok.', 'No transition available from this status.'],
   ['work-order', 'dialog.history.title', 'Durum Geçmişi — {id}', 'Status History — {id}'],
+
+  // --- Şebeke elemanı enum etiketleri (harita katman/filtre ağacı bunları paylaşır) ---
+  // Gerilim kısaltmaları uluslararası (HV/MV/LV) kullanılır — Türkçe YG/OG/AG karışıklığı
+  // yaratıyordu (bkz. `enum.voltageLevel.*`). `LV_JUNCTION` ve `LV_NETWORK` bilerek aynı
+  // metni taşır — biri "buat" biri "AG Şebeke" derken aynı elemanı iki farklı adla anan
+  // eski halin yerine geçer.
+  ['network', 'enum.componentType.TM', 'Trafo Merkezi', 'Substation (TM)'],
+  ['network', 'enum.componentType.BUS', 'Bara', 'Bus'],
+  ['network', 'enum.componentType.CIRCUIT_BREAKER', 'Kesici', 'Circuit Breaker'],
+  ['network', 'enum.componentType.FEEDER', 'Fider', 'Feeder'],
+  ['network', 'enum.componentType.MV_LINE', 'MV Ana Hat', 'MV Main Line'],
+  ['network', 'enum.componentType.MV_BRANCH', 'MV Kolu', 'MV Branch'],
+  ['network', 'enum.componentType.MV_TIE_LINE', 'MV Bağlantı Hattı', 'MV Tie Line'],
+  ['network', 'enum.componentType.DM', 'Dağıtım Merkezi', 'Distribution Center (DM)'],
+  ['network', 'enum.componentType.TRANSFORMER', 'Dağıtım Trafosu', 'Distribution Transformer'],
+  ['network', 'enum.componentType.LV_BUS', 'LV Panosu', 'LV Panel'],
+  ['network', 'enum.componentType.LV_LINE', 'LV Hat', 'LV Line'],
+  ['network', 'enum.componentType.LV_JUNCTION', 'LV Bağlantı Noktası', 'LV Connection Point'],
+  ['network', 'enum.componentType.SERVICE_DROP', 'İrtibat Hattı', 'Service Drop'],
+  ['network', 'enum.componentType.HV_LINE', 'HV Hattı', 'HV Line'],
+  ['network', 'enum.componentType.HV_LINK', 'HV Bağlantısı', 'HV Link'],
+
+  ['network', 'enum.category.SUBSTATION', 'Trafo Merkezi', 'Substation'],
+  ['network', 'enum.category.MV_NETWORK', 'MV Şebeke', 'MV Network'],
+  ['network', 'enum.category.DIST_TRANSFORMER', 'Trafo', 'Transformer'],
+  ['network', 'enum.category.LV_NETWORK', 'LV Bağlantı Noktası', 'LV Connection Point'],
+  ['network', 'enum.category.SERVICE_ENTRY', 'Kofra', 'Service Entry'],
+  ['network', 'enum.category.CUSTOMER', 'Abone', 'Customer'],
+
+  ['network', 'enum.breakerRole.TM_FEEDER', 'Fider Kesicisi', 'Feeder Breaker'],
+  ['network', 'enum.breakerRole.DM_ENTRY', 'DM Giriş Kesicisi', 'DM Entry Breaker'],
+  ['network', 'enum.breakerRole.TRANSFORMER', 'Trafo Kesicisi', 'Transformer Breaker'],
+  ['network', 'enum.breakerRole.TIE', 'Bağlantı (Tie) Kesicisi', 'Tie Breaker'],
+  ['network', 'enum.breakerRole.SERVICE_ENTRY', 'Kofra Kesicisi', 'Service Entry Breaker'],
+
+  // Gerilim her yerde kV olarak yazılır — kısaltma tek başına bırakılmaz.
+  ['network', 'enum.voltageLevel.HV', '154/400 kV', '154/400 kV'],
+  ['network', 'enum.voltageLevel.MV', '34,5 kV', '34.5 kV'],
+  ['network', 'enum.voltageLevel.LV', '0,4 kV', '0.4 kV'],
+  ['network', 'enum.voltageLevel.MV_LV', '34,5 / 0,4 kV', '34.5 / 0.4 kV'],
+
+  // --- Harita ekranı ---
+  ['map', 'page.title', 'Harita', 'Map'],
+  ['map', 'panel.detail.title', 'Seçili Eleman', 'Selected Element'],
+  ['map', 'panel.detail.empty', 'Haritada bir eleman seçin', 'Select an element on the map'],
+  ['map', 'panel.detail.field.id', 'CBS ID', 'GIS ID'],
+  ['map', 'panel.detail.field.type', 'Tip', 'Type'],
+  ['map', 'panel.detail.field.voltageLevel', 'Gerilim', 'Voltage'],
+  ['map', 'panel.detail.field.capacity', 'Kapasite', 'Capacity'],
+  ['map', 'panel.detail.field.status', 'Durum', 'Status'],
+  ['map', 'panel.detail.field.unitPath', 'Mahalle', 'Administrative Unit'],
+  ['map', 'panel.detail.field.customerCount', 'Abone Sayısı', 'Customer Count'],
+  ['map', 'panel.mode.title', 'Katmanlar', 'Layers'],
+  ['map', 'panel.mode.collapse', 'Paneli daralt', 'Collapse panel'],
+  ['map', 'panel.mode.expand', 'Paneli genişlet', 'Expand panel'],
+  ['map', 'mode.network.title', 'Şebeke Elemanlarını Göster', 'Show Network Elements'],
+
+  // Efsane — hat katmanları birim katmanlarından ayrıdır (bkz. ankara-yeni-detayli-v3.html).
+  ['map', 'legend.section.lines', 'Hatlar', 'Lines'],
+  ['map', 'legend.section.units', 'Birimler', 'Units'],
+  ['map', 'legend.line.hv', '154/400 kV HV hattı', '154/400 kV HV line'],
+  ['map', 'legend.line.mvMain', '34,5 kV MV ana hat + yedek', '34.5 kV MV main line + tie'],
+  ['map', 'legend.line.mvBranch', '34,5 kV MV dağıtım kolu', '34.5 kV MV branch'],
+  ['map', 'legend.line.lv', '0,4 kV LV hattı', '0.4 kV LV line'],
+  ['map', 'legend.unit.tm', 'TM — Trafo Merkezi (+ kesicileri)', 'TM — Substation (+ breakers)'],
+  ['map', 'legend.unit.dm', 'DM — Dağıtım Merkezi (+ kesicisi)', 'DM — Distribution Center (+ breaker)'],
+  ['map', 'legend.unit.transformer', 'Trafo (+ kesicisi)', 'Transformer (+ breaker)'],
+  ['map', 'legend.unit.lvJunction', 'LV bağlantı noktası', 'LV connection point'],
+  ['map', 'legend.unit.serviceEntry', 'Kofra kesicisi / ev girişi', 'Service entry breaker / house'],
+  ['map', 'legend.unit.customer', 'Abone', 'Customer'],
+  [
+    'map',
+    'legend.buildingHint',
+    'TM / DM / trafo bina izi ve kesicileri zoom 16’dan itibaren açılır.',
+    'Substation / DM / transformer footprints and breakers appear from zoom 16.',
+  ],
+  ['map', 'filter.voltageLevel.title', 'Gerilim Seviyesi', 'Voltage Level'],
+  ['map', 'filter.breakerRole.title', 'Yalnız Kesiciler', 'Breakers Only'],
+  ['map', 'layer.adminBoundaries', 'İdari Sınırlar', 'Administrative Boundaries'],
+  ['map', 'layer.zoomHint', 'Bu katman z ≥ {level} yakınlıkta görünür', 'This layer appears at zoom ≥ {level}'],
+  ['map', 'basemap.unavailable', 'Altlık harita yüklenemedi', 'Basemap unavailable'],
 ];
 
 async function main(): Promise<void> {

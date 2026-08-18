@@ -3,6 +3,7 @@ import { ForbiddenPage } from '../features/auth/ForbiddenPage.tsx';
 import { LoginPage } from '../features/auth/LoginPage.tsx';
 import { ProtectedRoute } from '../features/auth/ProtectedRoute.tsx';
 import { useAuth } from '../features/auth/useAuth.tsx';
+import { MapPage } from '../features/map/MapPage.tsx';
 import { OutageGrid } from '../features/outages/OutageGrid.tsx';
 import { UserManagementPage } from '../features/user-management/UserManagementPage.tsx';
 import { WorkOrderGrid } from '../features/work-orders/WorkOrderGrid.tsx';
@@ -53,6 +54,14 @@ export function AppRouter() {
           element={
             <ProtectedRoute permission="user:manage">
               <UserManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="map"
+          element={
+            <ProtectedRoute permission="network:read">
+              <MapPage />
             </ProtectedRoute>
           }
         />

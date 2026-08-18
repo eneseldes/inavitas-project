@@ -1,0 +1,15 @@
+@use '../../styles/variables' as v;
+
+// AppShell'in `.main`'ine uygulanan v.$space-6 dolguyu iptal eder — harita her zaman ana alan
+// olduğundan kenarlara kadar dolu olmalı.
+.page {
+  display: flex;
+  height: calc(100% + #{v.$space-6 * 2});
+  margin: -#{v.$space-6};
+}
+
+.mapArea {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}

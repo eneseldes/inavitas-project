@@ -1,0 +1,63 @@
+@use '../../styles/variables' as v;
+
+.panel {
+  width: 20rem;
+  flex-shrink: 0;
+  padding: v.$space-4;
+  background: v.$color-surface;
+  border-right: 1px solid v.$color-hairline;
+  overflow-y: auto;
+}
+
+.empty {
+  color: v.$color-ink-soft;
+  font-size: v.$control-font-size;
+  margin: v.$space-4 0 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+}
+
+.id {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: v.$color-brand-600;
+  margin: 0;
+  word-break: break-all;
+}
+
+.typeBadge {
+  font-size: 0.8125rem;
+  color: v.$color-ink-soft;
+  margin: v.$space-1 0 v.$space-4;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-3;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+
+  dt {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: v.$color-ink-soft;
+  }
+
+  dd {
+    font-size: v.$control-font-size;
+    color: v.$color-ink;
+    margin: 0;
+  }
+}

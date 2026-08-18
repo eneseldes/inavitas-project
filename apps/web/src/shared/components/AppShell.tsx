@@ -1,5 +1,5 @@
 import { useState, type ComponentType, type MouseEvent } from 'react';
-import { FiChevronLeft, FiChevronRight, FiFileText, FiLogOut, FiSettings, FiUsers, FiZap } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiFileText, FiLogOut, FiMap, FiSettings, FiUsers, FiZap } from 'react-icons/fi';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../../features/auth/useAuth.tsx';
@@ -19,6 +19,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/outages', labelKey: 'outage.page.title', icon: FiZap, permission: 'outage:read' },
   { to: '/work-orders', labelKey: 'work-order.page.title', icon: FiFileText, permission: 'workorder:read' },
+  { to: '/map', labelKey: 'map.page.title', icon: FiMap, permission: 'network:read' },
   { to: '/users', labelKey: 'user-management.page.title', icon: FiUsers, permission: 'user:manage' },
 ];
 

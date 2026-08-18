@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -172,6 +173,32 @@ services:
       retries: 10
       start_period: 10s
 
+  network-service:
+    image: inavitas-backend:latest
+    build: .
+    command: ["node", "services/network-service/dist/index.js"]
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      NETWORK_SERVICE_PORT: "3005"
+      NETWORK_APP_DATABASE_URL: postgresql://network_app:network_app_pw@postgres:5432/network_db
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-inavitas}
+    expose: ["3005"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3005/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   gateway:
     image: inavitas-backend:latest
     build: .
@@ -188,6 +215,7 @@ services:
       OUTAGE_SERVICE_HOST: outage-service
       WORK_ORDER_SERVICE_HOST: work-order-service
       TRANSLATION_SERVICE_HOST: translation-service
+      NETWORK_SERVICE_HOST: network-service
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
     # Dışa port açmaz, yalnızca docker network üzerinden erişilir.
     expose: ["8080"]
@@ -197,6 +225,7 @@ services:
       outage-service: { condition: service_healthy }
       work-order-service: { condition: service_healthy }
       translation-service: { condition: service_healthy }
+      network-service: { condition: service_healthy }
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health || exit 1"]
       interval: 10s

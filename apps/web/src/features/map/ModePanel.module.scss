@@ -1,0 +1,130 @@
+@use '../../styles/variables' as v;
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 17rem;
+  flex-shrink: 0;
+  background: v.$color-surface;
+  border-left: 1px solid v.$color-hairline;
+  overflow-y: auto;
+  transition: width 220ms ease;
+}
+
+.panelCollapsed {
+  width: 2.5rem;
+  overflow: hidden;
+}
+
+.toggleBtn {
+  position: sticky;
+  top: v.$space-2;
+  align-self: flex-end;
+  margin: v.$space-2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: v.$radius-md;
+  border: 1px solid v.$color-hairline;
+  background: v.$color-surface;
+  color: v.$color-ink-soft;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: v.$color-row-hover;
+  }
+}
+
+.toggleIcon {
+  transition: transform 160ms ease;
+  transform: rotate(180deg);
+}
+
+.toggleIconExpanded {
+  transform: rotate(0deg);
+}
+
+.body {
+  padding: 0 v.$space-4 v.$space-4;
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-5;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+}
+
+.sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: v.$color-ink-soft;
+  margin: 0;
+}
+
+.checkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+}
+
+.checkItem {
+  display: flex;
+  flex-direction: column;
+}
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+  cursor: pointer;
+  padding: 0.1875rem 0;
+}
+
+.swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: v.$radius-full;
+  flex-shrink: 0;
+}
+
+// Hat katmanları yuvarlak nokta değil kısa bir çizgi örneğiyle gösterilir.
+.swatchLine {
+  width: 1.125rem;
+  height: 0.1875rem;
+  border-radius: 1px;
+}
+
+.zoomHint {
+  margin-left: 1.375rem;
+  font-size: 0.6875rem;
+  color: v.$color-ink-soft;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+}

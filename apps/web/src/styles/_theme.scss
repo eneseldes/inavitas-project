@@ -46,6 +46,50 @@
   // Çeviri yöneticisindeki AI aksiyon ikonları.
   --c-ai-accent: #7c3aed;
   --c-ai-accent-soft: rgba(124, 58, 237, 0.1);
+
+  // Harita — altlık ve kendi katmanlarımız aynı token'lardan boyanır.
+  // Palet ankara-yeni-detayli-v3.html'den birebir alınmıştır (STY / UNIT / KES).
+  --c-map-bg: #eef2f6;
+
+  // Hatlar — gerilim sınıfına göre. `-case` beyaz kılıf, hattı altlıktan ayırır.
+  --c-map-line-case: #ffffff;
+  --c-map-line-hv: #922b21;
+  --c-map-line-mv: #1a5fb4;
+  --c-map-line-tie: #e67e22;
+  --c-map-line-mv-branch: #3b8fd4;
+  --c-map-line-lv: #95a5a6;
+  --c-map-line-drop: #a04000;
+
+  // Birimler — her biri renk / koyu kenar / bina izi tonu üçlüsü.
+  --c-map-tm: #8e44ad;
+  --c-map-tm-dark: #4a235a;
+  --c-map-tm-tint: #efe1f7;
+  --c-map-dm: #16a085;
+  --c-map-dm-dark: #0e6655;
+  --c-map-dm-tint: #dcf1ec;
+  --c-map-tr: #2ecc71;
+  --c-map-tr-dark: #145a32;
+  --c-map-tr-tint: #e0f5e6;
+  --c-map-lvj: #5dade2;
+  --c-map-lvj-dark: #21618c;
+  --c-map-breaker: #e74c3c;
+  --c-map-breaker-dark: #7b241c;
+  --c-map-customer: #6366f1;
+  --c-map-selected: #d946ef;
+  /** Bina izinin "buzlu cam" beyaz yıkaması — altından geçen hattı soluklaştırır. */
+  --c-map-bld-wash: #ffffff;
+
+  // İl/ilçe dolgusu — soluk, cam benzeri pastel bantlar; birim path'inden hesaplanan bir
+  // hash'le seçilir (bkz. networkLayers.ts unitBandColorExpression). Sınır çizgisi yok,
+  // yalnız dolgu — düşük fill-opacity ile birlikte kullanılır.
+  --c-map-unit-band-0: #dbeafe;
+  --c-map-unit-band-1: #dcfce7;
+  --c-map-unit-band-2: #fae8ff;
+  --c-map-unit-band-3: #fef9c3;
+  --c-map-unit-band-4: #ffe4e6;
+  --c-map-unit-band-5: #e0e7ff;
+  --c-map-unit-band-6: #ccfbf1;
+  --c-map-unit-band-7: #fed7aa;
 }
 
 // Nötr gri tonlarında koyu tema — lacivert/mavimsi değil, "Claude"vari
@@ -95,4 +139,34 @@
 
   --c-ai-accent: #a78bfa;
   --c-ai-accent-soft: rgba(167, 139, 250, 0.16);
+
+  // Koyu zeminde v3 paletinin doygun tonları kararıyor — aynı renkler açılarak kullanılır.
+  --c-map-bg: #15181c;
+
+  --c-map-line-case: #0b0d10;
+  --c-map-line-hv: #e06055;
+  --c-map-line-mv: #5b9bf0;
+  --c-map-line-tie: #f0a35c;
+  --c-map-line-mv-branch: #7bc0ef;
+  --c-map-line-lv: #aab7b8;
+  --c-map-line-drop: #cf7a4a;
+
+  --c-map-tm: #c78ae0;
+  --c-map-tm-dark: #e8d0f5;
+  --c-map-tm-tint: #4a235a;
+  --c-map-dm: #4ecdc4;
+  --c-map-dm-dark: #c9f2ee;
+  --c-map-dm-tint: #0e6655;
+  --c-map-tr: #6fe39b;
+  --c-map-tr-dark: #d3f7e0;
+  --c-map-tr-tint: #145a32;
+  --c-map-lvj: #7dc7ee;
+  --c-map-lvj-dark: #cfe9f8;
+  --c-map-breaker: #ff7060;
+  --c-map-breaker-dark: #ffd2cc;
+  --c-map-customer: #a5b4fc;
+  --c-map-selected: #f0abfc;
+  --c-map-bld-wash: #11161b;
+  // İl/ilçe pastel bantları koyu temada da açık kalır — düşük opaklıkla "buzlu cam"
+  // etkisi verir; koyulaştırılsalar altlıkla birleşip siyah bir leke olurlardı.
 }

@@ -10,13 +10,13 @@
     "apps/web"
   ],
   "scripts": {
-    "dev": "concurrently -n access,outage,workorder,translation,gw,web -c magenta,green,yellow,red,cyan,blue \"npm run dev -w services/access-service\" \"npm run dev -w services/outage-service\" \"npm run dev -w services/work-order-service\" \"npm run dev -w services/translation-service\" \"npm run dev -w services/gateway\" \"npm run dev -w apps/web\"",
+    "dev": "concurrently -n access,outage,workorder,translation,network,gw,web -c magenta,green,yellow,red,blue,cyan,gray \"npm run dev -w services/access-service\" \"npm run dev -w services/outage-service\" \"npm run dev -w services/work-order-service\" \"npm run dev -w services/translation-service\" \"npm run dev -w services/network-service\" \"npm run dev -w services/gateway\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w packages/contracts && npm run build -w packages/shared && npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service && npm run db:migrate -w services/translation-service",
-    "db:seed": "npm run db:seed -w services/access-service && npm run db:seed -w services/translation-service",
+    "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service && npm run db:migrate -w services/translation-service && npm run db:migrate -w services/network-service",
+    "db:seed": "npm run db:seed -w services/access-service && npm run db:seed -w services/translation-service && npm run db:seed -w services/network-service",
     "topics": "./scripts/create-topics.sh",
     "reconcile": "dotenv -e .env -- tsx scripts/reconcile.ts"
   },

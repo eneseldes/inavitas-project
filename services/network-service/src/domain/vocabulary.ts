@@ -1,6 +1,5 @@
 /**
  * Şebeke veri sözlüğü — `harita-verileri` seed'inde sabitlenmiş enum değerleri.
- * Kaynak: onceden-yapilanlar.md §5.2–§5.6.
  */
 
 export const UNIT_LEVELS = ['PROVINCE', 'DISTRICT', 'NEIGHBORHOOD'] as const;
