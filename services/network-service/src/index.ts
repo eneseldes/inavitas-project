@@ -2,6 +2,7 @@ import { createLogger, isDevelopment } from '@inavitas/shared';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
+import { loadGraph } from './graph/loader.ts';
 import { connectKafka, disconnectKafka, startNetworkConsumer } from './kafka.ts';
 import { createNetworkEventHandler } from './kafka/consumers.ts';
 import { startOutboxPoller, type OutboxPollerHandle } from './kafka/outbox-poller.ts';
@@ -21,6 +22,8 @@ const server = app.listen(config.NETWORK_SERVICE_PORT, () => {
 await connectKafka();
 await startNetworkConsumer(createNetworkEventHandler(logger), logger);
 logger.info('Kafka bağlantısı kuruldu');
+
+await loadGraph(logger);
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
 

@@ -99,6 +99,42 @@ export async function findById(id: string): Promise<ComponentRow | null> {
   return row ?? null;
 }
 
+/** Birden çok eleman ID'sini tek sorguda getirir (besleme zinciri gibi küçük kimlik kümeleri için). */
+export async function findByIds(ids: string[]): Promise<ComponentRow[]> {
+  if (ids.length === 0) return [];
+  return db.select().from(components).where(inArray(components.id, ids));
+}
+
+export interface Bbox {
+  minLon: number;
+  minLat: number;
+  maxLon: number;
+  maxLat: number;
+}
+
+/**
+ * Verilen eleman kümesinin kapsayan dikdörtgenini (`ST_Extent`) tek sorguda hesaplar.
+ * Harita odağı (`fitBounds`) için — istemci binlerce koordinatı tek tek toplamaz.
+ */
+export async function findBoundingBox(ids: string[]): Promise<Bbox | null> {
+  if (ids.length === 0) return null;
+
+  const result = await db.execute(sql`
+    SELECT ST_XMin(ext) AS min_lon, ST_YMin(ext) AS min_lat, ST_XMax(ext) AS max_lon, ST_YMax(ext) AS max_lat
+    FROM (SELECT ST_Extent(${components.geom}) AS ext FROM ${components} WHERE ${inArray(components.id, ids)}) t
+  `);
+
+  const row = result.rows[0] as unknown as
+    | { min_lon: number | null; min_lat: number | null; max_lon: number | null; max_lat: number | null }
+    | undefined;
+
+  if (!row || row.min_lon === null || row.min_lat === null || row.max_lon === null || row.max_lat === null) {
+    return null;
+  }
+
+  return { minLon: row.min_lon, minLat: row.min_lat, maxLon: row.max_lon, maxLat: row.max_lat };
+}
+
 /**
  * Elemanın idari yolundaki tüm ataları (il → ilçe → mahalle) tek GiST sorgusuyla getirir.
  * `network.units` içinde her seviye ayrı bir satır olduğundan `path @> unitPath` ile bulunur.

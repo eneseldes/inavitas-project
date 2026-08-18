@@ -1,4 +1,5 @@
-import type { ComponentRow } from '../repository/components.repository.ts';
+import type { DownstreamImpact, ImpactPreview } from '../modules/impact/service.ts';
+import type { Bbox, ComponentRow } from '../repository/components.repository.ts';
 import type { CustomerPiiRow, CustomerRow } from '../repository/customers.repository.ts';
 import type { UnitRow } from '../repository/units.repository.ts';
 
@@ -53,6 +54,48 @@ export function toComponentDetailDto(row: ComponentRow, unitAncestors: UnitRow[]
   return {
     ...toComponentDto(row),
     unitAncestors: unitAncestors.map((u) => ({ path: u.path, level: u.level, name: u.name })),
+  };
+}
+
+/** Aşağı akış (downstream) izini/etkisini API DTO nesnesine dönüştürür. */
+export function toDownstreamImpactDto(impact: DownstreamImpact) {
+  return {
+    componentId: impact.componentId,
+    affectedElementIds: impact.affectedElementIds,
+    affectedElementCount: impact.affectedElementCount,
+    affectedCustomerCount: impact.affectedCustomerCount,
+    overflowed: impact.overflowed,
+    radialityViolated: impact.radialityViolated,
+  };
+}
+
+/** Yukarı akış (upstream) besleme zincirini API DTO nesnesine dönüştürür. */
+export function toUpstreamChainDto(componentId: string, chain: ComponentRow[]) {
+  return {
+    componentId,
+    chain: chain.map((c) => ({ id: c.id, type: c.type, topologyLevel: c.topologyLevel, name: c.name })),
+  };
+}
+
+/**
+ * Kapsayan dikdörtgeni `[minLon, minLat, maxLon, maxLat]` biçiminde döner (GeoJSON `bbox`
+ * kuralı) — istemci tarafında `fitBounds` çağrısına doğrudan geçirilebilir bir ham dizi.
+ */
+export function toBboxDto(bbox: Bbox | null): [number, number, number, number] | null {
+  if (!bbox) return null;
+  return [bbox.minLon, bbox.minLat, bbox.maxLon, bbox.maxLat];
+}
+
+/** Etki önizlemesini (kesinti onay adımı) API DTO nesnesine dönüştürür. */
+export function toImpactPreviewDto(preview: ImpactPreview) {
+  return {
+    componentId: preview.componentId,
+    topologyLevel: preview.topologyLevel,
+    highImpact: preview.highImpact,
+    affectedElementCount: preview.affectedElementCount,
+    affectedCustomerCount: preview.affectedCustomerCount,
+    overflowed: preview.overflowed,
+    radialityViolated: preview.radialityViolated,
   };
 }
 

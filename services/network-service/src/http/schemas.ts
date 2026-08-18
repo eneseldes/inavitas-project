@@ -32,6 +32,20 @@ export const ListComponentsQuery = PaginationQuery.extend({
 });
 export type ListComponentsQuery = z.infer<typeof ListComponentsQuery>;
 
+/** Vector tile `z/x/y` yol parametreleri şeması. */
+export const TileParams = z.object({
+  z: z.coerce.number().int().min(0).max(22),
+  x: z.coerce.number().int().min(0),
+  y: z.coerce.number().int().min(0),
+});
+export type TileParams = z.infer<typeof TileParams>;
+
+/** Eleman izi (trace) sorgu parametreleri şeması. */
+export const TraceQuery = z.object({
+  direction: z.enum(['up', 'down']),
+});
+export type TraceQuery = z.infer<typeof TraceQuery>;
+
 /** Abone listeleme sorgu parametreleri şeması. */
 export const ListCustomersQuery = PaginationQuery.extend({
   sort: z.string().optional(),

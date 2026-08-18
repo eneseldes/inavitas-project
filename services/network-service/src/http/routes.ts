@@ -2,10 +2,13 @@ import { asyncHandler, authenticateFromHeaders, PERMISSIONS, requirePermission, 
 import { sql } from 'drizzle-orm';
 import { Router } from 'express';
 import { db } from '../db.ts';
+import { isGraphLoaded } from '../graph/loader.ts';
 import { getAdmin } from '../kafka.ts';
 import { redis } from '../redis.ts';
 import * as componentsController from './controllers/components.controller.ts';
 import * as customersController from './controllers/customers.controller.ts';
+import * as impactController from './controllers/impact.controller.ts';
+import * as tilesController from './controllers/tiles.controller.ts';
 import * as unitsController from './controllers/units.controller.ts';
 
 export function buildRouter(): Router {
@@ -23,6 +26,7 @@ export function buildRouter(): Router {
         db: () => db.execute(sql`SELECT 1`),
         redis: () => redis.ping(),
         kafka: () => getAdmin().listTopics(),
+        graph: () => (isGraphLoaded() ? Promise.resolve() : Promise.reject(new Error('graf henüz yüklenmedi'))),
       });
 
       res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'degraded', checks });
@@ -73,6 +77,23 @@ export function buildRouter(): Router {
     '/components/:id/customers',
     requirePermission(PERMISSIONS.CUSTOMER_READ),
     asyncHandler<AuthedRequest>(customersController.getByComponent),
+  );
+  networkRouter.get(
+    '/components/:id/trace',
+    requirePermission(PERMISSIONS.NETWORK_READ),
+    asyncHandler<AuthedRequest>(impactController.trace),
+  );
+  networkRouter.get(
+    '/components/:id/impact-preview',
+    requirePermission(PERMISSIONS.NETWORK_READ),
+    asyncHandler<AuthedRequest>(impactController.impactPreview),
+  );
+
+  // --- Vector Tile Uç Noktası ---
+  networkRouter.get(
+    '/tiles/:z/:x/:y.mvt',
+    requirePermission(PERMISSIONS.NETWORK_READ),
+    asyncHandler<AuthedRequest>(tilesController.getTile),
   );
 
   // --- Abone Uç Noktaları ---
