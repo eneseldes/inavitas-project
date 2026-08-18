@@ -94,6 +94,9 @@ export function createApp(logger: Logger): Express {
   app.use(
     buildProxy('/api/translations/**', SERVICE_TARGETS.translation, { '^/api/translations': '/translations' }, { forwardCookies: false }),
   );
+  app.use(
+    buildProxy('/api/network/**', SERVICE_TARGETS.network, { '^/api/network': '/network' }, { forwardCookies: false }),
+  );
 
 
   app.use(notFoundHandler());

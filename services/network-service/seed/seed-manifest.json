@@ -1,0 +1,24 @@
+{
+  "version": "3.0",
+  "build_time": "2026-08-18T09:04:14Z",
+  "script_version": "build_seed_gpkg.py v1.0",
+  "nearest_unit_path_ratio": 0.000116,
+  "customer_kofra_path_mismatch_count": 0,
+  "source_file_hashes": {
+    "ankara-idari-birimler.geojson": "84b46109113a65f33d5aafd05686211d09b242108adc9b848d1184a3b4be958d",
+    "elements.csv": "39c4f1db5676916e6eec60b609f0f54b1667a57ad96ccfcd79264847e3ad82d5",
+    "topology.csv": "160bb3a26f2377db83cf882c9a51fbbf5601b0edcb472807e1835354bd23add4",
+    "customers.csv": "78727a6819ecab2d738ed1f960e467cce276efcc9e434e86ee88fc4cabff31dc",
+    "network_lines.geojson": "332e697553f5590163727dff08faa91154c0cf33ff4bc0c3a574132d82b7cf7b",
+    "rings.csv": "79e8852b2fa5096bdfe78cf08978a93987891d47b8f5f1ffd27b6d307ee61e9f"
+  },
+  "row_counts": {
+    "admin_units": 1463,
+    "components": 593307,
+    "topology_edges": 823721,
+    "customers": 230000,
+    "customer_pii": 230000,
+    "rings": 108,
+    "seed_manifest": 1
+  }
+}
