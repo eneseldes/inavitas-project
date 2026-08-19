@@ -57,7 +57,17 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
       unit_path::ltree,
       string_to_array(unit_paths, ',')::ltree[],
       unit_path_source,
-      geom,
+      -- Kaynak koordinatlar 7 ondalığa yuvarlanmış; aynı köşe iki hatta 39.9732107 ve
+      -- 39.9732110 gibi ~3 cm farkla düşebiliyor. Aynı koridoru paylaşan hatlar bu yüzden
+      -- tek çizgi yerine birbirine yapışık ayrı tüyler gibi çiziliyordu. 1e-6'lık ızgaraya
+      -- (~11 cm) oturtmak çakışık köşeleri birebir aynı yapar; hatlar gerçekten ayrıldıkları
+      -- yerde ayrılır. Zaten sıfır uzunluklu 13.358 SERVICE_DROP ızgarada tek noktaya
+      -- çökeceğinden onlar ham haliyle bırakılır.
+      CASE
+        WHEN ST_GeometryType(geom) = 'ST_LineString'
+             AND ST_NPoints(ST_SnapToGrid(geom, 0.000001)) < 2 THEN geom
+        ELSE ST_SnapToGrid(geom, 0.000001)
+      END AS geom,
       lat::double precision,
       lon::double precision,
       switchable::boolean,

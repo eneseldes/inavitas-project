@@ -82,14 +82,16 @@
   // İl/ilçe dolgusu — soluk, cam benzeri pastel bantlar; birim path'inden hesaplanan bir
   // hash'le seçilir (bkz. networkLayers.ts unitBandColorExpression). Sınır çizgisi yok,
   // yalnız dolgu — düşük fill-opacity ile birlikte kullanılır.
-  --c-map-unit-band-0: #dbeafe;
-  --c-map-unit-band-1: #dcfce7;
-  --c-map-unit-band-2: #fae8ff;
-  --c-map-unit-band-3: #fef9c3;
-  --c-map-unit-band-4: #ffe4e6;
-  --c-map-unit-band-5: #e0e7ff;
-  --c-map-unit-band-6: #ccfbf1;
-  --c-map-unit-band-7: #fed7aa;
+  // Komşu ilçeler ayırt edilebilsin diye ton açısı geniş aralıklı seçilir; hepsi aynı
+  // açıklık/doygunlukta olduğundan birlikte hâlâ "buzlu cam" gibi okunur.
+  --c-map-unit-band-0: #7fb3ff;
+  --c-map-unit-band-1: #6fd7a8;
+  --c-map-unit-band-2: #d79bf0;
+  --c-map-unit-band-3: #f2d16b;
+  --c-map-unit-band-4: #ff9fb0;
+  --c-map-unit-band-5: #9aa5f5;
+  --c-map-unit-band-6: #5fd2cf;
+  --c-map-unit-band-7: #ffb27a;
 }
 
 // Nötr gri tonlarında koyu tema — lacivert/mavimsi değil, "Claude"vari

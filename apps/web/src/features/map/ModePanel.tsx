@@ -20,7 +20,6 @@ const LEGEND_LABEL_KEY: Record<LegendId, string> = {
   TRANSFORMER: 'map.legend.unit.transformer',
   LV_JUNCTION: 'map.legend.unit.lvJunction',
   SERVICE_ENTRY: 'map.legend.unit.serviceEntry',
-  CUSTOMER: 'map.legend.unit.customer',
 };
 
 /** Hat satırları yuvarlak nokta değil çizgi örneğiyle gösterilir. */

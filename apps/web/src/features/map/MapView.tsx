@@ -1,22 +1,20 @@
-import { Map as MapLibreMap, NavigationControl, type GeoJSONSource, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, NavigationControl, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from '../../features/theme/ThemeProvider.tsx';
 import type { VoltageLevel } from '../../types/network.ts';
 import { BASEMAP_PMTILES_URL, BASEMAP_SOURCE_ID, buildBasemapLayers, isBasemapAvailable, registerPmtilesProtocol } from './basemap.ts';
 import type { MapView as MapViewState } from './useMapState.ts';
-import { useComponent } from './useNetwork.ts';
+import { useUnitLabels } from './useNetwork.ts';
 import {
   buildingFilters,
   buildNetworkLayers,
   buildNetworkSource,
-  buildSelectedFeatureCollection,
-  buildSelectedSource,
   CLICKABLE_LAYER_IDS,
   componentFilters,
   legendVisibility,
   NETWORK_SOURCE_ID,
-  SELECTED_SOURCE_ID,
+  SELECTABLE_SOURCE_LAYERS,
   UNITS_DISTRICT_FILL_LAYER_ID,
   UNITS_PROVINCE_FILL_LAYER_ID,
   type LegendId,
@@ -74,9 +72,10 @@ export function MapView({
   // efektleri yeniden tetiklemez. URL'den gelen ilk filtre durumu bu state sayesinde uygulanır.
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  // Seçili elemanın konumu — tile LOD'u onu o an elese bile seçim, kullanıcı paneli
-  // kapatana kadar bu bağımsız kaynaktan haritada kalır.
-  const { data: selectedComponent } = useComponent(selectedId);
+  const { data: unitLabels } = useUnitLabels();
+  const labelMarkersRef = useRef<Marker[]>([]);
+  // Önceki seçimin `feature-state`'ini temizleyebilmek için tutulur.
+  const selectedFeatureRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -104,12 +103,18 @@ export function MapView({
         onViewChange({ lng: center.lng, lat: center.lat, zoom: map!.getZoom() });
       });
 
-      // Bina izindeki bir kesiciye tıklamak, sahibi olduğu birimi (TM/DM/trafo) seçer —
-      // kesici ile birim tek bir eleman gibi davranır (bkz. ankara-yeni-detayli-v3.html).
+      /**
+       * Seçim kuralı: bir birime tıklamak **binayı** seçer. Tek istisna TM'dir — orada
+       * birden çok fider çıkışı olduğu için kesiciler tek tek seçilebilir. DM, trafo ve
+       * kofrada tek kesici vardır, oraya tıklamak da birimin kendisini seçer.
+       */
       const handleFeatureClick = (e: MapLayerMouseEvent) => {
         const props = e.features?.[0]?.properties;
         if (!props) return;
-        const id = (props.unit_id as string | undefined) ?? (props.id as string | undefined);
+        const unitId = props.unit_id as string | undefined;
+        const unitType = props.unit_type as string | undefined;
+        const ownId = props.id as string | undefined;
+        const id = unitId !== undefined && unitType !== 'TM' ? unitId : ownId;
         if (id) onSelect(id);
       };
       for (const layerId of CLICKABLE_LAYER_IDS) {
@@ -175,15 +180,71 @@ export function MapView({
     map.setLayoutProperty(UNITS_DISTRICT_FILL_LAYER_ID, 'visibility', visibility);
   }, [showAdminBoundaries, mapLoaded]);
 
+  // Seçim `feature-state` ile gösterilir: bina izinin dolgusu koyulaşır, düğüm/kesici
+  // vurgulanır. Çizilen geometrinin kendisi boyandığı için ayrı bir seçim geometrisi yok.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !mapLoaded || !map.getSource(SELECTED_SOURCE_ID)) return;
-    const shape =
-      selectedComponent && selectedComponent.lat !== null && selectedComponent.lon !== null
-        ? { lat: selectedComponent.lat, lon: selectedComponent.lon, type: selectedComponent.type }
-        : undefined;
-    (map.getSource(SELECTED_SOURCE_ID) as GeoJSONSource).setData(buildSelectedFeatureCollection(shape));
-  }, [selectedComponent, mapLoaded]);
+    if (!map || !mapLoaded) return;
+
+    const previous = selectedFeatureRef.current;
+    if (previous) {
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id: previous }, 'selected');
+      }
+      selectedFeatureRef.current = undefined;
+    }
+    if (selectedId !== undefined) {
+      // Hangi kaynak katmanda olduğu bilinmediğinden hepsine yazılır; olmayan tarafta
+      // `feature-state` sessizce boşa gider.
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id: selectedId }, { selected: true });
+      }
+      selectedFeatureRef.current = selectedId;
+    }
+  }, [selectedId, mapLoaded]);
+
+  // İl/ilçe adları — kendi glyph fontumuzu barındırmadığımız için MapLibre `symbol`
+  // katmanı yerine HTML işaretçisi kullanılır (dış font sunucusuna bağımlılık yok).
+  // İl adı z<8'de, ilçe adları z8–13'te; üstünde hepsi kaybolur.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !unitLabels) return;
+
+    for (const marker of labelMarkersRef.current) marker.remove();
+    labelMarkersRef.current = [];
+
+    if (!showAdminBoundaries) return;
+
+    const add = (items: typeof unitLabels.provinces, className: string) => {
+      for (const unit of items) {
+        const el = document.createElement('div');
+        el.className = className;
+        el.textContent = unit.name;
+        const marker = new Marker({ element: el }).setLngLat([unit.centerLon!, unit.centerLat!]).addTo(map);
+        labelMarkersRef.current.push(marker);
+      }
+    };
+    add(unitLabels.provinces, styles.provinceLabel!);
+    add(unitLabels.districts, styles.districtLabel!);
+
+    const applyZoom = () => {
+      const z = map.getZoom();
+      for (const marker of labelMarkersRef.current) {
+        const el = marker.getElement();
+        // `classList` ile bakılır: Marker kendi sınıflarını da eklediğinden `className`
+        // birebir karşılaştırması hiçbir zaman tutmaz.
+        const isProvince = el.classList.contains(styles.provinceLabel!);
+        el.style.display = (isProvince ? z < 8 : z >= 8 && z < 13) ? '' : 'none';
+      }
+    };
+    applyZoom();
+    map.on('zoom', applyZoom);
+    return () => {
+      map.off('zoom', applyZoom);
+      for (const marker of labelMarkersRef.current) marker.remove();
+      labelMarkersRef.current = [];
+    };
+  }, [unitLabels, showAdminBoundaries, mapLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -199,18 +260,14 @@ function rebuildLayers(map: MapLibreMap, theme: 'light' | 'dark'): void {
   const style = map.getStyle();
   if (style) {
     for (const layer of style.layers) {
-      if ('source' in layer && (layer.source === NETWORK_SOURCE_ID || layer.source === SELECTED_SOURCE_ID)) {
-        map.removeLayer(layer.id);
-      }
+      if ('source' in layer && layer.source === NETWORK_SOURCE_ID) map.removeLayer(layer.id);
     }
   }
   if (map.getSource(NETWORK_SOURCE_ID)) map.removeSource(NETWORK_SOURCE_ID);
-  if (map.getSource(SELECTED_SOURCE_ID)) map.removeSource(SELECTED_SOURCE_ID);
   removeBasemap(map);
 
   // Katman sırası: altlık harita → il/ilçe renkleri → hatlar → bina izi → düğümler → seçim.
   map.addSource(NETWORK_SOURCE_ID, buildNetworkSource());
-  map.addSource(SELECTED_SOURCE_ID, buildSelectedSource());
   const layers = buildNetworkLayers(theme);
   for (const layer of layers) map.addLayer(layer);
   const firstLayerId = layers[0]!.id;

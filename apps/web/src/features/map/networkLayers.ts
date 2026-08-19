@@ -1,17 +1,14 @@
 import type {
   CircleLayerSpecification,
   ExpressionSpecification,
-  GeoJSONSourceSpecification,
   LayerSpecification,
   LineLayerSpecification,
   VectorSourceSpecification,
 } from 'maplibre-gl';
-import type { FeatureCollection } from 'geojson';
 import { NETWORK_TILE_URL_TEMPLATE } from './api.ts';
 import type { VoltageLevel } from '../../types/network.ts';
 
 export const NETWORK_SOURCE_ID = 'network';
-export const SELECTED_SOURCE_ID = 'selected-component';
 
 export const UNITS_PROVINCE_FILL_LAYER_ID = 'units-province-fill';
 export const UNITS_DISTRICT_FILL_LAYER_ID = 'units-district-fill';
@@ -30,7 +27,8 @@ export function buildNetworkSource(): VectorSourceSpecification {
     tiles: [`${window.location.origin}${NETWORK_TILE_URL_TEMPLATE}`],
     minzoom: 0,
     maxzoom: 20,
-    promoteId: { components: 'id' },
+    // Seçim `feature-state` ile gösterildiğinden her katmanın özellik kimliği tanıtılmalı.
+    promoteId: { components: 'id', building_shapes: 'id', building_breakers: 'id' },
   };
 }
 
@@ -47,8 +45,25 @@ function token(name: string): string {
 export const LINE_LEGEND_IDS = ['HV_LINE', 'MV_MAIN', 'MV_BRANCH', 'LV_LINE'] as const;
 export type LineLegendId = (typeof LINE_LEGEND_IDS)[number];
 
-export const UNIT_LEGEND_IDS = ['TM', 'DM', 'TRANSFORMER', 'LV_JUNCTION', 'SERVICE_ENTRY', 'CUSTOMER'] as const;
+export const UNIT_LEGEND_IDS = ['TM', 'DM', 'TRANSFORMER', 'LV_JUNCTION', 'SERVICE_ENTRY'] as const;
 export type UnitLegendId = (typeof UNIT_LEGEND_IDS)[number];
+
+/**
+ * Her katmanın görünmeye başladığı kesin zoom. Sunucu tile'ı tam sayı zoom'da ürettiği için
+ * kaba eleme orada (zoom-lod.ts `TYPE_MIN_ZOOM`, tabana yuvarlanmış) yapılır; kesin eşik
+ * burada `minzoom` ile uygulanır. İki tablo birlikte değişmelidir.
+ */
+export const LEGEND_MIN_ZOOM: Record<LegendId, number> = {
+  HV_LINE: 8,
+  TM: 8,
+  MV_MAIN: 9.75,
+  DM: 9.75,
+  MV_BRANCH: 12,
+  TRANSFORMER: 12,
+  LV_LINE: 15,
+  LV_JUNCTION: 15,
+  SERVICE_ENTRY: 16.5,
+};
 
 export type LegendId = LineLegendId | UnitLegendId;
 export const LEGEND_IDS: readonly LegendId[] = [...LINE_LEGEND_IDS, ...UNIT_LEGEND_IDS];
@@ -64,11 +79,10 @@ export const LEGEND_COLOR_VAR: Record<LegendId, string> = {
   TRANSFORMER: 'var(--c-map-tr)',
   LV_JUNCTION: 'var(--c-map-lvj)',
   SERVICE_ENTRY: 'var(--c-map-breaker)',
-  CUSTOMER: 'var(--c-map-customer)',
 };
 
 /** Bina izi olan birimler — tile'daki `unit_type` değerleriyle aynı. */
-const BUILDING_UNIT_LEGEND_IDS = ['TM', 'DM', 'TRANSFORMER'] as const;
+const BUILDING_UNIT_LEGEND_IDS = ['TM', 'DM', 'TRANSFORMER', 'SERVICE_ENTRY'] as const;
 
 // Katman kimlikleri — çizim sırası (alttan üste) v3'teki pane z-index'lerini izler:
 // LV(405) → kofra(405) → MV kolu(408) → MV ana(411) → HV(414) → bina(425) →
@@ -93,9 +107,6 @@ const L = {
   dm: 'unit-dm',
   tm: 'unit-tm',
   bldBreaker: 'bld-breaker',
-  customers: 'customers-point',
-  selectedHalo: 'selected-halo',
-  selectedWall: 'selected-wall',
 } as const;
 
 /** Bir efsane satırı açılıp kapandığında görünürlüğü değişen MapLibre katmanları. */
@@ -110,11 +121,14 @@ export const LEGEND_LAYER_IDS: Record<LegendId, string[]> = {
   LV_JUNCTION: [L.lvj],
   // v3'te "Kofra kesicisi / ev girişi" tek satır: irtibat hattı + kofra kesicisi birlikte.
   SERVICE_ENTRY: [L.dropLine, L.kofra],
-  CUSTOMER: [L.customers],
 };
 
-/** Tıklanabilir katmanlar — hat katmanları dahil değil (v3'te de yalnız düğümler tıklanır). */
-export const CLICKABLE_LAYER_IDS = [L.tm, L.dm, L.transformer, L.lvj, L.kofra, L.bldBreaker, L.customers];
+/**
+ * Tıklanabilir katmanlar — hat katmanları dahil değil (v3'te de yalnız düğümler tıklanır).
+ * Bina izinin duvar dolgusu da tıklanabilir: birimi seçmek için binanın herhangi bir yerine
+ * basmak yeter, minik düğüm noktasını yakalamak gerekmez.
+ */
+export const CLICKABLE_LAYER_IDS = [L.tm, L.dm, L.transformer, L.lvj, L.kofra, L.bldBreaker, L.bldTint];
 
 /** Bina izi katmanları — görünürlüğü zoom'a değil, ait olduğu birimin efsane satırına bağlıdır. */
 export const BUILDING_LAYER_IDS = [L.bldHalo, L.bldWash, L.bldTint, L.bldOutline, L.bldInner, L.bldBreaker];
@@ -127,6 +141,7 @@ function lineLayer(
   color: string,
   width: number,
   opacity: number,
+  minzoom: number,
   dash?: [number, number],
 ): LineLayerSpecification {
   return {
@@ -134,6 +149,7 @@ function lineLayer(
     type: 'line',
     source: NETWORK_SOURCE_ID,
     'source-layer': 'components',
+    minzoom,
     filter: rememberBaseFilter(id, ['all', LINESTRING_GEOMETRY_FILTER, ['in', ['get', 'type'], ['literal', types]]]),
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
@@ -152,18 +168,29 @@ function lineLayer(
 // (v3'teki "BUS'un pini yok" notunun sebebi). Aynı şekilde TM/DM/trafo kesicileri de
 // burada değil, yalnız bina izi içinde (ring'e yayılmış konumlarında) çizilir.
 
-function pointLayer(id: string, filter: ExpressionSpecification, radius: ExpressionSpecification, color: string, stroke: string): CircleLayerSpecification {
+function pointLayer(
+  id: string,
+  filter: ExpressionSpecification,
+  radius: ExpressionSpecification,
+  color: string,
+  stroke: string,
+  minzoom: number,
+): CircleLayerSpecification {
   return {
     id,
     type: 'circle',
     source: NETWORK_SOURCE_ID,
     'source-layer': 'components',
+    minzoom,
     filter: rememberBaseFilter(id, ['all', POINT_GEOMETRY_FILTER, filter]),
     paint: {
       'circle-color': color,
       'circle-radius': radius,
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': stroke,
+      // Seçili birim kendi düğümünde de belli olur — bina izinin görünmediği zoom'larda
+      // (z<16) tek işaret budur. Ayrı bir halka katmanı YOK: kullanıcı "seçince etrafında
+      // yuvarlak oluşmasın, sadece geometrisi seçili görünsün" dedi.
+      'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 1.5],
+      'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], token('--c-map-selected'), stroke],
       'circle-opacity': 0.95,
     },
   };
@@ -174,9 +201,16 @@ function radius(near: number, mid: number, far: number): ExpressionSpecification
 }
 
 /** `unit_type` → değer eşlemesi; renk (string) ve kalınlık (number) için ortak. */
-function unitTypeMatch<T extends string | number>(tm: T, dm: T, tr: T): ExpressionSpecification {
-  return ['match', ['get', 'unit_type'], 'TM', tm, 'DM', dm, tr] as ExpressionSpecification;
+function unitTypeMatch<T extends string | number>(tm: T, dm: T, tr: T, kofra: T): ExpressionSpecification {
+  return ['match', ['get', 'unit_type'], 'TM', tm, 'DM', dm, 'SERVICE_ENTRY', kofra, tr] as ExpressionSpecification;
 }
+
+/**
+ * Bina izi, birimin KENDİ düğüm rengiyle doldurulur (ayrı bir "tint" tonuyla değil) — poligon
+ * hangi elemana ait olduğunu renginden belli eder. Doygunluğu `fill-opacity` ayarlar.
+ */
+const TINT = () => unitTypeMatch(token('--c-map-tm'), token('--c-map-dm'), token('--c-map-tr'), token('--c-map-breaker'));
+const EDGE = () => unitTypeMatch(token('--c-map-tm-dark'), token('--c-map-dm-dark'), token('--c-map-tr-dark'), token('--c-map-breaker-dark'));
 
 /** Katmanları v3'teki çizim sırasıyla (alttan üste) döndürür. */
 export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[] {
@@ -206,15 +240,15 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       paint: { 'fill-color': bandColor(), 'fill-opacity': bandOpacity },
     },
 
-    // 2. Hatlar — ince olandan kalın olana.
-    lineLayer(L.lvLine, ['LV_LINE'], token('--c-map-line-lv'), 1, 0.75),
-    lineLayer(L.dropLine, ['SERVICE_DROP'], token('--c-map-line-drop'), 0.8, 0.55),
-    lineLayer(L.mvBranch, ['MV_BRANCH'], token('--c-map-line-mv-branch'), 1.6, 0.92),
-    lineLayer(L.mvMainCase, ['MV_LINE'], token('--c-map-line-case'), 4.4, 0.6),
-    lineLayer(L.mvMain, ['MV_LINE'], token('--c-map-line-mv'), 2.6, 0.95),
-    lineLayer(L.mvTie, ['MV_TIE_LINE'], token('--c-map-line-tie'), 2, 0.95, [9, 6]),
-    lineLayer(L.hvCase, ['HV_LINE', 'HV_LINK'], token('--c-map-line-case'), 5.4, 0.55),
-    lineLayer(L.hv, ['HV_LINE', 'HV_LINK'], token('--c-map-line-hv'), 3.2, 0.95),
+    // 2. Hatlar — ince olandan kalın olana; her biri kendi zoom eşiğinden sonra çizilir.
+    lineLayer(L.lvLine, ['LV_LINE'], token('--c-map-line-lv'), 1, 0.75, LEGEND_MIN_ZOOM.LV_LINE),
+    lineLayer(L.dropLine, ['SERVICE_DROP'], token('--c-map-line-drop'), 0.8, 0.55, LEGEND_MIN_ZOOM.SERVICE_ENTRY),
+    lineLayer(L.mvBranch, ['MV_BRANCH'], token('--c-map-line-mv-branch'), 1.6, 0.92, LEGEND_MIN_ZOOM.MV_BRANCH),
+    lineLayer(L.mvMainCase, ['MV_LINE'], token('--c-map-line-case'), 4.4, 0.6, LEGEND_MIN_ZOOM.MV_MAIN),
+    lineLayer(L.mvMain, ['MV_LINE'], token('--c-map-line-mv'), 2.6, 0.95, LEGEND_MIN_ZOOM.MV_MAIN),
+    lineLayer(L.mvTie, ['MV_TIE_LINE'], token('--c-map-line-tie'), 2, 0.95, LEGEND_MIN_ZOOM.MV_MAIN, [9, 6]),
+    lineLayer(L.hvCase, ['HV_LINE', 'HV_LINK'], token('--c-map-line-case'), 5.4, 0.55, LEGEND_MIN_ZOOM.HV_LINE),
+    lineLayer(L.hv, ['HV_LINE', 'HV_LINK'], token('--c-map-line-hv'), 3.2, 0.95, LEGEND_MIN_ZOOM.HV_LINE),
 
     // 3. Bina izi — "buzlu cam": dış halo, beyaz yıkama, birim tonu, koyu duvar.
     //    Altından GEÇEN hat soluklaşır; birime BAĞLI olan hat üstteki katmanda net kalır.
@@ -226,8 +260,9 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       filter: ['==', ['get', 'ring'], 'halo'],
       minzoom: BUILDING_ZOOM,
       paint: {
-        'fill-color': unitTypeMatch(token('--c-map-tm-tint'), token('--c-map-dm-tint'), token('--c-map-tr-tint')),
-        'fill-opacity': 0.24,
+        // Ana renk "tint" tonlarından doygun olduğu için opaklık düşük tutulur.
+        'fill-color': TINT(),
+        'fill-opacity': 0.14,
       },
     },
     {
@@ -247,8 +282,10 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       filter: ['==', ['get', 'ring'], 'wall'],
       minzoom: BUILDING_ZOOM,
       paint: {
-        'fill-color': unitTypeMatch(token('--c-map-tm-tint'), token('--c-map-dm-tint'), token('--c-map-tr-tint')),
-        'fill-opacity': 0.42,
+        'fill-color': TINT(),
+        // Seçim, kenar rengini değiştirerek değil yapının dolgusunu koyulaştırarak
+        // gösterilir — bina "yanmış" gibi okunur, ince bir çerçeve gibi değil.
+        'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.8, 0.26],
       },
     },
     {
@@ -259,7 +296,7 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       filter: ['==', ['get', 'ring'], 'wall'],
       minzoom: BUILDING_ZOOM,
       paint: {
-        'line-color': unitTypeMatch(token('--c-map-tm-dark'), token('--c-map-dm-dark'), token('--c-map-tr-dark')),
+        'line-color': EDGE(),
         'line-width': 1,
         'line-opacity': 0.5,
       },
@@ -272,18 +309,18 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       'source-layer': 'building_inner',
       minzoom: BUILDING_ZOOM,
       paint: {
-        'line-color': unitTypeMatch(token('--c-map-tm-dark'), token('--c-map-dm-dark'), token('--c-map-tr-dark')),
-        'line-width': unitTypeMatch(1.8, 1.6, 1.4),
+        'line-color': EDGE(),
+        'line-width': unitTypeMatch(1.8, 1.6, 1.4, 1.2),
         'line-opacity': 0.95,
       },
     },
 
     // 5. Düğümler — küçükten büyüğe, TM en üstte kalsın diye.
-    pointLayer(L.lvj, ['==', ['get', 'type'], 'LV_JUNCTION'], radius(2, 2.6, 4.5), token('--c-map-lvj'), token('--c-map-lvj-dark')),
-    pointLayer(L.kofra, ['==', ['get', 'breaker_role'], 'SERVICE_ENTRY'], radius(2, 2.8, 5), token('--c-map-breaker'), token('--c-map-breaker-dark')),
-    pointLayer(L.transformer, ['==', ['get', 'type'], 'TRANSFORMER'], radius(2.6, 3.6, 6.5), token('--c-map-tr'), token('--c-map-tr-dark')),
-    pointLayer(L.dm, ['==', ['get', 'type'], 'DM'], radius(3.2, 4.4, 8), token('--c-map-dm'), token('--c-map-dm-dark')),
-    pointLayer(L.tm, ['==', ['get', 'type'], 'TM'], radius(5, 7, 12), token('--c-map-tm'), token('--c-map-tm-dark')),
+    pointLayer(L.lvj, ['==', ['get', 'type'], 'LV_JUNCTION'], radius(2, 2.6, 4.5), token('--c-map-lvj'), token('--c-map-lvj-dark'), LEGEND_MIN_ZOOM.LV_JUNCTION),
+    pointLayer(L.kofra, ['==', ['get', 'breaker_role'], 'SERVICE_ENTRY'], radius(2, 2.8, 5), token('--c-map-breaker'), token('--c-map-breaker-dark'), LEGEND_MIN_ZOOM.SERVICE_ENTRY),
+    pointLayer(L.transformer, ['==', ['get', 'type'], 'TRANSFORMER'], radius(2.6, 3.6, 6.5), token('--c-map-tr'), token('--c-map-tr-dark'), LEGEND_MIN_ZOOM.TRANSFORMER),
+    pointLayer(L.dm, ['==', ['get', 'type'], 'DM'], radius(3.2, 4.4, 8), token('--c-map-dm'), token('--c-map-dm-dark'), LEGEND_MIN_ZOOM.DM),
+    pointLayer(L.tm, ['==', ['get', 'type'], 'TM'], radius(5, 7, 12), token('--c-map-tm'), token('--c-map-tm-dark'), LEGEND_MIN_ZOOM.TM),
 
     // 6. Birim kesicileri — yalnız bina izi açıkken, duvara yayılmış konumlarında.
     {
@@ -294,42 +331,18 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       minzoom: BUILDING_ZOOM,
       paint: {
         'circle-color': token('--c-map-breaker'),
-        'circle-radius': unitTypeMatch(2.8, 2.5, 2.2),
-        'circle-stroke-width': 1.2,
-        'circle-stroke-color': token('--c-map-breaker-dark'),
+        'circle-radius': unitTypeMatch(2.8, 2.5, 2.2, 2.2),
+        // TM'de tek tek fider kesicisi seçilebilir; seçilen kesici de vurgulanır.
+        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, 1.2],
+        'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], token('--c-map-selected'), token('--c-map-breaker-dark')],
       },
     },
 
-    {
-      id: L.customers,
-      type: 'circle',
-      source: NETWORK_SOURCE_ID,
-      'source-layer': 'customers',
-      paint: { 'circle-color': token('--c-map-customer'), 'circle-radius': 2.5 },
-    },
-
-    // 7. Seçim vurgusu — en üstte, kendi GeoJSON kaynağından (tile LOD'undan bağımsız).
-    {
-      id: L.selectedWall,
-      type: 'line',
-      source: SELECTED_SOURCE_ID,
-      filter: ['==', ['geometry-type'], 'Polygon'],
-      paint: { 'line-color': token('--c-map-selected'), 'line-width': 2.4 },
-    },
-    {
-      id: L.selectedHalo,
-      type: 'circle',
-      source: SELECTED_SOURCE_ID,
-      filter: ['==', ['geometry-type'], 'Point'],
-      paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 7, 14, 11, 20, 18],
-        'circle-color': 'transparent',
-        'circle-stroke-width': 2.6,
-        'circle-stroke-color': token('--c-map-selected'),
-      },
-    },
   ];
 }
+
+/** `feature-state` yazılacak kaynak katmanlar — seçim bunların hepsinde işaretlenir. */
+export const SELECTABLE_SOURCE_LAYERS = ['components', 'building_shapes', 'building_breakers'];
 
 // --- Filtreler ---------------------------------------------------------------
 
@@ -401,51 +414,6 @@ function bandColor(): ExpressionSpecification {
   ];
 }
 
-// --- Seçili eleman -----------------------------------------------------------
-
-export interface SelectedComponentShape {
-  lat: number;
-  lon: number;
-  type: string;
-}
-
-export function buildSelectedSource(): GeoJSONSourceSpecification {
-  return { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
-}
-
-/** Bina izi yarıçapları — tiles/service.ts'teki `building_units.radius` ile aynı. */
-const SELECTED_RADIUS_M: Record<string, number> = { TM: 9, DM: 5.5, TRANSFORMER: 4.5 };
-
-function octagonRing(lon: number, lat: number, radiusMeters: number): [number, number][] {
-  // Duvar yarıçapta olsun diye köşeler 1/cos(pi/8) ile açılır — tile'daki buffer ile aynı.
-  const rr = radiusMeters / Math.cos(Math.PI / 8);
-  const dLat = rr / 111_320;
-  const dLon = rr / (111_320 * Math.cos((lat * Math.PI) / 180));
-  const ring: [number, number][] = [];
-  for (let i = 0; i <= 8; i++) {
-    const a = (2 * Math.PI * i) / 8 + Math.PI / 8;
-    ring.push([lon + dLon * Math.sin(a), lat + dLat * Math.cos(a)]);
-  }
-  return ring;
-}
-
-/**
- * Seçili elemanın vurgusu: her zoom'da bir halka, bina izi olan birimlerde ayrıca duvarın
- * üstüne oturan bir sekizgen. Tile o elemanı LOD yüzünden elese bile seçim, kullanıcı
- * kapatana kadar haritada kalır.
- */
-export function buildSelectedFeatureCollection(shape: SelectedComponentShape | undefined): FeatureCollection {
-  if (!shape) return { type: 'FeatureCollection', features: [] };
-  const features: FeatureCollection['features'] = [
-    { type: 'Feature', geometry: { type: 'Point', coordinates: [shape.lon, shape.lat] }, properties: {} },
-  ];
-  const r = SELECTED_RADIUS_M[shape.type];
-  if (r !== undefined) {
-    features.push({
-      type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [octagonRing(shape.lon, shape.lat, r)] },
-      properties: {},
-    });
-  }
-  return { type: 'FeatureCollection', features };
-}
+// Seçim vurgusu artık sentetik bir GeoJSON poligonundan değil, tile'daki bina izinin
+// kendisinden çizilir (bkz. selectedWallFilter) ve düğümlerde `feature-state` ile
+// gösterilir — iki ayrı sekizgen üretmenin yarattığı geometri uyuşmazlığı böyle bitti.

@@ -5,3 +5,29 @@
   height: 100%;
   background: v.$color-map-bg;
 }
+
+// İl/ilçe adları. MapLibre `symbol` katmanı glyph fontu ister; kendi fontumuzu
+// barındırmadığımız (ve dış font sunucusuna bağlanmadığımız) için etiketler HTML
+// işaretçisi olarak çizilir. Tıklamayı yutmamaları için pointer-events kapalı.
+.provinceLabel,
+.districtLabel {
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  font-weight: 600;
+  color: v.$color-ink;
+  text-shadow:
+    0 0 3px v.$color-surface,
+    0 0 6px v.$color-surface;
+}
+
+.provinceLabel {
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.districtLabel {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}

@@ -1,7 +1,18 @@
 import type { PaginationQuery, SortOrder } from '@inavitas/shared';
-import { and, asc, count, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { units } from '../db/schema.ts';
+
+/**
+ * Seed'de `center_lat`/`center_lon` yalnız ilçe ve mahallelerde dolu; il satırında boş
+ * kalmış (ama `centroid` geometrisi var). Haritadaki il etiketi gibi tüketiciler boş
+ * merkezle çalışamayacağından değer burada geometriden tamamlanır.
+ */
+const unitSelection = {
+  ...getTableColumns(units),
+  centerLat: sql<number | null>`COALESCE(${units.centerLat}, ST_Y(${units.centroid}))`.as('center_lat'),
+  centerLon: sql<number | null>`COALESCE(${units.centerLon}, ST_X(${units.centroid}))`.as('center_lon'),
+};
 
 export type UnitRow = typeof units.$inferSelect;
 
@@ -44,7 +55,7 @@ export async function list(
   const offset = (pagination.page - 1) * pagination.pageSize;
 
   const [items, totalRows] = await Promise.all([
-    db.select().from(units).where(where).orderBy(orderBy).limit(pagination.pageSize).offset(offset),
+    db.select(unitSelection).from(units).where(where).orderBy(orderBy).limit(pagination.pageSize).offset(offset),
     db.select({ value: count() }).from(units).where(where),
   ]);
 
@@ -54,7 +65,7 @@ export async function list(
 /** Birim yolu (`path`) ile tek kaydı arar. */
 export async function findByPath(path: string): Promise<UnitRow | null> {
   const [row] = await db
-    .select()
+    .select(unitSelection)
     .from(units)
     .where(sql`${units.path} = ${path}::ltree`);
   return row ?? null;

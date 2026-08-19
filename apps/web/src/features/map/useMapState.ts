@@ -26,10 +26,10 @@ export function useMapState() {
 
   const legend = useMemo<Set<LegendId>>(() => {
     const raw = params.get('layers');
-    // Varsayılan v3'ün açılış katmanları: HV + MV ana hat + TM/DM/trafo. Ağır katmanlar
-    // (MV kolu, LV hattı, buat, kofra, abone) kullanıcı açana kadar kapalı.
+    // Varsayılan: HEPSİ açık. Ne kadarının çizileceğini efsane değil zoom belirler
+    // (bkz. networkLayers.ts LEGEND_MIN_ZOOM) — kullanıcı katmanı kapatmadıkça kaybolmaz.
     // `none` sentinel'i "hepsi kapalı"yı temsil eder — boş string varsayılana düşerdi.
-    if (raw === null) return new Set<LegendId>(['HV_LINE', 'MV_MAIN', 'TM', 'DM', 'TRANSFORMER']);
+    if (raw === null) return new Set<LegendId>(LEGEND_IDS);
     if (raw === NO_LAYERS) return new Set<LegendId>();
     return new Set(raw.split(',').filter((v): v is LegendId => (LEGEND_IDS as readonly string[]).includes(v)));
   }, [params]);
