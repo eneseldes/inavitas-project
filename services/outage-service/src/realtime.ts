@@ -10,9 +10,9 @@ const CHANNEL = 'ui:outage';
  * Redis erişilemezse istek başarısız olmaz, yalnızca loglanır — canlı güncelleme
  * bir "nice to have"dir, API'nin çalışması buna bağımlı değildir.
  */
-export async function notifyOutageChanged(row: Pick<OutageRow, 'id' | 'gisId' | 'status'>, log: Logger): Promise<void> {
+export async function notifyOutageChanged(row: Pick<OutageRow, 'id' | 'cbsId' | 'status'>, log: Logger): Promise<void> {
   try {
-    await redis.publish(CHANNEL, JSON.stringify({ id: row.id, gisId: row.gisId, status: row.status }));
+    await redis.publish(CHANNEL, JSON.stringify({ id: row.id, cbsId: row.cbsId, status: row.status }));
   } catch (err) {
     log.error({ err, outageId: row.id }, 'canlı bildirim yayınlanamadı');
   }

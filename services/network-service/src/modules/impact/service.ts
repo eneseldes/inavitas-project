@@ -2,6 +2,7 @@
  * Etki hesabı ve önizleme — "bunu kesersem kim etkilenir" sorusunun cevabı.
  */
 
+import { IMPACT_ID_LIMIT } from '@inavitas/contracts';
 import { NotFoundError } from '@inavitas/shared';
 import { HIGH_IMPACT_TOPOLOGY_LEVEL } from '../../domain/vocabulary.ts';
 import { NodeFlag } from '../../graph/csr.ts';
@@ -10,13 +11,18 @@ import { traceDownstream, traceUpstream } from '../../graph/traverse.ts';
 import * as componentsRepository from '../../repository/components.repository.ts';
 import type { Bbox, ComponentRow } from '../../repository/components.repository.ts';
 
-/** Etki kümesi çok büyük olabilir (TM kesintisinde binlerce eleman) — döndürülecek id sayısının üst sınırı. */
-const ID_LIST_LIMIT = 10_000;
+/**
+ * Etki kümesi çok büyük olabilir (TM kesintisinde binlerce eleman) — döndürülecek id sayısının
+ * üst sınırı. `outage.impact.calculated` olayı da aynı sınırı taşır (bkz. `IMPACT_ID_LIMIT`).
+ */
+const ID_LIST_LIMIT = IMPACT_ID_LIMIT;
 
 export interface DownstreamImpact {
   componentId: string;
   affectedElementIds: string[];
   affectedElementCount: number;
+  /** Etkilenen abone kimlikleri — `ID_LIST_LIMIT` ile kırpılır, sayı kırpılmaz. */
+  affectedCustomerIds: string[];
   affectedCustomerCount: number;
   overflowed: boolean;
   radialityViolated: boolean;
@@ -44,6 +50,7 @@ export function computeDownstreamImpact(componentId: string): DownstreamImpact {
       componentId,
       affectedElementIds: [],
       affectedElementCount: 0,
+      affectedCustomerIds: [],
       affectedCustomerCount: 0,
       overflowed: false,
       radialityViolated: true,
@@ -51,11 +58,11 @@ export function computeDownstreamImpact(componentId: string): DownstreamImpact {
   }
 
   const affectedElementIds: string[] = [];
-  let affectedCustomerCount = 0;
+  const affectedCustomerIds: string[] = [];
 
   for (const idx of nodeIndices) {
     if ((graph.nodeFlags[idx]! & NodeFlag.IsCustomer) !== 0) {
-      affectedCustomerCount++;
+      affectedCustomerIds.push(graph.nodeIds[idx]!);
     } else {
       affectedElementIds.push(graph.nodeIds[idx]!);
     }
@@ -65,8 +72,10 @@ export function computeDownstreamImpact(componentId: string): DownstreamImpact {
     componentId,
     affectedElementIds: affectedElementIds.length > ID_LIST_LIMIT ? affectedElementIds.slice(0, ID_LIST_LIMIT) : affectedElementIds,
     affectedElementCount: affectedElementIds.length,
-    affectedCustomerCount,
-    overflowed: affectedElementIds.length > ID_LIST_LIMIT,
+    affectedCustomerIds:
+      affectedCustomerIds.length > ID_LIST_LIMIT ? affectedCustomerIds.slice(0, ID_LIST_LIMIT) : affectedCustomerIds,
+    affectedCustomerCount: affectedCustomerIds.length,
+    overflowed: affectedElementIds.length > ID_LIST_LIMIT || affectedCustomerIds.length > ID_LIST_LIMIT,
     radialityViolated: false,
   };
 }

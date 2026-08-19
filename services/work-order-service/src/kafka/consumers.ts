@@ -1,4 +1,5 @@
 import {
+  CONSUMER_GROUPS,
   parseEvent,
   shouldTriggerCounterpart,
   SYSTEM_ACTOR,
@@ -13,6 +14,8 @@ import { ZodError } from 'zod';
 import { db } from '../db.ts';
 import { workOrders } from '../db/schema.ts';
 import { canTransition } from '../domain/state-machine.ts';
+import { ComponentNotFoundError } from '@inavitas/shared';
+import * as networkComponentRepository from '../repository/network-component.repository.ts';
 import { markProcessed } from '../repository/idempotency.repository.ts';
 import { createTx, linkOutageTx, updateWithVersionTx } from '../repository/work-order.repository.ts';
 import { redis } from '../redis.ts';
@@ -32,6 +35,14 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
     return;
   }
 
+  // Otomatik iş emri de geçerli bir CBS elemanına bağlanmak zorundadır; read-model'de
+  // karşılığı yoksa iş emri açılmaz.
+  const component = await networkComponentRepository.findById(envelope.payload.cbsId);
+  if (!component) {
+    log.error({ cbsId: envelope.payload.cbsId }, 'kesintinin CBS elemanı read-model\'de yok, iş emri açılmadı');
+    throw new ComponentNotFoundError(envelope.payload.cbsId);
+  }
+
   const created = await db.transaction(async (tx) => {
     const processed = await markProcessed(tx, envelope.eventId, TOPICS.OUTAGE_CREATED);
     if (!processed) return null;
@@ -39,17 +50,19 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
     const row = await createTx(
       tx,
       {
-        gisId: envelope.payload.gisId,
+        cbsId: envelope.payload.cbsId,
         type: 'UNPLANNED_OUTAGE_WORK_ORDER',
         status: 'STARTED',
         origin: 'SYSTEM',
         createdBy: SYSTEM_ACTOR,
         outageId: envelope.payload.outageId,
+        unitPath: component.unitPath,
+        unitName: component.unitName,
       },
       envelope.correlationId,
     );
 
-    await enqueueWorkOrderLinkedTx(tx, row.id, row.gisId, envelope.payload.outageId, {
+    await enqueueWorkOrderLinkedTx(tx, row.id, row.cbsId, envelope.payload.outageId, {
       origin: 'SYSTEM',
       actor: SYSTEM_ACTOR,
       correlationId: envelope.correlationId,
@@ -65,7 +78,7 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
   }
 
   log.info(
-    { workOrderId: created.id, outageId: envelope.payload.outageId, gisId: created.gisId },
+    { workOrderId: created.id, outageId: envelope.payload.outageId, cbsId: created.cbsId },
     'kesintiden otomatik iş emri oluşturuldu',
   );
 
@@ -168,7 +181,9 @@ export function createWorkOrderEventHandler(logger: Logger): EventHandler {
     const log = withCorrelation(logger, envelope.correlationId, { eventId: envelope.eventId, eventType: envelope.eventType });
 
     // Postgres veri tabanındaki idempotency kontrolüne ek olarak Redis ön filtresi kullanılır.
-    if (!(await markSeenOnce(redis, envelope.eventId))) {
+    // Anahtar consumer group'la ayrılır: aynı topic'i başka bir servis de dinliyor olabilir
+    // ve ortak Redis'te ayrılmamış anahtar diğerinin olayı atlamasına yol açar.
+    if (!(await markSeenOnce(redis, CONSUMER_GROUPS.WORK_ORDER_SERVICE, envelope.eventId))) {
       log.debug({ eventId: envelope.eventId }, 'redis ön filtresi: muhtemelen zaten işlenmiş, atlanıyor');
       return;
     }

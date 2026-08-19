@@ -18,7 +18,9 @@ export interface WorkOrder {
   updatedAt: string;
   status: WorkOrderStatus;
   type: WorkOrderType;
-  gisId: string;
+  cbsId: string;
+  unitPath: string;
+  unitName: string | null;
   outageId: string | null;
   origin: 'USER' | 'SYSTEM';
   createdBy: string;
@@ -27,8 +29,10 @@ export interface WorkOrder {
 
 export interface WorkOrderFilters {
   status?: WorkOrderStatus[];
-  type?: WorkOrderType;
-  gisId?: string;
+  type?: WorkOrderType[];
+  cbsId?: string;
+  /** İdari birim alt ağacı — `TR.06.012` altındaki tüm iş emirleri. */
+  unitPath?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
   origin?: ('USER' | 'SYSTEM')[];
@@ -36,7 +40,7 @@ export interface WorkOrderFilters {
 }
 
 export interface CreateWorkOrderInput {
-  gisId: string;
+  cbsId: string;
   type: WorkOrderType;
 }
 
@@ -49,3 +53,20 @@ export interface WorkOrderHistoryEntry {
   origin: 'USER' | 'SYSTEM';
 }
 
+
+/** Harita katmanının çizdiği hafif iş emri özeti (`/work-orders/map`). */
+export interface WorkOrderMapItem {
+  id: string;
+  cbsId: string;
+  status: WorkOrderStatus;
+  type: WorkOrderType;
+  /** Bağlı elemanın tipi ve kesici rolü — katmanın zoom eşiği bunlardan türer. */
+  componentType: string;
+  breakerRole: string | null;
+  unitPath: string;
+  unitName: string | null;
+  createdAt: string;
+  outageId: string | null;
+  lat: number;
+  lon: number;
+}

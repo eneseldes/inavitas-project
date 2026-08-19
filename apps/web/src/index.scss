@@ -105,6 +105,17 @@ button {
   }
 }
 
+// Yıkıcı/geri alınamaz onaylar (yüksek etkili kesinti onayı gibi). `$color-red-*` paleti
+// tema köprüsünün dışında kalan gerçek renk değerleridir — iki temada da aynı okunur.
+.btn--danger {
+  background: v.$color-red-600;
+  color: v.$color-ink-inverse;
+
+  &:hover:not(:disabled) {
+    background: v.$color-red-700;
+  }
+}
+
 .btn--outline {
   background: v.$color-surface;
   border-color: v.$color-hairline;

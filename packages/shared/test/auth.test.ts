@@ -2,6 +2,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ALL_PERMISSIONS,
+  assertHighImpactAllowed,
+  HIGH_IMPACT_TOPOLOGY_LEVEL,
   PERMISSIONS,
   ROLE_PERMISSIONS,
   ROLES,
@@ -10,7 +12,7 @@ import {
   userFromHeaders,
   type AuthedRequest,
 } from '../src/auth.ts';
-import { ForbiddenError, UnauthenticatedError } from '../src/errors.ts';
+import { ForbiddenError, HighImpactForbiddenError, UnauthenticatedError } from '../src/errors.ts';
 
 function runMiddleware(
   middleware: ReturnType<typeof requirePermission>,
@@ -82,12 +84,16 @@ describe('ROLE_PERMISSIONS', () => {
     expect(ROLE_PERMISSIONS[ROLES.ADMIN]).toEqual([
       'outage:read',
       'outage:write',
+      'outage:write-high-impact',
       'workorder:read',
       'workorder:write',
       'user:manage',
       'translation:read',
       'translation:write',
       'translation:publish',
+      'network:read',
+      'customer:read',
+      'customer:read-pii',
     ]);
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).toEqual(['outage:read', 'outage:write']);
     expect(ROLE_PERMISSIONS[ROLES.WORK_ORDER_OPERATOR]).toEqual(['workorder:read', 'workorder:write']);
@@ -98,6 +104,13 @@ describe('ROLE_PERMISSIONS', () => {
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.WORKORDER_WRITE);
     expect(ROLE_PERMISSIONS[ROLES.WORK_ORDER_OPERATOR]).not.toContain(PERMISSIONS.OUTAGE_WRITE);
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.USER_MANAGE);
+  });
+
+  it('yüksek etkili kesinti izni operatörde yok — ek izindir', () => {
+    // `outage:write` bir trafo kesicisini açmaya yeter; fider kesicisi ve üstü için
+    // ayrıca `outage:write-high-impact` gerekir (bkz. assertHighImpactAllowed).
+    expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT);
+    expect(ROLE_PERMISSIONS[ROLES.ADMIN]).toContain(PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT);
   });
 
   it('yalnızca ADMIN kullanıcı yönetebilir', () => {
@@ -111,6 +124,33 @@ describe('ROLE_PERMISSIONS', () => {
   it('tanımlı her izin en az bir role bağlı — sahipsiz izin kalmasın', () => {
     const assigned = new Set(Object.values(ROLE_PERMISSIONS).flat());
     expect([...assigned].sort()).toEqual([...ALL_PERMISSIONS].sort());
+  });
+});
+
+describe('assertHighImpactAllowed', () => {
+  const userWith = (...permissions: string[]) => ({ id: 'u1', email: 'a@b.c', roles: [], permissions });
+
+  it('eşiğin altındaki eleman ek izin istemez', () => {
+    // Trafo kesicisi seviye 8'dedir — `outage:write` tek başına yeter.
+    expect(() => assertHighImpactAllowed(userWith(PERMISSIONS.OUTAGE_WRITE), '104000', 8)).not.toThrow();
+  });
+
+  it('eşikteki eleman ek izin olmadan reddedilir', () => {
+    // Fider kesicisi seviye 2'dedir — tek açmayla 707 abone kararır.
+    expect(() => assertHighImpactAllowed(userWith(PERMISSIONS.OUTAGE_WRITE), '100196', 2)).toThrow(
+      HighImpactForbiddenError,
+    );
+  });
+
+  it('sınır değeri dahildir — eşiğin kendisi de yüksek etkilidir', () => {
+    expect(() =>
+      assertHighImpactAllowed(userWith(PERMISSIONS.OUTAGE_WRITE), '100196', HIGH_IMPACT_TOPOLOGY_LEVEL),
+    ).toThrow(HighImpactForbiddenError);
+  });
+
+  it('ek izinle eşikteki eleman geçer', () => {
+    const user = userWith(PERMISSIONS.OUTAGE_WRITE, PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT);
+    expect(() => assertHighImpactAllowed(user, '100000', 0)).not.toThrow();
   });
 });
 

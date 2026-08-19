@@ -37,12 +37,25 @@ export function getAdmin(): Admin {
   return admin;
 }
 
-/** Kafka tüketicisini (work-order topic'leri için) başlatır. */
+/**
+ * Kafka tüketicisini başlatır.
+ *
+ * `outage.energized` ve `outage.impact.calculated` bu servisin **kendi** yayınladığı
+ * olaylardır: etkinin geri yazılması ve kapsanan kesintilerin otomatik çözülmesi HTTP
+ * isteğinin içinde değil, olay akışında yürür — böylece kesinti açan istek etki hesabını
+ * beklemez.
+ */
 export async function startOutageConsumer(handler: EventHandler, logger: Logger): Promise<void> {
   consumerHandle = await startConsumer(
     kafka,
     CONSUMER_GROUPS.OUTAGE_SERVICE,
-    [TOPICS.WORK_ORDER_CREATED, TOPICS.WORK_ORDER_LINKED, TOPICS.WORK_ORDER_DONE],
+    [
+      TOPICS.WORK_ORDER_CREATED,
+      TOPICS.WORK_ORDER_LINKED,
+      TOPICS.WORK_ORDER_DONE,
+      TOPICS.OUTAGE_IMPACT_CALCULATED,
+      TOPICS.OUTAGE_ENERGIZED,
+    ],
     handler,
     getProducer(),
     logger,

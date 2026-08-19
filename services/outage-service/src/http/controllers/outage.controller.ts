@@ -1,6 +1,9 @@
 import {
+  assertHighImpactAllowed,
+  ComponentNotFoundError,
   ConflictError,
   NotFoundError,
+  PaginationQuery,
   parseSort,
   toExclusiveUpperBound,
   toPageResult,
@@ -12,16 +15,29 @@ import { db } from '../../db.ts';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
 import { enqueueOutageCreatedTx, enqueueOutageEnergizedIfNeededTx } from '../../kafka/producer.ts';
 import { notifyOutageChanged } from '../../realtime.ts';
+import * as networkComponentRepository from '../../repository/network-component.repository.ts';
 import * as outageRepository from '../../repository/outage.repository.ts';
 import { SORTABLE_FIELDS, type OutageFilters } from '../../repository/outage.repository.ts';
-import { toOutageDto, toOutageHistoryDto } from '../dto.ts';
-import { CreateOutageBody, ListOutagesQuery, PatchOutageBody } from '../schemas.ts';
+import {
+  toAffectedCustomerDto,
+  toOutageDto,
+  toOutageHistoryDto,
+  toOutageImpactDto,
+  toOutageMapDto,
+  toOutageRelationDto,
+} from '../dto.ts';
+import { CreateOutageBody, ListOutagesQuery, OutageMapQuery, PatchOutageBody } from '../schemas.ts';
 
-function toFilters(query: ListOutagesQuery): OutageFilters {
+/** Liste ve harita sorgularının paylaştığı filtre dönüşümü. */
+function toFilters(query: ListOutagesQuery | OutageMapQuery): OutageFilters {
   return {
     status: query.status,
     origin: query.origin,
-    gisId: query.gisId,
+    cbsId: query.cbsId,
+    unitPath: query.unitPath,
+    componentType: query.componentType,
+    minAffectedCustomers: query.minAffectedCustomers,
+    maxAffectedCustomers: query.maxAffectedCustomers,
     startedAtFrom: query.startedAtFrom ? new Date(query.startedAtFrom) : undefined,
     startedAtTo: query.startedAtTo ? toExclusiveUpperBound(query.startedAtTo) : undefined,
     createdAtFrom: query.createdAtFrom ? new Date(query.createdAtFrom) : undefined,
@@ -56,6 +72,17 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   if (!req.user) throw new UnauthenticatedError();
 
   const body = CreateOutageBody.parse(req.body);
+  const cbsId = body.cbsId;
+
+  // ⭐ Kesintinin varlık doğrulaması burada: read-model'de karşılığı olmayan bir kimlik
+  // reddedilir. Eskiden bu alanın tek doğrulaması uzunluktu ve "asdasd" kabul ediliyordu.
+  const component = await networkComponentRepository.findById(cbsId);
+  if (!component) throw new ComponentNotFoundError(cbsId);
+
+  // ⭐ Yüksek etkili kesinti (fider kesicisi ve üstü) ek izin ister. Harita üzerindeki etki
+  // önizlemesi kullanıcıya sayıyı gösterir ama karar burada verilir — önizleme atlanabilir
+  // ya da arada eskiyebilir; istemcinin gösterdiği sayıya güvenilmez.
+  assertHighImpactAllowed(req.user, cbsId, component.topologyLevel);
 
   const status: OutageStatus = body.endedAt ? 'ENERGIZED' : (body.status ?? 'STARTED');
   const user = req.user;
@@ -65,21 +92,32 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
     const created = await outageRepository.createTx(
       tx,
       {
-        gisId: body.gisId,
+        cbsId,
         startedAt: new Date(body.startedAt),
         endedAt: body.endedAt ? new Date(body.endedAt) : null,
         status,
+        kind: body.kind,
         origin: 'USER',
         createdBy: user.email,
+        // Konum ve idari yol read-model'den denormalize edilir; liste/harita sorguları
+        // her satır için read-model'e JOIN atmak zorunda kalmasın diye.
+        unitPath: component.unitPath,
+        componentType: component.type,
+        componentName: component.name,
+        topologyLevel: component.topologyLevel,
       },
       req.correlationId,
     );
 
-    await enqueueOutageCreatedTx(tx, created, req.correlationId!, user.email);
+    await enqueueOutageCreatedTx(tx, created, {
+      origin: 'USER',
+      actor: user.email,
+      correlationId: req.correlationId!,
+    });
     return created;
   });
 
-  req.log?.info({ outageId: row.id, gisId: row.gisId, status: row.status }, 'kesinti oluşturuldu');
+  req.log?.info({ outageId: row.id, cbsId: row.cbsId, status: row.status }, 'kesinti oluşturuldu');
 
   await notifyOutageChanged(row, req.log);
 
@@ -164,3 +202,62 @@ export async function getHistory(req: AuthedRequest, res: Response): Promise<voi
   res.json({ items: rows.map(toOutageHistoryDto) });
 }
 
+
+/**
+ * `GET /outages/:id/impact` — en güncel etki anlık görüntüsü.
+ * Etki henüz hesaplanmadıysa (olay yolda) 200 ve `null` döner; bu bir hata değil,
+ * geçici bir durumdur (`impactStatus: 'PENDING'`).
+ */
+export async function getImpact(req: AuthedRequest, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const outage = await outageRepository.findById(id);
+  if (!outage) throw new NotFoundError('Kesinti', id);
+
+  const impact = await outageRepository.findLatestImpact(id);
+
+  res.json({
+    impactStatus: outage.impactStatus,
+    impact: impact ? toOutageImpactDto(impact) : null,
+  });
+}
+
+/** `GET /outages/:id/cascade` — kesintinin üstü ve kapsadığı alt kesintiler. */
+export async function getCascade(req: AuthedRequest, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const outage = await outageRepository.findById(id);
+  if (!outage) throw new NotFoundError('Kesinti', id);
+
+  const relations = await outageRepository.findRelations(id);
+
+  res.json({
+    outageId: id,
+    parentOutageId: outage.parentOutageId,
+    relations: relations.map(toOutageRelationDto),
+  });
+}
+
+/** `GET /outages/:id/affected-customers` — sayfalı, **PII'sız** etkilenen abone listesi. */
+export async function getAffectedCustomers(req: AuthedRequest, res: Response): Promise<void> {
+  const id = req.params.id as string;
+  const outage = await outageRepository.findById(id);
+  if (!outage) throw new NotFoundError('Kesinti', id);
+
+  const pagination = PaginationQuery.parse(req.query);
+  const { items, total } = await outageRepository.listAffectedCustomers(id, pagination);
+
+  res.json(toPageResult(items.map(toAffectedCustomerDto), total, pagination.page, pagination.pageSize));
+}
+
+/**
+ * `GET /outages/map` — harita katmanı için hafif özet.
+ *
+ * Sayfalama yoktur: harita görünürdeki her kesintiyi çizer. Bunun yerine sunucu tarafında
+ * sert bir üst sınır vardır; sınıra dayanılırsa `truncated` bayrağı döner ve istemci
+ * kullanıcıyı filtre daraltmaya yönlendirir.
+ */
+export async function listForMap(req: AuthedRequest, res: Response): Promise<void> {
+  const query = OutageMapQuery.parse(req.query);
+  const items = await outageRepository.listForMap(toFilters(query), query.limit);
+
+  res.json({ items: items.map(toOutageMapDto), truncated: items.length === query.limit });
+}

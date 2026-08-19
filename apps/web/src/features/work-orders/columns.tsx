@@ -71,16 +71,16 @@ export function buildWorkOrderColumns(
       },
     },
     {
-      id: 'gisId',
-      header: 'GIS ID',
-      accessorFn: (row) => row.gisId,
+      id: 'cbsId',
+      header: 'CBS ID',
+      accessorFn: (row) => row.cbsId,
       cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
       meta: {
-        sortField: 'gisId',
+        sortField: 'cbsId',
         filter: {
-          key: 'gisId',
+          key: 'cbsId',
           type: 'text',
-          toQuery: (v) => ({ gisId: (v as string) || undefined }),
+          toQuery: (v) => ({ cbsId: (v as string) || undefined }),
         },
       } satisfies ColumnMeta,
     },
@@ -91,12 +91,11 @@ export function buildWorkOrderColumns(
       cell: (ctx) => <span>{labels.workOrderType(ctx.getValue<WorkOrder['type']>())}</span>,
       meta: {
         sortField: 'type',
-        // Backend `type` filtresi tek değer kabul eder (bkz. WorkOrderFilters.type) — çoklu seçim yok.
         filter: {
           key: 'type',
-          type: 'select',
+          type: 'multiselect',
           options: typeFilterOptions,
-          toQuery: (v) => ({ type: (v as string) || undefined }),
+          toQuery: (v) => ({ type: (v as string[]).length ? v : undefined }),
         },
       } satisfies ColumnMeta,
     },

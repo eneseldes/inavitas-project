@@ -1,5 +1,7 @@
 import type { z } from 'zod';
+import { OutageImpactCalculatedEvent } from './network.events.ts';
 import {
+  OutageCascadedEvent,
   OutageCreatedEvent,
   OutageEnergizedEvent,
   OutageLinkedEvent,
@@ -13,6 +15,7 @@ import {
 import { TranslationPublishedEvent } from './translation.events.ts';
 
 export * from './envelope.ts';
+export * from './network.events.ts';
 export * from './outage.events.ts';
 export * from './topics.ts';
 export * from './work-order.events.ts';
@@ -25,6 +28,8 @@ export const EVENT_SCHEMAS = {
   [TOPICS.OUTAGE_CREATED]: OutageCreatedEvent,
   [TOPICS.OUTAGE_ENERGIZED]: OutageEnergizedEvent,
   [TOPICS.OUTAGE_LINKED]: OutageLinkedEvent,
+  [TOPICS.OUTAGE_IMPACT_CALCULATED]: OutageImpactCalculatedEvent,
+  [TOPICS.OUTAGE_CASCADED]: OutageCascadedEvent,
   [TOPICS.WORK_ORDER_CREATED]: WorkOrderCreatedEvent,
   [TOPICS.WORK_ORDER_DONE]: WorkOrderDoneEvent,
   [TOPICS.WORK_ORDER_LINKED]: WorkOrderLinkedEvent,

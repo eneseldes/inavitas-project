@@ -48,7 +48,8 @@
   --c-ai-accent-soft: rgba(124, 58, 237, 0.1);
 
   // Harita — altlık ve kendi katmanlarımız aynı token'lardan boyanır.
-  // Palet ankara-yeni-detayli-v3.html'den birebir alınmıştır (STY / UNIT / KES).
+  // Şebeke paleti: her birim tipinin kendi rengi + koyu kenar tonu vardır; bina izi de
+  // birimin kendi rengiyle doldurulur, böylece poligon kime ait olduğunu renginden belli eder.
   --c-map-bg: #eef2f6;
 
   // Hatlar — gerilim sınıfına göre. `-case` beyaz kılıf, hattı altlıktan ayırır.
@@ -76,6 +77,32 @@
   --c-map-breaker-dark: #7b241c;
   --c-map-customer: #6366f1;
   --c-map-selected: #d946ef;
+  // İz vurgusu — yön renkten okunur: besleme zinciri yukarı doğru "kaynağa",
+  // etkilenenler aşağı doğru "karanlığa" gider. Seçim renginden (macenta) ayrı tutulur,
+  // yoksa seçili eleman izin bir parçası mı diye ayırt edilemez.
+  --c-map-trace-up: #f1c40f;
+  --c-map-trace-down: #ff4d3d;
+
+  // İşletim katmanları — kesinti ve iş emri noktaları durum rengiyle çizilir.
+  // Renkler durum rozetleriyle (StatusBadge) aynı aileden seçilir ki tablo ile harita
+  // aynı olayı aynı renkte göstersin.
+  --c-map-outage-started: #e74c3c;
+  --c-map-outage-energized: #27ae60;
+  --c-map-outage-archived: #7f8c8d;
+  --c-map-outage-cancelled: #bdc3c7;
+  --c-map-wo-started: #2980b9;
+  --c-map-wo-assigned: #8e44ad;
+  --c-map-wo-in-progress: #d68910;
+  --c-map-wo-energized: #27ae60;
+  --c-map-wo-done: #16a085;
+  --c-map-wo-cancelled: #bdc3c7;
+  /** İşletim noktalarının kenar çizgisi — altlıktan ayrışsın diye. */
+  --c-map-op-stroke: #ffffff;
+  /** Isı haritası bantları; sıfır yoğunluk saydamdır, aksi halde tüm harita boyanır. */
+  --c-map-heat-zero: rgba(231, 76, 60, 0);
+  --c-map-heat-low: rgba(241, 196, 15, 0.55);
+  --c-map-heat-mid: rgba(230, 126, 34, 0.7);
+  --c-map-heat-high: rgba(192, 57, 43, 0.85);
   /** Bina izinin "buzlu cam" beyaz yıkaması — altından geçen hattı soluklaştırır. */
   --c-map-bld-wash: #ffffff;
 
@@ -142,7 +169,7 @@
   --c-ai-accent: #a78bfa;
   --c-ai-accent-soft: rgba(167, 139, 250, 0.16);
 
-  // Koyu zeminde v3 paletinin doygun tonları kararıyor — aynı renkler açılarak kullanılır.
+  // Koyu zeminde açık temanın doygun tonları kararıyor — aynı renkler açılarak kullanılır.
   --c-map-bg: #15181c;
 
   --c-map-line-case: #0b0d10;
@@ -168,6 +195,24 @@
   --c-map-breaker-dark: #ffd2cc;
   --c-map-customer: #a5b4fc;
   --c-map-selected: #f0abfc;
+  --c-map-trace-up: #ffd95c;
+  --c-map-trace-down: #ff7d6e;
+
+  --c-map-outage-started: #ff7060;
+  --c-map-outage-energized: #5fd88f;
+  --c-map-outage-archived: #9aa5ad;
+  --c-map-outage-cancelled: #6b7580;
+  --c-map-wo-started: #5dade2;
+  --c-map-wo-assigned: #c78ae0;
+  --c-map-wo-in-progress: #f0b357;
+  --c-map-wo-energized: #5fd88f;
+  --c-map-wo-done: #4ecdc4;
+  --c-map-wo-cancelled: #6b7580;
+  --c-map-op-stroke: #11161b;
+  --c-map-heat-zero: rgba(255, 112, 96, 0);
+  --c-map-heat-low: rgba(241, 196, 15, 0.45);
+  --c-map-heat-mid: rgba(230, 126, 34, 0.6);
+  --c-map-heat-high: rgba(255, 112, 96, 0.8);
   --c-map-bld-wash: #11161b;
   // İl/ilçe pastel bantları koyu temada da açık kalır — düşük opaklıkla "buzlu cam"
   // etkisi verir; koyulaştırılsalar altlıkla birleşip siyah bir leke olurlardı.

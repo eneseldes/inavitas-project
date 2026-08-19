@@ -1,5 +1,5 @@
 import { apiFetch } from '../../shared/api/client.ts';
-import type { NetworkComponentDetail } from '../../types/network.ts';
+import type { DownstreamImpact, ImpactPreview, NetworkComponentDetail, UpstreamChain } from '../../types/network.ts';
 
 /**
  * Tile MVT şemasının sürümü. Tile yanıtları `max-age=3600` ile önbelleğe alındığından,
@@ -8,7 +8,7 @@ import type { NetworkComponentDetail } from '../../types/network.ts';
  *
  * 2 — `building_shapes` / `building_inner` / `building_breakers` katmanları ve `band` kolonu.
  * 3 — tip bazlı zoom LOD, `customers` katmanı kaldırıldı, kofra bina izi, duvarda kesilen
- *     hatlar, v3 `ringLL` ile aynı sekizgen.
+ *     hatlar, bina izi sekizgene çevrildi.
  * 4 — TM'de fider sayısı kadar köşe, diğerlerinde kare; kesici köşe yolunun ortasında;
  *     bağlı hattın ucu köşeye taşınıyor; geometri 1e-6 ızgaraya oturtuldu.
  * 5 — köşeler eşit aralıkla değil, hattın geldiği yöne kümelenerek yerleştiriliyor.
@@ -49,4 +49,24 @@ export async function fetchUnitLabels(level: 'PROVINCE' | 'DISTRICT'): Promise<U
     if (page >= res.totalPages) break;
   }
   return all.filter((u) => u.centerLat !== null && u.centerLon !== null);
+}
+
+/** İz yönü — aşağı akış "kimler etkilenir", yukarı akış "nereden besleniyor". */
+export type TraceDirection = 'up' | 'down';
+
+/**
+ * Tıklanan elemanın izi. Yanıt eleman kimliklerinin yanında bir `bbox` de taşır: harita
+ * odağı (`fitBounds`) için istemci binlerce elemanın koordinatını toplamaz, sunucu tek
+ * `ST_Extent` sorgusuyla kapsayan dikdörtgeni hesaplayıp döner.
+ */
+export function fetchTrace(id: string, direction: 'down'): Promise<DownstreamImpact>;
+export function fetchTrace(id: string, direction: 'up'): Promise<UpstreamChain>;
+export function fetchTrace(id: string, direction: TraceDirection): Promise<DownstreamImpact | UpstreamChain>;
+export function fetchTrace(id: string, direction: TraceDirection): Promise<DownstreamImpact | UpstreamChain> {
+  return apiFetch(`/api/network/components/${id}/trace?direction=${direction}`);
+}
+
+/** Kesinti/iş emri açmadan önceki zorunlu onay adımının beslediği etki özeti. */
+export function fetchImpactPreview(id: string): Promise<ImpactPreview> {
+  return apiFetch(`/api/network/components/${id}/impact-preview`);
 }

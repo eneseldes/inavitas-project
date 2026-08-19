@@ -72,8 +72,8 @@ export function EditWorkOrderDialog({ workOrder, onClose }: EditWorkOrderDialogP
           </span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>GIS ID</span>
-          <span className={`${styles.readOnlyValue} font-mono`}>{workOrder.gisId}</span>
+          <span className={styles.readOnlyLabel}>CBS ID</span>
+          <span className={`${styles.readOnlyValue} font-mono`}>{workOrder.cbsId}</span>
         </div>
         <div className={styles.readOnlyRow}>
           <span className={styles.readOnlyLabel}>{t('work-order.dialog.edit.typeLabel')}</span>

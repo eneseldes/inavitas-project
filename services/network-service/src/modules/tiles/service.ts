@@ -9,7 +9,7 @@
  * ## Bina izi (z ≥ BUILDING_ZOOM)
  *
  * Kaynak veride kesici, bara ve fider sahibi birimle **birebir aynı koordinattadır**; bina
- * izi bunları ayırt edilebilir kılan tek görünümdür (bkz. ankara-yeni-detayli-v3.html).
+ * izi bunları ayırt edilebilir kılan tek görünümdür.
  *
  * - Poligon her zaman **düzgün** çokgendir; kenar sayısı birim tipini anlatır:
  *   TM sekizgen · DM beşgen · trafo kare · kofra üçgen.
@@ -187,7 +187,7 @@ export async function renderTile({ z, x, y }: TileCoord, user: AuthenticatedUser
              -- (kenar ortası) r*cos(pi/n); köşeye yaklaştıkça 1/cos(alpha) ile büyür.
              w.wall_dist,
              ST_Project(c.unit_geom::geography, w.wall_dist, a.theta)::geometry AS wall_geom,
-             -- Kesici duvarda değil, merkez ile duvar arasında yolun yarısında (v3).
+             -- Kesici duvarda değil, merkez ile duvar arasında yolun yarısındadır.
              ST_Project(c.unit_geom::geography, w.wall_dist * 0.5, a.theta)::geometry AS breaker_geom
       FROM unit_clustered c
       JOIN unit_phase p ON p.unit_id = c.unit_id

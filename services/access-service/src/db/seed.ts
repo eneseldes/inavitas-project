@@ -32,6 +32,7 @@ const ROLE_NAMES: Record<Role, string> = {
 const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'outage:read': 'Kesinti kayıtlarını görme',
   'outage:write': 'Kesinti oluşturma ve düzenle',
+  'outage:write-high-impact': 'Yüksek etkili (fider ve üstü) kesinti açma',
   'workorder:read': 'İş emirlerini görme',
   'workorder:write': 'İş emri oluşturma ve durum güncelleme',
   'user:manage': 'Kullanıcı ve rol yönetimi',

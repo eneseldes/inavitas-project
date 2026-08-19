@@ -55,6 +55,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE access_migrator IN SCHEMA public
 
 \c outage_db
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Kesintinin idari birim yolu (`unit_path`) `network_db`'deki ile aynı ltree tipindedir;
+-- bölge sorguları (`unit_path <@ 'TR.06.012'`) JOIN'siz tek indeks taramasıyla cevaplanır.
+CREATE EXTENSION IF NOT EXISTS ltree;
 GRANT USAGE ON SCHEMA public TO outage_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE outage_migrator IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO outage_app;
@@ -63,6 +66,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE outage_migrator IN SCHEMA public
 
 \c work_order_db
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS ltree;
 GRANT USAGE ON SCHEMA public TO work_order_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE work_order_migrator IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO work_order_app;

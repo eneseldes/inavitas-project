@@ -94,6 +94,34 @@ export class ConflictError extends AppError {
   }
 }
 
+/**
+ * Kesinti/iş emri var olmayan bir CBS elemanına bağlanmaya çalışıldığında fırlatılır.
+ * `gis_id` döneminde bu alanın tek doğrulaması uzunluğuydu ("asdasd" kabul ediliyordu);
+ * artık `network_components_ro` read-model'inde karşılığı olmayan kimlik reddedilir.
+ */
+export class ComponentNotFoundError extends AppError {
+  constructor(cbsId: string) {
+    super('NOT_FOUND', `Şebeke elemanı bulunamadı: ${cbsId}`, {
+      details: [{ field: 'cbsId', issue: 'COMPONENT_NOT_FOUND' }],
+    });
+  }
+}
+
+/**
+ * Yüksek etkili bir kesinti (topoloji seviyesi ≤ {@link HIGH_IMPACT_TOPOLOGY_LEVEL}) ek izin
+ * olmadan açılmaya çalışıldığında fırlatılır. Bir fider kesicisini açmak binlerce aboneyi
+ * karartır; bu yüzden `outage:write` yetmez, ayrıca `outage:write-high-impact` aranır.
+ */
+export class HighImpactForbiddenError extends AppError {
+  constructor(cbsId: string, topologyLevel: number) {
+    super(
+      'FORBIDDEN',
+      `Yüksek etkili kesinti için ek izin gerekiyor (${cbsId}, topoloji seviyesi ${topologyLevel})`,
+      { details: [{ field: 'cbsId', issue: 'HIGH_IMPACT_FORBIDDEN' }] },
+    );
+  }
+}
+
 export class RateLimitedError extends AppError {
   constructor(message = 'Çok fazla istek gönderildi, lütfen bekleyin') {
     super('RATE_LIMITED', message);

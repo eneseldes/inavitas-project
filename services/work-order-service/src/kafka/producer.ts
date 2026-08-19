@@ -22,7 +22,7 @@ export interface PublishOptions {
 export async function enqueueWorkOrderCreatedTx(tx: Tx, row: WorkOrderRow, correlationId: string, actor: string): Promise<void> {
   const payload: WorkOrderCreatedPayload = {
     workOrderId: row.id,
-    gisId: row.gisId,
+    cbsId: row.cbsId,
     type: row.type,
     status: row.status,
     outageId: row.outageId,
@@ -36,14 +36,14 @@ export async function enqueueWorkOrderCreatedTx(tx: Tx, row: WorkOrderRow, corre
     correlationId,
   });
 
-  await enqueueTx(tx, TOPICS.WORK_ORDER_CREATED, row.gisId, envelope);
+  await enqueueTx(tx, TOPICS.WORK_ORDER_CREATED, row.cbsId, envelope);
 }
 
 /** İş emri DONE durumuna geldiğinde 'work-order.done' event'ini outbox'a yazar. */
 export async function enqueueWorkOrderDoneTx(tx: Tx, row: WorkOrderRow, correlationId: string, actor: string): Promise<void> {
   const payload: WorkOrderDonePayload = {
     workOrderId: row.id,
-    gisId: row.gisId,
+    cbsId: row.cbsId,
     type: row.type,
     doneAt: row.updatedAt.toISOString(),
     outageId: row.outageId,
@@ -57,14 +57,14 @@ export async function enqueueWorkOrderDoneTx(tx: Tx, row: WorkOrderRow, correlat
     correlationId,
   });
 
-  await enqueueTx(tx, TOPICS.WORK_ORDER_DONE, row.gisId, envelope);
+  await enqueueTx(tx, TOPICS.WORK_ORDER_DONE, row.cbsId, envelope);
 }
 
 /** İş emrine bir kesinti bağlandığında 'work-order.linked' event'ini outbox'a yazar. */
 export async function enqueueWorkOrderLinkedTx(
   tx: Tx,
   workOrderId: string,
-  gisId: string,
+  cbsId: string,
   outageId: string,
   opts: PublishOptions,
 ): Promise<void> {
@@ -77,5 +77,5 @@ export async function enqueueWorkOrderLinkedTx(
     causedBy: opts.causedBy,
   });
 
-  await enqueueTx(tx, TOPICS.WORK_ORDER_LINKED, gisId, envelope);
+  await enqueueTx(tx, TOPICS.WORK_ORDER_LINKED, cbsId, envelope);
 }

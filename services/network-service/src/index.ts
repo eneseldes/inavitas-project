@@ -20,10 +20,13 @@ const server = app.listen(config.NETWORK_SERVICE_PORT, () => {
 });
 
 await connectKafka();
-await startNetworkConsumer(createNetworkEventHandler(logger), logger);
-logger.info('Kafka bağlantısı kuruldu');
 
+// Graf, tüketiciden ÖNCE yüklenir: `outage.created` işleyicisi ilk mesajda grafı hazır
+// bulmalı, aksi halde etki hesabı "graf henüz yüklenmedi" hatasıyla DLQ'ya düşer.
 await loadGraph(logger);
+
+await startNetworkConsumer(createNetworkEventHandler(logger), logger);
+logger.info('Kafka consumer ayakta (outage.created)');
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { envelopeOf } from './envelope.ts';
-import { GisId } from './outage.events.ts';
+import { CbsId } from './outage.events.ts';
 import { TOPICS } from './topics.ts';
 
 /** İş emri durumları. */
@@ -26,7 +26,7 @@ export type WorkOrderType = z.infer<typeof WorkOrderType>;
 
 export const WorkOrderCreatedPayload = z.object({
   workOrderId: z.uuid(),
-  gisId: GisId,
+  cbsId: CbsId,
   type: WorkOrderType,
   status: WorkOrderStatus,
   outageId: z.uuid().nullable(),
@@ -35,7 +35,7 @@ export type WorkOrderCreatedPayload = z.infer<typeof WorkOrderCreatedPayload>;
 
 export const WorkOrderDonePayload = z.object({
   workOrderId: z.uuid(),
-  gisId: GisId,
+  cbsId: CbsId,
   type: WorkOrderType,
   doneAt: z.iso.datetime(),
   outageId: z.uuid().nullable(),

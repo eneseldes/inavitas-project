@@ -13,12 +13,18 @@ import { useCreateWorkOrder } from './useWorkOrders.ts';
 function useCreateWorkOrderSchema() {
   const { t } = useTranslation();
   return z.object({
-    gisId: z.string().min(1, t('work-order.validation.gisIdRequired')).max(64),
+    cbsId: z.string().min(1, t('work-order.validation.cbsIdRequired')).max(64),
     type: z.enum(WORK_ORDER_TYPES),
   });
 }
 
-export function CreateWorkOrderDialog({ onClose }: { onClose: () => void }) {
+interface CreateWorkOrderDialogProps {
+  onClose: () => void;
+  /** Haritadan açıldığında hedef eleman zaten seçilidir; alan dolu ve **kilitli** gelir. */
+  presetCbsId?: string;
+}
+
+export function CreateWorkOrderDialog({ onClose, presetCbsId }: CreateWorkOrderDialogProps) {
   const createWorkOrder = useCreateWorkOrder();
   const { show } = useToast();
   const { t } = useTranslation();
@@ -33,7 +39,7 @@ export function CreateWorkOrderDialog({ onClose }: { onClose: () => void }) {
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     mode: 'onSubmit',
-    defaultValues: { type: 'BASIC_WORK' },
+    defaultValues: { type: 'BASIC_WORK', ...(presetCbsId ? { cbsId: presetCbsId } : {}) },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -51,7 +57,12 @@ export function CreateWorkOrderDialog({ onClose }: { onClose: () => void }) {
       <form onSubmit={onSubmit} noValidate>
         {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-        <TextField label={t('work-order.dialog.create.gisIdLabel')} error={errors.gisId?.message} {...register('gisId')} />
+        <TextField
+          label={t('work-order.dialog.create.cbsIdLabel')}
+          error={errors.cbsId?.message}
+          readOnly={presetCbsId !== undefined}
+          {...register('cbsId')}
+        />
 
         <SelectField label={t('work-order.dialog.create.typeLabel')} error={errors.type?.message} {...register('type')}>
           {WORK_ORDER_TYPES.map((type) => (

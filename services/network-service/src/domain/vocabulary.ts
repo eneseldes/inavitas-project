@@ -39,5 +39,10 @@ export type BreakerRole = (typeof BREAKER_ROLES)[number];
 export const VOLTAGE_LEVELS = ['HV', 'MV', 'LV', 'MV_LV'] as const;
 export type VoltageLevel = (typeof VOLTAGE_LEVELS)[number];
 
-/** Yüksek etkili kesinti eşiği: bu seviye ve altı TM / bara / fider kesicisi / fider demektir. */
-export const HIGH_IMPACT_TOPOLOGY_LEVEL = 3;
+/**
+ * Yüksek etkili kesinti eşiği: bu seviye ve altı TM / bara / fider kesicisi / fider demektir.
+ * Sözlüğün geri kalanının aksine değeri burada tanımlı **değil** — aynı eşiği kesinti ve iş
+ * emri servisleri de kayıt anında yetki kontrolü için okuyor, bu yüzden `@inavitas/shared`
+ * tek kaynak olarak tutuluyor ve buradan yalnız yeniden dışa aktarılıyor.
+ */
+export { HIGH_IMPACT_TOPOLOGY_LEVEL } from '@inavitas/shared';

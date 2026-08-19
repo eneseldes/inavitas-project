@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { bundleVersions, locales, translationKeys, translationNamespaces, translations } from './schema.ts';
 
@@ -125,7 +125,7 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['settings', 'translations.toast.localeDeactivateFailed', 'Dil pasifleştirilemedi', 'Failed to deactivate language'],
   ['settings', 'translations.confirmDeleteKey', 'Bu anahtarı silmek istediğine emin misin?', 'Are you sure you want to delete this key?'],
   ['common', 'action.add', 'Ekle', 'Add'],
-  ['common', 'placeholder.gisIdExample', 'ör. CB-10', 'e.g. CB-10'],
+  ['common', 'placeholder.cbsIdExample', 'ör. 100196', 'e.g. 100196'],
   ['common', 'pagination.pageSize', 'Sayfa boyutu', 'Page size'],
   ['common', 'pagination.first', 'İlk sayfa', 'First page'],
   ['common', 'pagination.prev', 'Önceki sayfa', 'Previous page'],
@@ -267,7 +267,7 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['outage', 'page.title', 'Kesintiler', 'Outages'],
   ['outage', 'related.label', 'İlişkili kesinti:', 'Related outage:'],
   ['outage', 'related.loading', 'İlişkili kesinti yükleniyor…', 'Loading related outage…'],
-  ['outage', 'related.gisLabel', 'GIS:', 'GIS:'],
+  ['outage', 'related.cbsLabel', 'CBS:', 'GIS:'],
   ['outage', 'table.empty', 'Kesinti kaydı yok', 'No outage records'],
   ['outage', 'column.createdAt', 'Oluşturulma', 'Created'],
   ['outage', 'column.status', 'Durum', 'Status'],
@@ -275,12 +275,13 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['outage', 'column.endedAt', 'Bitiş', 'Ended'],
   ['outage', 'column.durationMinutes', 'Süre (dk)', 'Duration (min)'],
   ['outage', 'column.origin', 'Kaynak', 'Origin'],
+  ['outage', 'column.affectedCustomerCount', 'Etkilenen Abone', 'Affected Customers'],
   ['outage', 'column.workOrderId', 'İş Emri', 'Work Order'],
   ['outage', 'action.openWorkOrder', 'İş emri ekranında aç', 'Open in work order screen'],
   ['outage', 'action.new', 'Yeni Kesinti', 'New Outage'],
   ['outage', 'action.locked', 'Kilitli', 'Locked'],
   ['outage', 'action.edit', 'Kesintiyi güncelle', 'Update outage'],
-  ['outage', 'validation.gisIdRequired', 'gisId zorunlu', 'gisId is required'],
+  ['outage', 'validation.cbsIdRequired', 'CBS ID zorunlu', 'CBS ID is required'],
   ['outage', 'validation.startedAtRequired', 'Başlangıç zamanı zorunlu', 'Start time is required'],
   ['outage', 'validation.endedAtBeforeStarted', 'Bitiş zamanı, başlangıçtan önce olamaz', 'End time cannot be before start time'],
   ['outage', 'toast.createSuccess', 'Kesinti oluşturuldu', 'Outage created'],
@@ -288,7 +289,7 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['outage', 'toast.updateSuccess', 'Kesinti güncellendi', 'Outage updated'],
   ['outage', 'toast.updateError', 'Kesinti güncellenemedi', 'Failed to update outage'],
   ['outage', 'dialog.create.title', 'Yeni Kesinti', 'New Outage'],
-  ['outage', 'dialog.create.gisIdLabel', 'GIS ID (kesici)', 'GIS ID (breaker)'],
+  ['outage', 'dialog.create.cbsIdLabel', 'CBS ID (şebeke elemanı)', 'GIS ID (network element)'],
   ['outage', 'dialog.create.startedAtLabel', 'Başlangıç zamanı', 'Start time'],
   ['outage', 'dialog.create.endedAtLabel', 'Bitiş zamanı', 'End time'],
   [
@@ -296,6 +297,37 @@ const SEED_KEYS: [string, string, string, string][] = [
     'dialog.create.endedAtHint',
     '(opsiyonel — verilirse durum otomatik "{status}" olur)',
     '(optional — if set, status automatically becomes "{status}")',
+  ],
+  // --- Etki ve kaskad ---
+  ['outage', 'tab.detail', 'Detay', 'Details'],
+  ['outage', 'tab.history', 'Durum Geçmişi', 'Status History'],
+  ['outage', 'tab.affectedCustomers', 'Etkilenen Aboneler', 'Affected Customers'],
+  ['outage', 'detail.componentLabel', 'Eleman', 'Element'],
+  ['outage', 'detail.unitPathLabel', 'İdari Birim', 'Administrative Unit'],
+  ['outage', 'detail.affectedCustomerCountLabel', 'Etkilenen Abone', 'Affected Customers'],
+  ['outage', 'detail.customerMinutesLabel', 'Müşteri-Dakika', 'Customer-Minutes'],
+  ['outage', 'detail.impactPending', 'Hesaplanıyor…', 'Calculating…'],
+  [
+    'outage',
+    'detail.impactUnavailable',
+    'Hesaplanamadı (alternatif besleme)',
+    'Unavailable (alternative supply)',
+  ],
+  [
+    'outage',
+    'detail.coveredByParent',
+    'Üst kesintide sayılıyor',
+    'Counted in the covering outage',
+  ],
+  ['outage', 'affectedCustomers.column.customerId', 'Abone No', 'Customer No'],
+  ['outage', 'affectedCustomers.column.unitPath', 'İdari Birim', 'Administrative Unit'],
+  ['outage', 'affectedCustomers.column.customerType', 'Abone Tipi', 'Customer Type'],
+  ['outage', 'affectedCustomers.empty', 'Etkilenen abone kaydı yok', 'No affected customers'],
+  [
+    'outage',
+    'affectedCustomers.unavailable',
+    'Etki hesaplanamadı — bu eleman kapalı bir ring üzerinden besleniyor olabilir.',
+    'Impact could not be calculated — this element may be fed through a closed ring.',
   ],
   ['outage', 'dialog.edit.title', 'Kesintiyi Güncelle', 'Update Outage'],
   ['outage', 'dialog.edit.endedAtHint', '(verilirse durum otomatik "{status}" olur)', '(if set, status automatically becomes "{status}")'],
@@ -319,13 +351,13 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['work-order', 'action.openOutage', 'Kesinti ekranında aç', 'Open in outage screen'],
   ['work-order', 'action.new', 'Yeni İş Emri', 'New Work Order'],
   ['work-order', 'action.edit', 'İş emrini güncelle', 'Update work order'],
-  ['work-order', 'validation.gisIdRequired', 'gisId zorunlu', 'gisId is required'],
+  ['work-order', 'validation.cbsIdRequired', 'CBS ID zorunlu', 'CBS ID is required'],
   ['work-order', 'toast.createSuccess', 'İş emri oluşturuldu', 'Work order created'],
   ['work-order', 'toast.createError', 'İş emri oluşturulamadı', 'Failed to create work order'],
   ['work-order', 'toast.updateError', 'İş emri güncellenemedi', 'Failed to update work order'],
   ['work-order', 'toast.statusChanged', 'İş emri {status} durumuna geçti', 'Work order transitioned to {status}'],
   ['work-order', 'dialog.create.title', 'Yeni İş Emri', 'New Work Order'],
-  ['work-order', 'dialog.create.gisIdLabel', 'GIS ID (kesici)', 'GIS ID (breaker)'],
+  ['work-order', 'dialog.create.cbsIdLabel', 'CBS ID (şebeke elemanı)', 'GIS ID (network element)'],
   ['work-order', 'dialog.create.typeLabel', 'Tip', 'Type'],
   ['work-order', 'dialog.edit.title', 'İş Emrini Güncelle', 'Update Work Order'],
   ['work-order', 'dialog.edit.originLabel', 'Kaynak', 'Origin'],
@@ -371,6 +403,10 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['network', 'enum.breakerRole.SERVICE_ENTRY', 'Kofra Kesicisi', 'Service Entry Breaker'],
 
   // Gerilim her yerde kV olarak yazılır — kısaltma tek başına bırakılmaz.
+  // Veri setinde yalnız bu iki abone tipi var (ölçüldü: `SELECT DISTINCT customer_type`).
+  ['network', 'enum.customerType.RESIDENTIAL', 'Mesken', 'Residential'],
+  ['network', 'enum.customerType.COMMERCIAL', 'Ticarethane', 'Commercial'],
+
   ['network', 'enum.voltageLevel.HV', '154/400 kV', '154/400 kV'],
   ['network', 'enum.voltageLevel.MV', '34,5 kV', '34.5 kV'],
   ['network', 'enum.voltageLevel.LV', '0,4 kV', '0.4 kV'],
@@ -392,7 +428,7 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'panel.mode.expand', 'Paneli genişlet', 'Expand panel'],
   ['map', 'mode.network.title', 'Şebeke Elemanlarını Göster', 'Show Network Elements'],
 
-  // Efsane — hat katmanları birim katmanlarından ayrıdır (bkz. ankara-yeni-detayli-v3.html).
+  // Efsane — hat katmanları birim katmanlarından ayrı satırlardır.
   ['map', 'legend.section.lines', 'Hatlar', 'Lines'],
   ['map', 'legend.section.units', 'Birimler', 'Units'],
   ['map', 'legend.line.hv', '154/400 kV HV hattı', '154/400 kV HV line'],
@@ -416,6 +452,100 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'layer.adminBoundaries', 'İdari Sınırlar', 'Administrative Boundaries'],
   ['map', 'layer.zoomHint', 'Bu katman z ≥ {level} yakınlıkta görünür', 'This layer appears at zoom ≥ {level}'],
   ['map', 'basemap.unavailable', 'Altlık harita yüklenemedi', 'Basemap unavailable'],
+
+  // --- Harita işletim katmanları ---
+  // Kesinti ve iş emri haritada ayrı bir "mod" değil, efsanede kendi katman satırıdır.
+  ['map', 'legend.section.outages', 'Kesintiler', 'Outages'],
+  ['map', 'legend.section.workOrders', 'İş Emirleri', 'Work Orders'],
+  ['map', 'legend.section.independent', 'Bağımsız Katmanlar', 'Independent Layers'],
+  ['map', 'layer.outages', 'Kesintileri göster', 'Show outages'],
+  ['map', 'layer.workOrders', 'İş emirlerini göster', 'Show work orders'],
+  ['map', 'layer.outageHeatmap', 'Kesinti ısı haritası', 'Outage heat map'],
+  [
+    'map',
+    'layer.truncated',
+    'Sonuçlar üst sınıra ulaştı — filtreyi daraltın.',
+    'Results hit the limit — narrow the filter.',
+  ],
+  ['map', 'filter.status', 'Durum', 'Status'],
+  ['map', 'filter.origin', 'Kaynak', 'Origin'],
+  ['map', 'filter.type', 'Tür', 'Type'],
+  ['map', 'filter.startedAtFrom', 'Başlangıç (en erken)', 'Started after'],
+  ['map', 'filter.startedAtTo', 'Başlangıç (en geç)', 'Started before'],
+  ['map', 'filter.createdAtFrom', 'Oluşturulma (en erken)', 'Created after'],
+  ['map', 'filter.createdAtTo', 'Oluşturulma (en geç)', 'Created before'],
+  ['map', 'filter.minAffectedCustomers', 'En az etkilenen abone', 'Min affected customers'],
+  ['map', 'filter.minDuration', 'En kısa süre (dk)', 'Min duration (min)'],
+  ['map', 'filter.maxDuration', 'En uzun süre (dk)', 'Max duration (min)'],
+  ['map', 'filter.hasWorkOrder', 'İş emri bağı', 'Work order link'],
+  ['map', 'filter.hasOutage', 'Kesinti bağı', 'Outage link'],
+  ['map', 'filter.any', 'Farketmez', 'Any'],
+  ['map', 'filter.linked', 'Var', 'Linked'],
+  ['map', 'filter.unlinked', 'Yok', 'Not linked'],
+
+  // --- Haritadan aksiyon ---
+  // Sol paneldeki iz aksiyonları, etki onay adımı ve haritadan kayıt açma.
+  ['map', 'action.traceUp', 'Besleme zincirini göster', 'Show supply chain'],
+  ['map', 'action.traceDown', 'Etkilenenleri göster', 'Show affected'],
+  ['map', 'action.createOutage', 'Kesinti Aç', 'Open Outage'],
+  ['map', 'action.createWorkOrder', 'İş Emri Aç', 'Open Work Order'],
+  ['map', 'action.showOnMap', 'Haritada göster', 'Show on map'],
+
+  [
+    'map',
+    'trace.upstreamSummary',
+    'Besleme zinciri: TM’ye kadar {count} eleman.',
+    'Supply chain: {count} elements up to the substation.',
+  ],
+  [
+    'map',
+    'trace.downstreamSummary',
+    'Etkilenen: {elements} şebeke elemanı, {customers} abone.',
+    'Affected: {elements} network elements, {customers} customers.',
+  ],
+  // Sayılar kesindir; kırpılan yalnız kimlik listesidir — vurgu eksik kalır, sayı değil.
+  [
+    'map',
+    'trace.overflowed',
+    'Sayılar tamdır, haritadaki vurgu ilk 10.000 elemanla sınırlıdır.',
+    'The counts are exact; the map highlight is limited to the first 10,000 elements.',
+  ],
+  [
+    'map',
+    'trace.radialityViolated',
+    'Bu eleman birden çok kaynaktan besleniyor (kapalı ring) — etki güvenilir biçimde hesaplanamıyor.',
+    'This element is fed from more than one source (closed ring) — impact cannot be computed reliably.',
+  ],
+
+  ['map', 'confirm.outageTitle', 'Kesinti Onayı', 'Outage Confirmation'],
+  ['map', 'confirm.workOrderTitle', 'İş Emri Onayı', 'Work Order Confirmation'],
+  ['map', 'confirm.componentLabel', 'Eleman', 'Element'],
+  ['map', 'confirm.locationLabel', 'Konum', 'Location'],
+  ['map', 'confirm.impactLead', 'Bu işlem aşağıdakileri etkileyecek:', 'This operation will affect:'],
+  ['map', 'confirm.impactElements', 'şebeke elemanı', 'network elements'],
+  ['map', 'confirm.impactCustomers', 'abone', 'customers'],
+  [
+    'map',
+    'confirm.highImpactWarning',
+    'Yüksek etkili kesinti — bu eleman bir fider veya üstüdür.',
+    'High-impact outage — this element is a feeder or above.',
+  ],
+  [
+    'map',
+    'confirm.highImpactForbidden',
+    'Yüksek etkili kesinti açmak için ek yetki gerekiyor; yöneticinizle görüşün.',
+    'Opening a high-impact outage requires additional authorization; contact your administrator.',
+  ],
+  [
+    'map',
+    'confirm.highImpactWorkOrderNote',
+    'Kesintili iş emri türleri (planlı/plansız) bu elemanda ek yetki ister; kesintisiz türler serbesttir.',
+    'Outage-causing work order types (planned/unplanned) need extra authorization on this element; non-outage types do not.',
+  ],
+  ['map', 'confirm.previewFailed', 'Etki önizlemesi alınamadı.', 'Impact preview could not be loaded.'],
+
+  ['map', 'panel.detail.linkedOutages', 'Bu elemandaki kesintiler', 'Outages on this element'],
+  ['map', 'panel.detail.linkedWorkOrders', 'Bu elemandaki iş emirleri', 'Work orders on this element'],
 ];
 
 async function main(): Promise<void> {
@@ -445,12 +575,18 @@ async function main(): Promise<void> {
   //    "Yayınla"ya basması gerekir.
   let keyCount = 0;
   let translationCount = 0;
+  /**
+   * Yeni anahtar eklenen namespace'ler. Bundle'ın ETag'i ve Redis anahtarı **versiyona**
+   * bağlıdır; versiyon artmazsa yeni anahtar veritabanında olsa bile istemci eski bundle'ı
+   * önbellekten okumaya devam eder ve ekranda ham anahtar adı (`map.action.traceUp`) görünür.
+   */
+  const namespacesWithNewKeys = new Set<string>();
 
   for (const [namespaceName, keySuffix, tr, en] of SEED_KEYS) {
     const namespaceId = namespaceIds[namespaceName];
     if (!namespaceId) throw new Error(`Namespace bulunamadı: ${namespaceName}`);
 
-    // Anahtar adı namespace ön ekini LİTERAL olarak taşır (bkz. §4 adlandırma kuralı) —
+    // Anahtar adı namespace ön ekini LİTERAL olarak taşır —
     // toplu bundle (E3) namespace'siz düz bir sözlük döndüğü için ön ek olmadan
     // farklı namespace'lerdeki aynı adlı anahtarlar (ör. enum.status.STARTED) çakışırdı.
     const keyName = `${namespaceName}.${keySuffix}`;
@@ -467,6 +603,7 @@ async function main(): Promise<void> {
         .returning();
       key = created;
       keyCount++;
+      namespacesWithNewKeys.add(namespaceName);
     }
 
     for (const [localeCode, value] of [
@@ -497,9 +634,14 @@ async function main(): Promise<void> {
   }
 
   // 4. Bundle versiyonları — yayınlanmış içerik v1'dir (bkz. translation.repository.ts D1 notu).
+  //    Var olan bir namespace'e yeni anahtar geldiyse versiyon artırılır: seed zaten
+  //    `published_value`'yu doldurduğu için "Yayınla"ya basmaya gerek yok, ama versiyon
+  //    sabit kalırsa ETag da sabit kalır ve istemci 304 alıp eski sözlüğü kullanmaya devam eder.
   let versionCount = 0;
+  let bumpedCount = 0;
   for (const ns of SEED_NAMESPACES) {
     const namespaceId = namespaceIds[ns.name]!;
+    const hasNewKeys = namespacesWithNewKeys.has(ns.name);
     for (const loc of SEED_LOCALES) {
       const inserted = await db
         .insert(bundleVersions)
@@ -507,12 +649,23 @@ async function main(): Promise<void> {
         .onConflictDoNothing({ target: [bundleVersions.localeCode, bundleVersions.namespaceId] })
         .returning({ localeCode: bundleVersions.localeCode });
 
-      if (inserted.length > 0) versionCount++;
+      if (inserted.length > 0) {
+        versionCount++;
+        continue;
+      }
+
+      // Satır zaten vardı — yalnız içeriği değişen namespace'in versiyonu artırılır.
+      if (!hasNewKeys) continue;
+      await db
+        .update(bundleVersions)
+        .set({ version: sql`${bundleVersions.version} + 1`, publishedAt: new Date() })
+        .where(and(eq(bundleVersions.localeCode, loc.code), eq(bundleVersions.namespaceId, namespaceId)));
+      bumpedCount++;
     }
   }
 
   console.log(
-    `Seed tamam: ${SEED_LOCALES.length} dil, ${SEED_NAMESPACES.length} namespace, ${keyCount} yeni anahtar, ${translationCount} yeni çeviri satırı, ${versionCount} yeni bundle versiyonu.`,
+    `Seed tamam: ${SEED_LOCALES.length} dil, ${SEED_NAMESPACES.length} namespace, ${keyCount} yeni anahtar, ${translationCount} yeni çeviri satırı, ${versionCount} yeni bundle versiyonu, ${bumpedCount} versiyon artırıldı.`,
   );
 }
 

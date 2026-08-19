@@ -1,6 +1,8 @@
+import { CONSUMER_GROUPS, TOPICS } from '@inavitas/contracts';
 import {
   createKafkaClient,
   createProducer,
+  startConsumer,
   type Admin,
   type ConsumerHandle,
   type EventHandler,
@@ -35,10 +37,16 @@ export function getAdmin(): Admin {
   return admin;
 }
 
-/** Kafka tüketicilerini başlatır. */
-export async function startNetworkConsumer(_handler?: any, _logger?: any): Promise<void> {
-  // Henüz dinlenecek topic yok
-  consumerHandle = undefined;
+/** Kafka tüketicisini (kesinti topic'leri için) başlatır. */
+export async function startNetworkConsumer(handler: EventHandler, logger: Logger): Promise<void> {
+  consumerHandle = await startConsumer(
+    kafka,
+    CONSUMER_GROUPS.NETWORK_SERVICE,
+    [TOPICS.OUTAGE_CREATED],
+    handler,
+    getProducer(),
+    logger,
+  );
 }
 
 export async function disconnectKafka(): Promise<void> {

@@ -1,0 +1,87 @@
+@use '../../styles/variables' as v;
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-3;
+  padding: v.$space-4;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-md;
+  background: v.$color-surface-alt;
+}
+
+// Yüksek etkili kesinti (topoloji seviyesi ≤ 3) görsel olarak yükseltilir — aynı ekran,
+// farklı ağırlık; kullanıcı "bu sıradan bir trafo değil" bilgisini renkten alır.
+.bodyHighImpact {
+  border-color: v.$color-danger-soft-ink;
+  background: v.$color-danger-soft-bg;
+}
+
+.highImpactBanner {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-weight: 600;
+  color: v.$color-danger-soft-ink;
+  margin: 0;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+
+  dt {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: v.$color-ink-soft;
+  }
+
+  dd {
+    font-size: v.$control-font-size;
+    color: v.$color-ink;
+    margin: 0;
+  }
+}
+
+.impactLead {
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.impactList {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 v.$space-3;
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+
+  strong {
+    font-size: 1.125rem;
+  }
+}
+
+.pending {
+  font-size: v.$control-font-size;
+  color: v.$color-ink-soft;
+  margin: 0;
+}
+
+.blocked {
+  font-size: v.$control-font-size;
+  font-weight: 500;
+  color: v.$color-danger-soft-ink;
+  margin: 0;
+}

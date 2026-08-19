@@ -1,7 +1,7 @@
 import type { PaginationQuery, SortOrder } from '@inavitas/shared';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import { db, type Tx } from '../db.ts';
-import { workOrders, workOrderStatusHistory } from '../db/schema.ts';
+import { networkComponentsRo, workOrders, workOrderStatusHistory } from '../db/schema.ts';
 import type { WorkOrderStatus } from '../domain/state-machine.ts';
 
 export type WorkOrderRow = typeof workOrders.$inferSelect;
@@ -10,8 +10,10 @@ export type WorkOrderType = WorkOrderRow['type'];
 
 export interface WorkOrderFilters {
   status?: WorkOrderStatus[];
-  type?: WorkOrderType;
-  gisId?: string;
+  type?: WorkOrderType[];
+  cbsId?: string;
+  /** İdari birim alt ağacı — `unit_path <@ :unitPath` (ltree GiST indeksi kullanılır). */
+  unitPath?: string;
   createdAtFrom?: Date;
   createdAtTo?: Date;
   origin?: ('USER' | 'SYSTEM')[];
@@ -19,12 +21,32 @@ export interface WorkOrderFilters {
 }
 
 export interface CreateWorkOrderInput {
-  gisId: string;
+  cbsId: string;
   type: WorkOrderType;
   status: WorkOrderStatus;
   origin: 'USER' | 'SYSTEM';
   createdBy: string;
   outageId?: string | null;
+  // Oluşturma anında `network_components_ro`'dan denormalize edilen alanlar.
+  unitPath: string;
+  unitName: string | null;
+}
+
+/** Harita katmanının ihtiyaç duyduğu hafif iş emri özeti. */
+export interface WorkOrderMapRow {
+  id: string;
+  cbsId: string;
+  status: WorkOrderStatus;
+  type: WorkOrderType;
+  /** Bağlı elemanın tipi ve kesici rolü — harita katmanının zoom eşiği bunlardan türer. */
+  componentType: string;
+  breakerRole: string | null;
+  unitPath: string;
+  unitName: string | null;
+  createdAt: Date;
+  outageId: string | null;
+  lat: number;
+  lon: number;
 }
 
 export interface StatusChangeMeta {
@@ -35,13 +57,13 @@ export interface StatusChangeMeta {
 }
 
 /** Sıralama yapılabilecek alanlar. */
-export const SORTABLE_FIELDS = ['createdAt', 'status', 'type', 'gisId'] as const;
+export const SORTABLE_FIELDS = ['createdAt', 'status', 'type', 'cbsId'] as const;
 
 const SORT_COLUMNS = {
   createdAt: workOrders.createdAt,
   status: workOrders.status,
   type: workOrders.type,
-  gisId: workOrders.gisId,
+  cbsId: workOrders.cbsId,
 } as const;
 
 function buildConditions(filters: WorkOrderFilters): SQL[] {
@@ -61,8 +83,13 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
         : inArray(workOrders.origin, filters.origin),
     );
   }
-  if (filters.type) conditions.push(eq(workOrders.type, filters.type));
-  if (filters.gisId) conditions.push(ilike(workOrders.gisId, `${filters.gisId}%`));
+  if (filters.type && filters.type.length > 0) {
+    conditions.push(
+      filters.type.length === 1 ? eq(workOrders.type, filters.type[0]!) : inArray(workOrders.type, filters.type),
+    );
+  }
+  if (filters.unitPath) conditions.push(sql`${workOrders.unitPath} <@ ${filters.unitPath}::ltree`);
+  if (filters.cbsId) conditions.push(ilike(workOrders.cbsId, `${filters.cbsId}%`));
   if (filters.createdAtFrom) conditions.push(gte(workOrders.createdAt, filters.createdAtFrom));
   if (filters.createdAtTo) conditions.push(lt(workOrders.createdAt, filters.createdAtTo));
   if (filters.hasOutage === true) conditions.push(isNotNull(workOrders.outageId));
@@ -162,3 +189,32 @@ export async function getHistory(workOrderId: string): Promise<WorkOrderStatusHi
     .orderBy(desc(workOrderStatusHistory.changedAt));
 }
 
+
+/**
+ * Harita katmanı için hafif özet. Koordinat `network_components_ro` read-model'inden gelir;
+ * iş emri satırında koordinat kopyası tutulmaz.
+ */
+export async function listForMap(filters: WorkOrderFilters, limit: number): Promise<WorkOrderMapRow[]> {
+  const conditions = buildConditions(filters);
+
+  return db
+    .select({
+      id: workOrders.id,
+      cbsId: workOrders.cbsId,
+      status: workOrders.status,
+      type: workOrders.type,
+      componentType: networkComponentsRo.type,
+      breakerRole: networkComponentsRo.breakerRole,
+      unitPath: workOrders.unitPath,
+      unitName: workOrders.unitName,
+      createdAt: workOrders.createdAt,
+      outageId: workOrders.outageId,
+      lat: networkComponentsRo.lat,
+      lon: networkComponentsRo.lon,
+    })
+    .from(workOrders)
+    .innerJoin(networkComponentsRo, eq(networkComponentsRo.id, workOrders.cbsId))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(workOrders.createdAt))
+    .limit(limit);
+}

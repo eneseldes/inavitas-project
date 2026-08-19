@@ -1,7 +1,7 @@
 {
   "name": "inavitas-project",
   "version": "1.0.0",
-  "description": "Elektrik dağıtımı kesinti & iş emri yönetim modülü",
+  "description": "Elektrik da\u011f\u0131t\u0131m\u0131 kesinti & i\u015f emri y\u00f6netim mod\u00fcl\u00fc",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -16,7 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "npm run db:migrate -w services/access-service && npm run db:migrate -w services/outage-service && npm run db:migrate -w services/work-order-service && npm run db:migrate -w services/translation-service && npm run db:migrate -w services/network-service",
-    "db:seed": "npm run db:seed -w services/access-service && npm run db:seed -w services/translation-service && npm run db:seed -w services/network-service",
+    "db:seed": "npm run db:seed -w services/access-service && npm run db:seed -w services/translation-service && npm run db:seed -w services/network-service && npm run db:seed -w services/outage-service && npm run db:seed -w services/work-order-service",
     "topics": "./scripts/create-topics.sh",
     "reconcile": "dotenv -e .env -- tsx scripts/reconcile.ts"
   },

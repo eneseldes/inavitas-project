@@ -14,12 +14,24 @@ const FAST_IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 168;
  * Postgres'teki transactional `processed_events` kontrolüne ek, hızlı bir ön filtre.
  * Event daha önce görülmediyse `true`, zaten işlenmişse `false` döner.
  *
+ * ⚠️ **`consumer` zorunludur ve atlanamaz.** Tüm servisler AYNI Redis örneğini paylaşır;
+ * anahtar consumer group'a göre ayrılmazsa aynı topic'i dinleyen iki servis birbirinin
+ * olayını "zaten işlenmiş" sanar ve olayı **ilk davranan servis dışında herkes atlar**.
+ * Idempotency her zaman "bu servis bu olayı işledi mi" sorusudur — Postgres tarafında da
+ * öyledir, çünkü her servisin kendi `processed_events` tablosu vardır.
+ *
  * Asıl doğruluk garantisini hâlâ Postgres veriyor — Redis erişilemezse (bağlantı
  * hatası) bu filtre atlanır ve `true` dönülür, akış Postgres kontrolüne düşer.
  */
-export async function markSeenOnce(redis: Redis, eventId: string): Promise<boolean> {
+export async function markSeenOnce(redis: Redis, consumer: string, eventId: string): Promise<boolean> {
   try {
-    const result = await redis.set(`processed:${eventId}`, '1', 'EX', FAST_IDEMPOTENCY_TTL_SECONDS, 'NX');
+    const result = await redis.set(
+      `processed:${consumer}:${eventId}`,
+      '1',
+      'EX',
+      FAST_IDEMPOTENCY_TTL_SECONDS,
+      'NX',
+    );
     return result === 'OK';
   } catch {
     return true;

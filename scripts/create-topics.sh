@@ -6,6 +6,7 @@ set -euo pipefail
 
 TOPICS=(
   outage.created outage.energized outage.linked
+  outage.impact.calculated outage.cascaded
   work-order.created work-order.done work-order.linked
   translation.published
 )

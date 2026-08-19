@@ -32,6 +32,12 @@ export function buildRouter(): Router {
 
   // --- Kesinti Yönetim Uç Noktaları ---
   router.get('/outages', requirePermission(PERMISSIONS.OUTAGE_READ), asyncHandler<AuthedRequest>(outageController.list));
+  // `/outages/map` `/outages/:id`'den ÖNCE tanımlanmalı, yoksa "map" bir id sanılır.
+  router.get(
+    '/outages/map',
+    requirePermission(PERMISSIONS.OUTAGE_READ),
+    asyncHandler<AuthedRequest>(outageController.listForMap),
+  );
   router.get(
     '/outages/:id',
     requirePermission(PERMISSIONS.OUTAGE_READ),
@@ -41,6 +47,23 @@ export function buildRouter(): Router {
     '/outages/:id/history',
     requirePermission(PERMISSIONS.OUTAGE_READ),
     asyncHandler<AuthedRequest>(outageController.getHistory),
+  );
+  router.get(
+    '/outages/:id/impact',
+    requirePermission(PERMISSIONS.OUTAGE_READ),
+    asyncHandler<AuthedRequest>(outageController.getImpact),
+  );
+  router.get(
+    '/outages/:id/cascade',
+    requirePermission(PERMISSIONS.OUTAGE_READ),
+    asyncHandler<AuthedRequest>(outageController.getCascade),
+  );
+  // Abone kimliği PII değildir (tesisat/sözleşme bilgisi taşımaz), o yüzden ayrı bir
+  // `customer:read-pii` izni aranmaz — kesintiyi görebilen etkilenen aboneyi de görür.
+  router.get(
+    '/outages/:id/affected-customers',
+    requirePermission(PERMISSIONS.OUTAGE_READ),
+    asyncHandler<AuthedRequest>(outageController.getAffectedCustomers),
   );
   router.post(
     '/outages',

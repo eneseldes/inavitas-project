@@ -15,7 +15,7 @@ function useCreateOutageSchema() {
   const { t } = useTranslation();
   return z
     .object({
-      gisId: z.string().min(1, t('outage.validation.gisIdRequired')).max(64),
+      cbsId: z.string().min(1, t('outage.validation.cbsIdRequired')).max(64),
       startedAt: z.string().min(1, t('outage.validation.startedAtRequired')),
       endedAt: z.string().optional(),
     })
@@ -25,7 +25,17 @@ function useCreateOutageSchema() {
     });
 }
 
-export function CreateOutageDialog({ onClose }: { onClose: () => void }) {
+interface CreateOutageDialogProps {
+  onClose: () => void;
+  /**
+   * Haritadan açıldığında hedef eleman zaten seçilidir; alan dolu ve **kilitli** gelir.
+   * Kesinti oluşturma yolu tek kalsın diye harita için ayrı bir form yazılmaz — aynı
+   * dialog, aynı `POST /outages` ucu, aynı doğrulamalar.
+   */
+  presetCbsId?: string;
+}
+
+export function CreateOutageDialog({ onClose, presetCbsId }: CreateOutageDialogProps) {
   const createOutage = useCreateOutage();
   const { show } = useToast();
   const { t } = useTranslation();
@@ -40,13 +50,13 @@ export function CreateOutageDialog({ onClose }: { onClose: () => void }) {
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     mode: 'onSubmit',
-    defaultValues: { startedAt: toDateTimeLocalInput(new Date()) },
+    defaultValues: { startedAt: toDateTimeLocalInput(new Date()), ...(presetCbsId ? { cbsId: presetCbsId } : {}) },
   });
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       await createOutage.mutateAsync({
-        gisId: values.gisId,
+        cbsId: values.cbsId,
         startedAt: new Date(values.startedAt).toISOString(),
         endedAt: values.endedAt ? new Date(values.endedAt).toISOString() : undefined,
       });
@@ -62,7 +72,12 @@ export function CreateOutageDialog({ onClose }: { onClose: () => void }) {
       <form onSubmit={onSubmit} noValidate>
         {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
-        <TextField label={t('outage.dialog.create.gisIdLabel')} error={errors.gisId?.message} {...register('gisId')} />
+        <TextField
+          label={t('outage.dialog.create.cbsIdLabel')}
+          error={errors.cbsId?.message}
+          readOnly={presetCbsId !== undefined}
+          {...register('cbsId')}
+        />
 
         <TextField
           label={t('outage.dialog.create.startedAtLabel')}

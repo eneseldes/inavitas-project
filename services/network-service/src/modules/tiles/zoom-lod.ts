@@ -19,7 +19,7 @@ export interface ZoomLod {
   includeBuildings: boolean;
 }
 
-/** Bina izinin açıldığı zoom — ankara-yeni-detayli-v3.html'deki `BLD_ZOOM` ile aynı. */
+/** Bina izinin açıldığı zoom — istemcideki `BUILDING_ZOOM` ile aynı olmalıdır. */
 export const BUILDING_ZOOM = 16;
 
 /**

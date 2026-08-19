@@ -84,8 +84,8 @@ export function EditOutageDialog({ outage, onClose }: EditOutageDialogProps) {
           </span>
         </div>
         <div className={styles.readOnlyRow}>
-          <span className={styles.readOnlyLabel}>GIS ID</span>
-          <span className={`${styles.readOnlyValue} font-mono`}>{outage.gisId}</span>
+          <span className={styles.readOnlyLabel}>CBS ID</span>
+          <span className={`${styles.readOnlyValue} font-mono`}>{outage.cbsId}</span>
         </div>
         <div className={styles.readOnlyRow}>
           <span className={styles.readOnlyLabel}>{t('outage.dialog.edit.currentStatusLabel')}</span>

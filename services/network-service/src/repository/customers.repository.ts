@@ -1,5 +1,5 @@
 import type { PaginationQuery, SortOrder } from '@inavitas/shared';
-import { and, asc, count, desc, eq, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { customerPii, customers } from '../db/schema.ts';
 
@@ -86,4 +86,25 @@ export async function findById(id: string): Promise<CustomerRow | null> {
 export async function findPiiById(id: string): Promise<CustomerPiiRow | null> {
   const [row] = await db.select().from(customerPii).where(eq(customerPii.id, id));
   return row ?? null;
+}
+
+/** Etki olayında taşınan, PII içermeyen abone özeti. */
+export interface AffectedCustomerRow {
+  id: string;
+  unitPath: string;
+  customerType: string | null;
+}
+
+/**
+ * Etki hesabının döndürdüğü abone kimliklerini PII'sız özet satırlarına çevirir.
+ * `outage.impact.calculated` olayının abone kümesi buradan doldurulur — `outage-service`
+ * ayrıca sormaz, bu yüzden yalnız read-model'e yazılacak üç alan okunur.
+ */
+export async function findAffectedByIds(ids: string[]): Promise<AffectedCustomerRow[]> {
+  if (ids.length === 0) return [];
+
+  return db
+    .select({ id: customers.id, unitPath: customers.unitPath, customerType: customers.customerType })
+    .from(customers)
+    .where(inArray(customers.id, ids));
 }

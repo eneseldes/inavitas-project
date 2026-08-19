@@ -1,10 +1,13 @@
+import { sql } from 'drizzle-orm';
 import {
   boolean,
   customType,
   doublePrecision,
+  index,
   integer,
   jsonb,
   pgSchema,
+  pgTable,
   serial,
   text,
   timestamp,
@@ -152,3 +155,31 @@ export const customerPii = customerSchema.table('customer_pii', {
   wiringId: varchar('wiring_id', { length: 64 }).notNull(),
   contractId: varchar('contract_id', { length: 64 }).notNull(),
 });
+
+/**
+ * Kafka event idempotency takibi tablosu (çift işlemeyi önler).
+ * `outage-service`/`work-order-service`'teki desenin birebir aynısıdır.
+ */
+export const processedEvents = pgTable('processed_events', {
+  eventId: uuid('event_id').primaryKey(),
+  topic: varchar('topic', { length: 128 }).notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Transactional outbox tablosu. `outage.created` tüketimi ve `outage.impact.calculated`
+ * yayını AYNI transaction'da yazılır — dual-write yoktur.
+ */
+export const outbox = pgTable(
+  'outbox',
+  {
+    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    topic: varchar('topic', { length: 128 }).notNull(),
+    partitionKey: varchar('partition_key', { length: 64 }).notNull(),
+    payload: jsonb('payload').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    attempts: integer('attempts').notNull().default(0),
+  },
+  (table) => [index('idx_outbox_pending').on(table.createdAt).where(sql`${table.publishedAt} IS NULL`)],
+);

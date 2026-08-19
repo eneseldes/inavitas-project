@@ -20,7 +20,7 @@ const server = app.listen(config.OUTAGE_SERVICE_PORT, () => {
 
 await connectKafka();
 await startOutageConsumer(createOutageEventHandler(logger), logger);
-logger.info('Kafka consumer ayakta (work-order.created, work-order.linked, work-order.done)');
+logger.info('Kafka consumer ayakta (work-order.*, outage.impact.calculated, outage.energized)');
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
 

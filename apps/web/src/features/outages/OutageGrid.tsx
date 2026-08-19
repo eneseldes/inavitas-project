@@ -86,8 +86,8 @@ export function OutageGrid() {
           {activeOutageFromQuery ? (
             <span>
               {t('outage.related.label')} <span className="font-mono">{activeOutageFromQuery.id}</span> —{' '}
-              <StatusBadge status={activeOutageFromQuery.status} /> — {t('outage.related.gisLabel')}{' '}
-              {activeOutageFromQuery.gisId}
+              <StatusBadge status={activeOutageFromQuery.status} /> — {t('outage.related.cbsLabel')}{' '}
+              {activeOutageFromQuery.cbsId}
             </span>
           ) : (
             <span>{t('outage.related.loading')}</span>

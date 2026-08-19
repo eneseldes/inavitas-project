@@ -61,3 +61,84 @@
     margin: 0;
   }
 }
+
+// --- Aksiyonlar --------------------------------------------------------------
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+  margin-top: v.$space-4;
+}
+
+.action {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+// İz açıkken buton basılı görünür — aynı butona ikinci kez basmak izi kapatır.
+.actionActive {
+  border-color: v.$color-brand-soft-border;
+  background: v.$color-brand-soft-bg;
+  color: v.$color-brand-soft-ink;
+}
+
+.traceSummary {
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+  margin: v.$space-2 0 0;
+}
+
+.traceNote {
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+  margin: v.$space-1 0 0;
+}
+
+.traceWarning {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  color: v.$color-danger-soft-ink;
+}
+
+// --- Elemana bağlı kayıtlar --------------------------------------------------
+
+.linked {
+  margin-top: v.$space-5;
+}
+
+.linkedTitle {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: v.$color-ink-soft;
+  margin: 0 0 v.$space-2;
+}
+
+.linkedList {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.linkedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+  width: 100%;
+  padding: v.$space-2;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-sm;
+  background: v.$color-surface-alt;
+  color: v.$color-ink;
+  cursor: pointer;
+
+  &:hover {
+    background: v.$color-row-hover;
+  }
+}

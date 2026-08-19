@@ -1,8 +1,11 @@
 import {
+  CONSUMER_GROUPS,
   parseEvent,
   shouldTriggerCounterpart,
   SYSTEM_ACTOR,
   TOPICS,
+  type OutageEnergizedEvent,
+  type OutageImpactCalculatedEvent,
   type WorkOrderCreatedEvent,
   type WorkOrderDoneEvent,
   type WorkOrderLinkedEvent,
@@ -13,11 +16,15 @@ import { ZodError } from 'zod';
 import { db } from '../db.ts';
 import { outages } from '../db/schema.ts';
 import { canTransition } from '../domain/state-machine.ts';
+import { applyCascade, resolveChildOutages } from '../modules/cascade/service.ts';
+import { ComponentNotFoundError } from '@inavitas/shared';
+import * as networkComponentRepository from '../repository/network-component.repository.ts';
 import { markProcessed } from '../repository/idempotency.repository.ts';
-import { createTx, linkWorkOrderTx, updateWithVersionTx } from '../repository/outage.repository.ts';
+import * as outageRepository from '../repository/outage.repository.ts';
+import { applyImpactTx, createTx, linkWorkOrderTx, updateWithVersionTx } from '../repository/outage.repository.ts';
 import { redis } from '../redis.ts';
 import { notifyOutageChanged } from '../realtime.ts';
-import { enqueueOutageEnergizedIfNeededTx, enqueueOutageLinkedTx } from './producer.ts';
+import { enqueueOutageCreatedTx, enqueueOutageEnergizedIfNeededTx, enqueueOutageLinkedTx } from './producer.ts';
 
 /**
  * 'work-order.created' event'i işleyicisi: Kullanıcı kaynaklı bir iş emri oluştuğunda otomatik sistem kesintisi oluşturur.
@@ -32,6 +39,14 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
     return;
   }
 
+  // Otomatik kesinti de geçerli bir CBS elemanına bağlanmak zorundadır; read-model'de
+  // karşılığı yoksa kesinti açılmaz (kayıt "asdasd" gibi bir kimlikle doğmaz).
+  const component = await networkComponentRepository.findById(envelope.payload.cbsId);
+  if (!component) {
+    log.error({ cbsId: envelope.payload.cbsId }, 'iş emrinin CBS elemanı read-model\'de yok, kesinti açılmadı');
+    throw new ComponentNotFoundError(envelope.payload.cbsId);
+  }
+
   const created = await db.transaction(async (tx) => {
     const processed = await markProcessed(tx, envelope.eventId, TOPICS.WORK_ORDER_CREATED);
     if (!processed) return null;
@@ -39,18 +54,32 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
     const row = await createTx(
       tx,
       {
-        gisId: envelope.payload.gisId,
+        cbsId: envelope.payload.cbsId,
         startedAt: new Date(),
         endedAt: null,
         status: 'STARTED',
         origin: 'SYSTEM',
         createdBy: SYSTEM_ACTOR,
         workOrderId: envelope.payload.workOrderId,
+        unitPath: component.unitPath,
+        componentType: component.type,
+        componentName: component.name,
+        topologyLevel: component.topologyLevel,
       },
       envelope.correlationId,
     );
 
-    await enqueueOutageLinkedTx(tx, row.id, row.gisId, envelope.payload.workOrderId, {
+    // Sistem kesintisi de tıpkı kullanıcının açtığı gibi 'outage.created' yayınlar —
+    // etki hesabı bu olaya bağlıdır. `origin: 'SYSTEM'` olduğu için work-order-service
+    // bunu görüp ikinci bir iş emri açmaz (shouldTriggerCounterpart).
+    await enqueueOutageCreatedTx(tx, row, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    await enqueueOutageLinkedTx(tx, row.id, row.cbsId, envelope.payload.workOrderId, {
       origin: 'SYSTEM',
       actor: SYSTEM_ACTOR,
       correlationId: envelope.correlationId,
@@ -66,7 +95,7 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
   }
 
   log.info(
-    { outageId: created.id, workOrderId: envelope.payload.workOrderId, gisId: created.gisId },
+    { outageId: created.id, workOrderId: envelope.payload.workOrderId, cbsId: created.cbsId },
     'iş emrinden otomatik kesinti oluşturuldu',
   );
 
@@ -154,10 +183,111 @@ export async function handleWorkOrderDone(envelope: WorkOrderDoneEvent, log: Log
   await notifyOutageChanged(result.row, log);
 }
 
+/**
+ * 'outage.impact.calculated' event'i işleyicisi: `network-service`'in hesapladığı etkiyi
+ * geri yazar, ardından kaskad ilişkilerini kurar.
+ *
+ * Etki yazımı ve idempotency kaydı aynı transaction'dadır; kaskad ise ayrı transaction'larda
+ * yürür — bir kaskad bağı kurulamasa bile etki verisi kaybolmaz (etki, kaskadın ön koşuludur,
+ * tersi değil).
+ */
+export async function handleOutageImpactCalculated(envelope: OutageImpactCalculatedEvent, log: Logger): Promise<void> {
+  const { outageId, revision, customers, affectedElementIds } = envelope.payload;
+
+  const updated = await db.transaction(async (tx) => {
+    const processed = await markProcessed(tx, envelope.eventId, TOPICS.OUTAGE_IMPACT_CALCULATED);
+    if (!processed) return null;
+
+    return applyImpactTx(tx, {
+      outageId,
+      revision,
+      affectedElementIds,
+      affectedElementCount: envelope.payload.affectedElementCount,
+      affectedCustomerCount: envelope.payload.affectedCustomerCount,
+      customers,
+      overflowed: envelope.payload.overflowed,
+      radialityViolated: envelope.payload.radialityViolated,
+    });
+  });
+
+  if (!updated) {
+    log.debug({ eventId: envelope.eventId }, 'zaten işlenmiş veya kesinti bulunamadı, atlanıyor');
+    return;
+  }
+
+  log.info(
+    {
+      outageId,
+      revision,
+      affectedCustomerCount: envelope.payload.affectedCustomerCount,
+      impactStatus: updated.impactStatus,
+    },
+    'kesinti etkisi kaydedildi',
+  );
+
+  await notifyOutageChanged(updated, log);
+
+  // Radyallik bozulduysa etki kümesi güvenilir değildir — üzerine kaskad kurulmaz.
+  if (envelope.payload.radialityViolated) {
+    log.warn({ outageId }, 'radyallik varsayımı bozuk, kaskad değerlendirmesi atlandı');
+    return;
+  }
+
+  const cascade = await applyCascade(
+    updated,
+    affectedElementIds,
+    { correlationId: envelope.correlationId, causedBy: envelope },
+    log,
+  );
+
+  // Kaskad bağı kesintinin kendisini de (parentOutageId) alt kesintileri de değiştirir;
+  // açık duran ekranlar bunu SSE ile görmeli, sayfa yenilemeyle değil.
+  const changedIds = [
+    ...(cascade.parentOutageId === null ? [] : [updated.id]),
+    ...cascade.supersededOutageIds,
+  ];
+  for (const id of changedIds) {
+    const row = await outageRepository.findById(id);
+    if (row) await notifyOutageChanged(row, log);
+  }
+}
+
+/**
+ * 'outage.energized' event'i işleyicisi: üst kesinti enerjilenince kapsanan alt kesintileri
+ * doğrulayarak kapatır (otomatik çözülme).
+ */
+export async function handleOutageEnergized(envelope: OutageEnergizedEvent, log: Logger): Promise<void> {
+  const parent = await outageRepository.findById(envelope.payload.outageId);
+  if (!parent) {
+    log.debug({ outageId: envelope.payload.outageId }, 'kesinti bulunamadı, otomatik çözülme atlanıyor');
+    return;
+  }
+
+  const processed = await db.transaction((tx) => markProcessed(tx, envelope.eventId, TOPICS.OUTAGE_ENERGIZED));
+  if (!processed) {
+    log.debug({ eventId: envelope.eventId }, 'event zaten işlenmiş, atlanıyor');
+    return;
+  }
+
+  const resolved = await resolveChildOutages(
+    parent,
+    new Date(envelope.payload.endedAt),
+    { correlationId: envelope.correlationId, causedBy: envelope },
+    log,
+  );
+
+  for (const id of resolved) {
+    const row = await outageRepository.findById(id);
+    if (row) await notifyOutageChanged(row, log);
+  }
+}
+
 const VALIDATORS = {
   [TOPICS.WORK_ORDER_CREATED]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_CREATED, raw),
   [TOPICS.WORK_ORDER_LINKED]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_LINKED, raw),
   [TOPICS.WORK_ORDER_DONE]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_DONE, raw),
+  [TOPICS.OUTAGE_IMPACT_CALCULATED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_IMPACT_CALCULATED, raw),
+  [TOPICS.OUTAGE_ENERGIZED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_ENERGIZED, raw),
 } as const;
 
 /**
@@ -182,7 +312,9 @@ export function createOutageEventHandler(logger: Logger): EventHandler {
     const log = withCorrelation(logger, envelope.correlationId, { eventId: envelope.eventId, eventType: envelope.eventType });
 
     // Postgres veri tabanındaki idempotency kontrolüne ek olarak Redis ön filtresi kullanılır.
-    if (!(await markSeenOnce(redis, envelope.eventId))) {
+    // Anahtar consumer group'la ayrılır: aynı topic'i başka bir servis de dinliyor olabilir
+    // ve ortak Redis'te ayrılmamış anahtar diğerinin olayı atlamasına yol açar.
+    if (!(await markSeenOnce(redis, CONSUMER_GROUPS.OUTAGE_SERVICE, envelope.eventId))) {
       log.debug({ eventId: envelope.eventId }, 'redis ön filtresi: muhtemelen zaten işlenmiş, atlanıyor');
       return;
     }
@@ -194,6 +326,10 @@ export function createOutageEventHandler(logger: Logger): EventHandler {
         return handleWorkOrderLinked(envelope as WorkOrderLinkedEvent, log);
       case TOPICS.WORK_ORDER_DONE:
         return handleWorkOrderDone(envelope as WorkOrderDoneEvent, log);
+      case TOPICS.OUTAGE_IMPACT_CALCULATED:
+        return handleOutageImpactCalculated(envelope as OutageImpactCalculatedEvent, log);
+      case TOPICS.OUTAGE_ENERGIZED:
+        return handleOutageEnergized(envelope as OutageEnergizedEvent, log);
     }
   };
 }

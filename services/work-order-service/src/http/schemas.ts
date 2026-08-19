@@ -14,7 +14,7 @@ export const WorkOrderTypeEnum = z.enum([
 
 /** Yeni iş emri oluşturma istek gövdesi şeması. */
 export const CreateWorkOrderBody = z.object({
-  gisId: z.string().min(1, 'gisId zorunlu').max(64),
+  cbsId: z.string().min(1).max(64),
   type: WorkOrderTypeEnum,
   status: WorkOrderStatusEnum.optional(),
 });
@@ -31,15 +31,32 @@ const csv = z
   .string()
   .transform((s) => s.split(',').map((v) => v.trim()).filter(Boolean));
 
-/** İş emri listeleme sorgu (query) parametreleri şeması. */
-export const ListWorkOrdersQuery = PaginationQuery.extend({
-  sort: z.string().optional(),
+/** Liste ve harita uçlarının paylaştığı filtre parametreleri. */
+const workOrderFilterShape = {
   status: csv.pipe(z.array(WorkOrderStatusEnum)).optional(),
   origin: csv.pipe(z.array(z.enum(['USER', 'SYSTEM']))).optional(),
-  type: WorkOrderTypeEnum.optional(),
-  gisId: z.string().optional(),
+  type: csv.pipe(z.array(WorkOrderTypeEnum)).optional(),
+  cbsId: z.string().optional(),
+  /** İdari birim alt ağacı — `TR.06.012` altındaki tüm iş emirleri. */
+  unitPath: z.string().optional(),
   createdAtFrom: z.string().optional(),
   createdAtTo: z.string().optional(),
   hasOutage: z.enum(['true', 'false']).optional(),
+} as const;
+
+/** İş emri listeleme sorgu (query) parametreleri şeması. */
+export const ListWorkOrdersQuery = PaginationQuery.extend({
+  sort: z.string().optional(),
+  ...workOrderFilterShape,
 });
 export type ListWorkOrdersQuery = z.infer<typeof ListWorkOrdersQuery>;
+
+/**
+ * Harita katmanı sorgusu. Sayfalama yoktur — harita bir liste değil; bunun yerine sunucu
+ * tarafında sert bir üst sınır uygulanır.
+ */
+export const WorkOrderMapQuery = z.object({
+  ...workOrderFilterShape,
+  limit: z.coerce.number().int().min(1).max(5_000).default(2_000),
+});
+export type WorkOrderMapQuery = z.infer<typeof WorkOrderMapQuery>;

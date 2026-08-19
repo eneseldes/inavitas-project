@@ -32,15 +32,20 @@ export function buildNetworkSource(): VectorSourceSpecification {
   };
 }
 
-function token(name: string): string {
+/**
+ * CSS custom property'yi düz renk değerine çözer. MapLibre canlı `var()` desteklemediği
+ * için token'lar yalnız katman kurulurken çözülür; tema değişince katmanlar yeniden kurulur.
+ */
+export function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 // --- Efsane (sağ panel) ------------------------------------------------------
 //
-// ankara-yeni-detayli-v3.html'deki katman listesinin birebir karşılığı. İki bölüm:
-// HATLAR ve BİRİMLER. Hat katmanları birim katmanlarından **bağımsızdır** — TM'i
-// kapatmak TM'e giden HV hattını gizlemez, çünkü hat ayrı bir katmandır.
+// Düz katman listesi, iki bölüm: HATLAR ve BİRİMLER. İki seviyeli bir kategori ağacı
+// denendi ve terk edildi, çünkü hat katmanları birim katmanlarından **bağımsızdır** —
+// TM'i kapatmak TM'e giden HV hattını gizlemez, hat ayrı bir katmandır ve kategori bazlı
+// tek filtre bunu ifade edemiyordu.
 
 export const LINE_LEGEND_IDS = ['HV_LINE', 'MV_MAIN', 'MV_BRANCH', 'LV_LINE'] as const;
 export type LineLegendId = (typeof LINE_LEGEND_IDS)[number];
@@ -84,9 +89,9 @@ export const LEGEND_COLOR_VAR: Record<LegendId, string> = {
 /** Bina izi olan birimler — tile'daki `unit_type` değerleriyle aynı. */
 const BUILDING_UNIT_LEGEND_IDS = ['TM', 'DM', 'TRANSFORMER', 'SERVICE_ENTRY'] as const;
 
-// Katman kimlikleri — çizim sırası (alttan üste) v3'teki pane z-index'lerini izler:
-// LV(405) → kofra(405) → MV kolu(408) → MV ana(411) → HV(414) → bina(425) →
-// bina içi(435) → düğüm(445) → seçim(655).
+// Katman kimlikleri. Dizi sırası aynı zamanda çizim sırasıdır (alttan üste): ince/az
+// önemli olan altta, kalın/öncelikli olan üstte kalsın diye —
+// LV → kofra → MV kolu → MV ana → HV → bina izi → bina içi yol → düğümler → kesiciler.
 const L = {
   lvLine: 'line-lv',
   dropLine: 'line-drop',
@@ -119,19 +124,42 @@ export const LEGEND_LAYER_IDS: Record<LegendId, string[]> = {
   DM: [L.dm],
   TRANSFORMER: [L.transformer],
   LV_JUNCTION: [L.lvj],
-  // v3'te "Kofra kesicisi / ev girişi" tek satır: irtibat hattı + kofra kesicisi birlikte.
+  // "Kofra kesicisi / ev girişi" efsanede tek satırdır: irtibat hattı + kofra kesicisi
+  // birlikte açılıp kapanır — kullanıcı için ikisi tek bir görsel bütündür.
   SERVICE_ENTRY: [L.dropLine, L.kofra],
 };
 
 /**
- * Tıklanabilir katmanlar — hat katmanları dahil değil (v3'te de yalnız düğümler tıklanır).
- * Bina izinin duvar dolgusu da tıklanabilir: birimi seçmek için binanın herhangi bir yerine
+ * Tıklanabilir katmanlar — yalnız düğümler ve bina izi; **hat katmanları dahil değil**.
+ * Seçim bir noktayı işaret eder, bir güzergâhı değil.
+ * Bina izinin duvar dolgusu tıklanabilir: birimi seçmek için binanın herhangi bir yerine
  * basmak yeter, minik düğüm noktasını yakalamak gerekmez.
  */
 export const CLICKABLE_LAYER_IDS = [L.tm, L.dm, L.transformer, L.lvj, L.kofra, L.bldBreaker, L.bldTint];
 
 /** Bina izi katmanları — görünürlüğü zoom'a değil, ait olduğu birimin efsane satırına bağlıdır. */
 export const BUILDING_LAYER_IDS = [L.bldHalo, L.bldWash, L.bldTint, L.bldOutline, L.bldInner, L.bldBreaker];
+
+// --- İz vurgusu (upstream / downstream) --------------------------------------
+//
+// İz ayrı bir katman ÜRETMEZ; zaten çizilen geometrinin `feature-state`'i boyanır.
+// Durum boolean değil string taşır ('up' | 'down'), çünkü iki yön iki ayrı renktir ve
+// tek bir bayrak bunu ifade edemez. Ayarlanmamış `feature-state` null döner; `==` farklı
+// tipleri sessizce `false` sayar, bu yüzden ek bir varlık kontrolü gerekmez.
+
+const TRACED_UP: ExpressionSpecification = ['==', ['feature-state', 'traced'], 'up'];
+const TRACED_DOWN: ExpressionSpecification = ['==', ['feature-state', 'traced'], 'down'];
+const IS_TRACED: ExpressionSpecification = ['any', TRACED_UP, TRACED_DOWN];
+
+/** İz rengi; iz yoksa katmanın kendi rengine düşer. */
+function tracedColor(base: string): ExpressionSpecification {
+  return ['case', TRACED_UP, token('--c-map-trace-up'), TRACED_DOWN, token('--c-map-trace-down'), base];
+}
+
+/** İzdeki eleman öne çıksın diye kalınlık/opaklık gibi sayısal değerleri yükseltir. */
+function tracedValue(base: number, traced: number): ExpressionSpecification {
+  return ['case', IS_TRACED, traced, base];
+}
 
 // --- Hat katmanları ----------------------------------------------------------
 
@@ -153,9 +181,11 @@ function lineLayer(
     filter: rememberBaseFilter(id, ['all', LINESTRING_GEOMETRY_FILTER, ['in', ['get', 'type'], ['literal', types]]]),
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': color,
-      'line-width': width,
-      'line-opacity': opacity,
+      // İzdeki hat kendi renginin yerine iz rengiyle, bir tık kalın ve tam opak çizilir —
+      // 0,4 kV hattı gibi soluk katmanlarda iz aksi halde fark edilmiyordu.
+      'line-color': tracedColor(color),
+      'line-width': tracedValue(width, width * 2),
+      'line-opacity': tracedValue(opacity, 1),
       ...(dash ? { 'line-dasharray': dash } : {}),
     },
   };
@@ -163,10 +193,10 @@ function lineLayer(
 
 // --- Birim / düğüm katmanları ------------------------------------------------
 //
-// ⚠️ BUS, FEEDER ve LV_BUS hiç çizilmez; kaynak veride birimle **tam aynı koordinatta**
-// durdukları için üstünü kapatıp birimin kendisini tıklanamaz hale getiriyorlardı
-// (v3'teki "BUS'un pini yok" notunun sebebi). Aynı şekilde TM/DM/trafo kesicileri de
-// burada değil, yalnız bina izi içinde (ring'e yayılmış konumlarında) çizilir.
+// ⚠️ BUS, FEEDER ve LV_BUS hiç çizilmez; kaynak veride sahibi oldukları birimle **tam aynı
+// koordinatta** durdukları için üstünü kapatıp birimin kendisini tıklanamaz hale
+// getiriyorlardı. Aynı şekilde TM/DM/trafo kesicileri de burada değil, yalnız bina izi
+// içinde (duvara yayılmış konumlarında) çizilir.
 
 function pointLayer(
   id: string,
@@ -184,7 +214,9 @@ function pointLayer(
     minzoom,
     filter: rememberBaseFilter(id, ['all', POINT_GEOMETRY_FILTER, filter]),
     paint: {
-      'circle-color': color,
+      // İzdeki düğüm gövdesinden boyanır; seçim ise yalnız kenarı değiştirir. Böylece
+      // seçili eleman aynı anda izin de parçasıysa ikisi birbirini ezmez.
+      'circle-color': tracedColor(color),
       'circle-radius': radius,
       // Seçili birim kendi düğümünde de belli olur — bina izinin görünmediği zoom'larda
       // (z<16) tek işaret budur. Ayrı bir halka katmanı YOK: kullanıcı "seçince etrafında
@@ -212,7 +244,7 @@ function unitTypeMatch<T extends string | number>(tm: T, dm: T, tr: T, kofra: T)
 const TINT = () => unitTypeMatch(token('--c-map-tm'), token('--c-map-dm'), token('--c-map-tr'), token('--c-map-breaker'));
 const EDGE = () => unitTypeMatch(token('--c-map-tm-dark'), token('--c-map-dm-dark'), token('--c-map-tr-dark'), token('--c-map-breaker-dark'));
 
-/** Katmanları v3'teki çizim sırasıyla (alttan üste) döndürür. */
+/** Katmanları çizim sırasıyla (alttan üste) döndürür. */
 export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[] {
   // Pastel bantlar iki temada da açık renktir; koyu zeminde yalnız opaklık düşürülür —
   // koyulaştırılsalar altlıkla birleşip siyah bir lekeye dönüşüyorlardı.
@@ -282,10 +314,11 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       filter: ['==', ['get', 'ring'], 'wall'],
       minzoom: BUILDING_ZOOM,
       paint: {
-        'fill-color': TINT(),
+        // Bina izi de ize girer: bir fideri izlerken altındaki trafo binaları da boyanır.
+        'fill-color': ['case', TRACED_UP, token('--c-map-trace-up'), TRACED_DOWN, token('--c-map-trace-down'), TINT()],
         // Seçim, kenar rengini değiştirerek değil yapının dolgusunu koyulaştırarak
         // gösterilir — bina "yanmış" gibi okunur, ince bir çerçeve gibi değil.
-        'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.8, 0.26],
+        'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.8, IS_TRACED, 0.6, 0.26],
       },
     },
     {
@@ -330,7 +363,7 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       'source-layer': 'building_breakers',
       minzoom: BUILDING_ZOOM,
       paint: {
-        'circle-color': token('--c-map-breaker'),
+        'circle-color': tracedColor(token('--c-map-breaker')),
         'circle-radius': unitTypeMatch(2.8, 2.5, 2.2, 2.2),
         // TM'de tek tek fider kesicisi seçilebilir; seçilen kesici de vurgulanır.
         'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, 1.2],
@@ -341,7 +374,7 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
   ];
 }
 
-/** `feature-state` yazılacak kaynak katmanlar — seçim bunların hepsinde işaretlenir. */
+/** `feature-state` yazılacak kaynak katmanlar — seçim ve iz bunların hepsinde işaretlenir. */
 export const SELECTABLE_SOURCE_LAYERS = ['components', 'building_shapes', 'building_breakers'];
 
 // --- Filtreler ---------------------------------------------------------------

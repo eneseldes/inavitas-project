@@ -80,16 +80,16 @@ export function buildOutageColumns(
         },
       },
       {
-        id: 'gisId',
-        header: 'GIS ID',
-        accessorFn: (row) => row.gisId,
+        id: 'cbsId',
+        header: 'CBS ID',
+        accessorFn: (row) => row.cbsId,
         cell: (ctx) => <span className="font-mono">{ctx.getValue<string>()}</span>,
         meta: {
-          sortField: 'gisId',
+          sortField: 'cbsId',
           filter: {
-            key: 'gisId',
+            key: 'cbsId',
             type: 'text',
-            toQuery: (v) => ({ gisId: (v as string) || undefined }),
+            toQuery: (v) => ({ cbsId: (v as string) || undefined }),
           },
         } satisfies ColumnMeta,
       },
@@ -153,6 +153,30 @@ export function buildOutageColumns(
             toQuery: (v) => {
               const { min, max } = v as NumberRangeFilterValue;
               return { durationMinMinutes: min, durationMaxMinutes: max };
+            },
+          },
+        } satisfies ColumnMeta,
+      },
+      {
+        id: 'affectedCustomerCount',
+        header: t('outage.column.affectedCustomerCount'),
+        accessorFn: (row) => row.affectedCustomerCount,
+        // Etki olay akışıyla geldiği için ilk saniyelerde henüz boş olabilir; bu bir hata
+        // değil, geçici bir durumdur (bkz. impactStatus).
+        cell: (ctx) => {
+          const outage = ctx.row.original;
+          if (outage.impactStatus === 'PENDING') return <span className="text-muted">…</span>;
+          if (outage.impactStatus === 'UNAVAILABLE') return <span className="text-muted">—</span>;
+          return outage.affectedCustomerCount ?? '—';
+        },
+        meta: {
+          sortField: 'affectedCustomerCount',
+          filter: {
+            key: 'affectedCustomers',
+            type: 'numberRange',
+            toQuery: (v) => {
+              const { min, max } = v as NumberRangeFilterValue;
+              return { minAffectedCustomers: min, maxAffectedCustomers: max };
             },
           },
         } satisfies ColumnMeta,

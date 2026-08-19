@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { FiArrowRight, FiLink } from 'react-icons/fi';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
@@ -90,6 +91,7 @@ function WorkOrderDetailTab({
 }) {
   const { hasPermission } = useAuth();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const labels = useLabels();
   const { show } = useToast();
   const patchWorkOrder = usePatchWorkOrder();
@@ -131,8 +133,21 @@ function WorkOrderDetailTab({
           </span>
         </div>
         <div className={styles.infoItem}>
-          <span className={styles.infoLabel}>GIS ID</span>
-          <span className={`${styles.infoValue} font-mono`}>{workOrder.gisId}</span>
+          <span className={styles.infoLabel}>CBS ID</span>
+          {/* Çift yönlü bağ: CBS ID haritayı elemanın konumunda açar. Şebekeyi göremeyen
+              kullanıcıya bağlantı verilmez, düz metin kalır. */}
+          {hasPermission('network:read') ? (
+            <button
+              type="button"
+              className={`link font-mono`}
+              onClick={() => navigate(`/map?focus=${workOrder.cbsId}`)}
+              title={t('map.action.showOnMap')}
+            >
+              {workOrder.cbsId}
+            </button>
+          ) : (
+            <span className={`${styles.infoValue} font-mono`}>{workOrder.cbsId}</span>
+          )}
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('work-order.dialog.edit.typeLabel', undefined, 'İş Emri Türü')}</span>

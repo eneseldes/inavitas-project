@@ -5,6 +5,10 @@ export const TOPICS = {
   OUTAGE_CREATED: 'outage.created',
   OUTAGE_ENERGIZED: 'outage.energized',
   OUTAGE_LINKED: 'outage.linked',
+  /** Etki hesaplandı — network-service grafı gezdi, etkilenen eleman ve abone kümesini yayınlıyor. */
+  OUTAGE_IMPACT_CALCULATED: 'outage.impact.calculated',
+  /** İki kesinti arasında kapsama/yükselme ilişkisi kuruldu. */
+  OUTAGE_CASCADED: 'outage.cascaded',
   WORK_ORDER_CREATED: 'work-order.created',
   WORK_ORDER_DONE: 'work-order.done',
   WORK_ORDER_LINKED: 'work-order.linked',
@@ -28,4 +32,5 @@ export function dlqOf(topic: Topic): `${Topic}.DLQ` {
 export const CONSUMER_GROUPS = {
   OUTAGE_SERVICE: 'outage-service-group',
   WORK_ORDER_SERVICE: 'work-order-service-group',
+  NETWORK_SERVICE: 'network-service-group',
 } as const;

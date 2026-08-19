@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { FiArrowRight, FiLink, FiLock } from 'react-icons/fi';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
@@ -16,6 +17,7 @@ import type { Outage, OutageStatus } from '../../types/outage.ts';
 import { USER_SELECTABLE_NEXT_STATUSES, isLocked } from './columns.tsx';
 import styles from '../../shared/components/DetailSectionLayout.module.scss';
 import { useOutageHistory, usePatchOutage } from './useOutages.ts';
+import { AffectedCustomersTab } from './AffectedCustomersTab.tsx';
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'medium' });
 const shortDateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
@@ -30,6 +32,9 @@ function makeSchema(startedAt: string, invalidMessage: string) {
       path: ['endedAt'],
     });
 }
+
+/** Kesinti detayının sekmeleri. */
+type OutageDetailTabId = 'detail' | 'history' | 'affectedCustomers';
 
 interface OutageDetailSectionProps {
   outage: Outage;
@@ -47,15 +52,16 @@ export function OutageDetailSection({
   onOpenWorkOrder,
 }: OutageDetailSectionProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'detail' | 'history'>('detail');
+  const [activeTab, setActiveTab] = useState<OutageDetailTabId>('detail');
 
-  const tabs: TabConfig<'detail' | 'history'>[] = [
+  const tabs: TabConfig<OutageDetailTabId>[] = [
     { id: 'detail', label: t('outage.tab.detail', undefined, 'Detay') },
     { id: 'history', label: t('outage.tab.history', undefined, 'Durum Geçmişi') },
+    { id: 'affectedCustomers', label: t('outage.tab.affectedCustomers', undefined, 'Etkilenen Aboneler') },
   ];
 
   return (
-    <DetailSectionLayout<Outage, 'detail' | 'history'>
+    <DetailSectionLayout<Outage, OutageDetailTabId>
       title={`${outage.id.slice(0, 8)} ${t('outage.detail.headerTitle', undefined, 'Kesinti Ayrıntıları')}`}
       onBack={onBack}
       items={outages}
@@ -78,11 +84,9 @@ export function OutageDetailSection({
       activeTab={activeTab}
       onTabChange={setActiveTab}
     >
-      {activeTab === 'detail' ? (
-        <OutageDetailTab key={outage.id} outage={outage} onOpenWorkOrder={onOpenWorkOrder} />
-      ) : (
-        <OutageHistoryTab outageId={outage.id} />
-      )}
+      {activeTab === 'detail' && <OutageDetailTab key={outage.id} outage={outage} onOpenWorkOrder={onOpenWorkOrder} />}
+      {activeTab === 'history' && <OutageHistoryTab outageId={outage.id} />}
+      {activeTab === 'affectedCustomers' && <AffectedCustomersTab key={outage.id} outage={outage} />}
     </DetailSectionLayout>
   );
 }
@@ -97,6 +101,7 @@ function OutageDetailTab({
 }) {
   const { hasPermission } = useAuth();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const labels = useLabels();
   const { show } = useToast();
   const patchOutage = usePatchOutage();
@@ -158,8 +163,21 @@ function OutageDetailTab({
           </span>
         </div>
         <div className={styles.infoItem}>
-          <span className={styles.infoLabel}>GIS ID</span>
-          <span className={`${styles.infoValue} font-mono`}>{outage.gisId}</span>
+          <span className={styles.infoLabel}>CBS ID</span>
+          {/* Çift yönlü bağ: CBS ID haritayı elemanın konumunda açar. Şebekeyi göremeyen
+              kullanıcıya bağlantı verilmez, düz metin kalır. */}
+          {hasPermission('network:read') ? (
+            <button
+              type="button"
+              className={`link font-mono`}
+              onClick={() => navigate(`/map?focus=${outage.cbsId}`)}
+              title={t('map.action.showOnMap')}
+            >
+              {outage.cbsId}
+            </button>
+          ) : (
+            <span className={`${styles.infoValue} font-mono`}>{outage.cbsId}</span>
+          )}
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('outage.dialog.edit.currentStatusLabel', undefined, 'Mevcut Durum')}</span>
@@ -180,6 +198,38 @@ function OutageDetailTab({
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('outage.column.durationMinutes')}</span>
           <span className={styles.infoValue}>{outage.durationMinutes ?? '—'}</span>
+        </div>
+        <div className={styles.infoItem}>
+          <span className={styles.infoLabel}>{t('outage.detail.componentLabel', undefined, 'Eleman')}</span>
+          <span className={styles.infoValue}>
+            {t(`network.enum.componentType.${outage.componentType}`, undefined, outage.componentType)}
+            {outage.componentName ? ` · ${outage.componentName}` : ''}
+          </span>
+        </div>
+        <div className={styles.infoItem}>
+          <span className={styles.infoLabel}>{t('outage.detail.unitPathLabel', undefined, 'İdari Birim')}</span>
+          <span className={`${styles.infoValue} font-mono`}>{outage.unitPath}</span>
+        </div>
+        <div className={styles.infoItem}>
+          <span className={styles.infoLabel}>
+            {t('outage.detail.affectedCustomerCountLabel', undefined, 'Etkilenen Abone')}
+          </span>
+          <span className={styles.infoValue}>
+            {outage.impactStatus === 'PENDING'
+              ? t('outage.detail.impactPending', undefined, 'Hesaplanıyor…')
+              : outage.impactStatus === 'UNAVAILABLE'
+                ? t('outage.detail.impactUnavailable', undefined, 'Hesaplanamadı')
+                : (outage.affectedCustomerCount ?? '—')}
+          </span>
+        </div>
+        <div className={styles.infoItem}>
+          <span className={styles.infoLabel}>{t('outage.detail.customerMinutesLabel', undefined, 'Müşteri-Dakika')}</span>
+          <span className={styles.infoValue}>
+            {outage.customerMinutes ?? '—'}
+            {outage.parentOutageId !== null && (
+              <span className="text-muted"> · {t('outage.detail.coveredByParent', undefined, 'Üst kesintide sayılıyor')}</span>
+            )}
+          </span>
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('outage.column.origin')}</span>

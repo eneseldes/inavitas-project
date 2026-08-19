@@ -29,6 +29,27 @@
       "when": 1786110183587,
       "tag": "0003_add_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787123948460,
+      "tag": "0004_add_cbs_id_and_impact_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787123955340,
+      "tag": "0005_drop_gis_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787123956340,
+      "tag": "0006_add_ltree_and_jsonb_indexes",
+      "breakpoints": true
     }
   ]
 }

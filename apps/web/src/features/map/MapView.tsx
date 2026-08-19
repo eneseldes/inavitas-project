@@ -1,9 +1,19 @@
-import { Map as MapLibreMap, Marker, NavigationControl, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl';
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  type GeoJSONSource,
+  type MapLayerMouseEvent,
+  type StyleSpecification,
+} from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTheme } from '../../features/theme/ThemeProvider.tsx';
-import type { VoltageLevel } from '../../types/network.ts';
+import type { Bbox, VoltageLevel } from '../../types/network.ts';
+import type { OutageMapItem } from '../../types/outage.ts';
+import type { WorkOrderMapItem } from '../../types/work-order.ts';
 import { BASEMAP_PMTILES_URL, BASEMAP_SOURCE_ID, buildBasemapLayers, isBasemapAvailable, registerPmtilesProtocol } from './basemap.ts';
+import type { TraceDirection } from './api.ts';
 import type { MapView as MapViewState } from './useMapState.ts';
 import { useUnitLabels } from './useNetwork.ts';
 import {
@@ -19,6 +29,17 @@ import {
   UNITS_PROVINCE_FILL_LAYER_ID,
   type LegendId,
 } from './networkLayers.ts';
+import {
+  buildOperationLayers,
+  buildOperationSource,
+  buildOutageHeatmapLayer,
+  operationLayerIds,
+  OUTAGE_HEATMAP_LAYER_ID,
+  OUTAGE_SOURCE_ID,
+  toOutageCollection,
+  toWorkOrderCollection,
+  WORK_ORDER_SOURCE_ID,
+} from './operationLayers.ts';
 import styles from './MapView.module.scss';
 
 interface MapViewProps {
@@ -30,6 +51,25 @@ interface MapViewProps {
   selectedId: string | undefined;
   onSelect: (id: string | undefined) => void;
   flyTo?: { lng: number; lat: number; zoom: number };
+  /**
+   * Açık izdeki eleman kimlikleri ve yönü. İz ayrı bir katman üretmez; bu kimliklerin
+   * `feature-state`'i boyanır (bkz. networkLayers.ts iz ifadeleri).
+   */
+  tracedIds: string[] | undefined;
+  traceDirection: TraceDirection | undefined;
+  /**
+   * İzin kapsayan dikdörtgeni — sunucu tek `ST_Extent` sorgusuyla döner. Geldiğinde kamera
+   * buraya oturur; iz kapanınca kullanıcının seçimden önceki konumuna geri döner.
+   */
+  traceBbox: Bbox | null | undefined;
+  /** İşletim katmanları — `/outages/map` ve `/work-orders/map` özetleri. */
+  outages: OutageMapItem[] | undefined;
+  workOrders: WorkOrderMapItem[] | undefined;
+  showOutages: boolean;
+  showWorkOrders: boolean;
+  showOutageHeatmap: boolean;
+  /** Haritadaki bir kesinti/iş emri noktasına tıklandığında çağrılır. */
+  onSelectOperation: (kind: 'outage' | 'workOrder', id: string) => void;
 }
 
 registerPmtilesProtocol();
@@ -62,6 +102,15 @@ export function MapView({
   selectedId,
   onSelect,
   flyTo,
+  outages,
+  workOrders,
+  showOutages,
+  showWorkOrders,
+  showOutageHeatmap,
+  onSelectOperation,
+  tracedIds,
+  traceDirection,
+  traceBbox,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -76,6 +125,30 @@ export function MapView({
   const labelMarkersRef = useRef<Marker[]>([]);
   // Önceki seçimin `feature-state`'ini temizleyebilmek için tutulur.
   const selectedFeatureRef = useRef<string | undefined>(undefined);
+  // Aynısının iz karşılığı — iz kapanınca boyanmış her kimlik tek tek geri alınır.
+  const tracedFeatureIdsRef = useRef<string[]>([]);
+  // İz açılmadan önceki kamera; iz kapanınca buraya dönülür.
+  const savedCameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
+
+  // Mount efektindeki `moveend`/click dinleyicileri harita örneğiyle birlikte YALNIZ BİR KEZ
+  // kurulur (bkz. aşağıdaki `[]` bağımlılık listesi) ve asla yeniden bağlanmaz. Bu yüzden
+  // `onViewChange`/`onSelect`'i doğrudan kapatırlarsa kurulum anındaki (URL'de henüz hiçbir
+  // filtre yokken) sürümde donarlar: sonraki her pan/zoom veya tıklama, o ilk `searchParams`
+  // taban alınarak `patch` çağırır ve o ana kadar değiştirilmiş tüm filtreleri (gerilim,
+  // efsane, seçim) URL'den siler. Ref'ler her render'da güncel tutulup dinleyiciler ref
+  // üzerinden çağrılarak her zaman en güncel URL durumunun üstüne yazılması sağlanır.
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const onSelectOperationRef = useRef(onSelectOperation);
+  onSelectOperationRef.current = onSelectOperation;
+  // Kesinti/iş emri verisi katmanlar kurulmadan da gelebilir; son hâli burada tutulur ki
+  // tema değişiminde katmanlar yeniden kurulurken veri kaybolmasın.
+  const outagesRef = useRef(outages);
+  outagesRef.current = outages;
+  const workOrdersRef = useRef(workOrders);
+  workOrdersRef.current = workOrders;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -100,7 +173,7 @@ export function MapView({
 
       map.on('moveend', () => {
         const center = map!.getCenter();
-        onViewChange({ lng: center.lng, lat: center.lat, zoom: map!.getZoom() });
+        onViewChangeRef.current({ lng: center.lng, lat: center.lat, zoom: map!.getZoom() });
       });
 
       /**
@@ -115,7 +188,7 @@ export function MapView({
         const unitType = props.unit_type as string | undefined;
         const ownId = props.id as string | undefined;
         const id = unitId !== undefined && unitType !== 'TM' ? unitId : ownId;
-        if (id) onSelect(id);
+        if (id) onSelectRef.current(id);
       };
       for (const layerId of CLICKABLE_LAYER_IDS) {
         map.on('click', layerId, handleFeatureClick);
@@ -127,9 +200,25 @@ export function MapView({
         });
       }
 
+      // İşletim katmanları ayrı bir tıklama kuralı izler: nokta bir şebeke elemanını
+      // değil, bir kesinti/iş emri kaydını temsil eder.
+      for (const layerId of [...operationLayerIds(OUTAGE_SOURCE_ID), ...operationLayerIds(WORK_ORDER_SOURCE_ID)]) {
+        const kind = layerId.startsWith(OUTAGE_SOURCE_ID) ? 'outage' : 'workOrder';
+        map.on('click', layerId, (e: MapLayerMouseEvent) => {
+          const id = e.features?.[0]?.properties?.id as string | undefined;
+          if (id) onSelectOperationRef.current(kind, id);
+        });
+        map.on('mouseenter', layerId, () => {
+          map!.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', layerId, () => {
+          map!.getCanvas().style.cursor = '';
+        });
+      }
+
       map.on('load', () => {
         loadedRef.current = true;
-        rebuildLayers(map!, theme);
+        rebuildLayers(map!, theme, outagesRef.current, workOrdersRef.current);
         setMapLoaded(true);
       });
     });
@@ -150,8 +239,35 @@ export function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !loadedRef.current) return;
-    rebuildLayers(map, theme);
+    rebuildLayers(map, theme, outagesRef.current, workOrdersRef.current);
   }, [theme]);
+
+  // Kesinti/iş emri verisi değişince katman kurulmaz, yalnız kaynağın verisi güncellenir —
+  // SSE her olayda katmanları yeniden kurmasın diye.
+  useEffect(() => {
+    const source = mapRef.current?.getSource(OUTAGE_SOURCE_ID) as GeoJSONSource | undefined;
+    source?.setData(toOutageCollection(outages));
+  }, [outages, mapLoaded]);
+
+  useEffect(() => {
+    const source = mapRef.current?.getSource(WORK_ORDER_SOURCE_ID) as GeoJSONSource | undefined;
+    source?.setData(toWorkOrderCollection(workOrders));
+  }, [workOrders, mapLoaded]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const apply = (layerIds: string[], visible: boolean) => {
+      for (const layerId of layerIds) {
+        if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+      }
+    };
+    apply(operationLayerIds(OUTAGE_SOURCE_ID), showOutages);
+    apply(operationLayerIds(WORK_ORDER_SOURCE_ID), showWorkOrders);
+    // Isı haritası kesinti katmanından bağımsız açılıp kapanır.
+    apply([OUTAGE_HEATMAP_LAYER_ID], showOutageHeatmap);
+  }, [showOutages, showWorkOrders, showOutageHeatmap, mapLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -202,6 +318,55 @@ export function MapView({
       selectedFeatureRef.current = selectedId;
     }
   }, [selectedId, mapLoaded]);
+
+  // İz vurgusu — seçimle aynı mekanizma (`feature-state`), ayrı bir katman üretilmez.
+  // Önceki iz her seferinde tek tek temizlenir: `removeFeatureState` kaynağın tamamını
+  // sıfırlayabilirdi ama o seçimi de silerdi.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    for (const id of tracedFeatureIdsRef.current) {
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, 'traced');
+      }
+    }
+    tracedFeatureIdsRef.current = [];
+
+    if (!tracedIds || !traceDirection) return;
+    for (const id of tracedIds) {
+      // Hangi kaynak katmanda olduğu bilinmediğinden hepsine yazılır; olmayan tarafta
+      // `feature-state` sessizce boşa gider (seçimde de aynı desen kullanılıyor).
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, { traced: traceDirection });
+      }
+    }
+    tracedFeatureIdsRef.current = tracedIds;
+  }, [tracedIds, traceDirection, mapLoaded]);
+
+  // Harita odağı: iz açılınca kamera izin kapsayan dikdörtgenine oturur, iz kapanınca
+  // kullanıcının seçimden ÖNCEKİ konumuna geri döner. Ayrı bir "temizle" butonuna
+  // bağlanmaz — unutulursa harita yanlış konumda takılı kalmış gibi hissedilir.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    if (traceBbox) {
+      savedCameraRef.current ??= { center: map.getCenter().toArray(), zoom: map.getZoom() };
+      // `maxZoom` olmadan tek elemanlı bir iz (kofra kesicisi → 0 eleman) sonuna kadar
+      // yakınlaşıp bağlamı tamamen kaybettiriyor.
+      map.fitBounds(traceBbox, { padding: 64, maxZoom: 17, duration: 600 });
+      return;
+    }
+
+    const saved = savedCameraRef.current;
+    if (saved) {
+      map.easeTo({ center: saved.center, zoom: saved.zoom, duration: 600 });
+      savedCameraRef.current = null;
+    }
+    // `traceBbox` dizi kimliği her render'da değişebileceğinden içeriğine göre bağımlanılır.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceBbox?.join(','), mapLoaded]);
 
   // İl/ilçe adları — kendi glyph fontumuzu barındırmadığımız için MapLibre `symbol`
   // katmanı yerine HTML işaretçisi kullanılır (dış font sunucusuna bağımlılık yok).
@@ -255,22 +420,38 @@ export function MapView({
   return <div ref={containerRef} className={styles.container} />;
 }
 
-/** Mevcut basemap + şebeke katmanlarını kaldırıp güncel tema token'larıyla yeniden kurar. */
-function rebuildLayers(map: MapLibreMap, theme: 'light' | 'dark'): void {
+/** Mevcut basemap + şebeke + işletim katmanlarını kaldırıp güncel tema token'larıyla yeniden kurar. */
+function rebuildLayers(
+  map: MapLibreMap,
+  theme: 'light' | 'dark',
+  outages: OutageMapItem[] | undefined,
+  workOrders: WorkOrderMapItem[] | undefined,
+): void {
   const style = map.getStyle();
   if (style) {
     for (const layer of style.layers) {
-      if ('source' in layer && layer.source === NETWORK_SOURCE_ID) map.removeLayer(layer.id);
+      if ('source' in layer && (layer.source === NETWORK_SOURCE_ID || layer.source === OUTAGE_SOURCE_ID || layer.source === WORK_ORDER_SOURCE_ID)) {
+        map.removeLayer(layer.id);
+      }
     }
   }
   if (map.getSource(NETWORK_SOURCE_ID)) map.removeSource(NETWORK_SOURCE_ID);
+  if (map.getSource(OUTAGE_SOURCE_ID)) map.removeSource(OUTAGE_SOURCE_ID);
+  if (map.getSource(WORK_ORDER_SOURCE_ID)) map.removeSource(WORK_ORDER_SOURCE_ID);
   removeBasemap(map);
 
-  // Katman sırası: altlık harita → il/ilçe renkleri → hatlar → bina izi → düğümler → seçim.
+  // Katman sırası: altlık harita → il/ilçe renkleri → hatlar → bina izi → düğümler →
+  // ısı haritası → kesinti/iş emri noktaları (işletim katmanı her zaman en üstte).
   map.addSource(NETWORK_SOURCE_ID, buildNetworkSource());
   const layers = buildNetworkLayers(theme);
   for (const layer of layers) map.addLayer(layer);
   const firstLayerId = layers[0]!.id;
+
+  map.addSource(OUTAGE_SOURCE_ID, buildOperationSource(toOutageCollection(outages)));
+  map.addSource(WORK_ORDER_SOURCE_ID, buildOperationSource(toWorkOrderCollection(workOrders)));
+  map.addLayer(buildOutageHeatmapLayer());
+  for (const layer of buildOperationLayers(WORK_ORDER_SOURCE_ID, 'workOrder')) map.addLayer(layer);
+  for (const layer of buildOperationLayers(OUTAGE_SOURCE_ID, 'outage')) map.addLayer(layer);
 
   void isBasemapAvailable().then((available) => {
     if (!map.getSource(NETWORK_SOURCE_ID)) return;

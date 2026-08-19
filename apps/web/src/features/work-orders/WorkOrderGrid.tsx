@@ -83,8 +83,8 @@ export function WorkOrderGrid() {
           {activeWorkOrderFromQuery ? (
             <span>
               {t('work-order.related.label')} <span className="font-mono">{activeWorkOrderFromQuery.id}</span> —{' '}
-              <StatusBadge status={activeWorkOrderFromQuery.status} /> — {t('outage.related.gisLabel')}{' '}
-              {activeWorkOrderFromQuery.gisId}
+              <StatusBadge status={activeWorkOrderFromQuery.status} /> — {t('outage.related.cbsLabel')}{' '}
+              {activeWorkOrderFromQuery.cbsId}
             </span>
           ) : (
             <span>{t('work-order.related.loading')}</span>

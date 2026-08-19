@@ -15,6 +15,13 @@
       "when": 1787054498255,
       "tag": "0001_grant_app_schema_access",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787122817993,
+      "tag": "0002_add_outbox_and_processed_events",
+      "breakpoints": true
     }
   ]
 }

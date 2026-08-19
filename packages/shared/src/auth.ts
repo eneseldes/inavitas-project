@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { ForbiddenError, UnauthenticatedError } from './errors.ts';
+import { ForbiddenError, HighImpactForbiddenError, UnauthenticatedError } from './errors.ts';
 
 /** Kullanıcı rol tanımları. */
 export const ROLES = {
@@ -16,6 +16,7 @@ export type Role = (typeof ROLES)[keyof typeof ROLES];
 export const PERMISSIONS = {
   OUTAGE_READ: 'outage:read',
   OUTAGE_WRITE: 'outage:write',
+  OUTAGE_WRITE_HIGH_IMPACT: 'outage:write-high-impact',
   WORKORDER_READ: 'workorder:read',
   WORKORDER_WRITE: 'workorder:write',
   USER_MANAGE: 'user:manage',
@@ -34,6 +35,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ADMIN: [
     PERMISSIONS.OUTAGE_READ,
     PERMISSIONS.OUTAGE_WRITE,
+    PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT,
     PERMISSIONS.WORKORDER_READ,
     PERMISSIONS.WORKORDER_WRITE,
     PERMISSIONS.USER_MANAGE,
@@ -106,6 +108,30 @@ export function requireAnyPermission(...permissions: Permission[]) {
 
     next();
   };
+}
+
+/**
+ * Yüksek etkili kesinti eşiği: bu topoloji seviyesi ve altı TM / bara / fider kesicisi /
+ * fider demektir — tek bir açma binlerce aboneyi karartır.
+ *
+ * Sabit burada durur çünkü kullanımı bir **yetki kuralıdır** ve üç servis birden okur:
+ * `network-service` etki önizlemesinin `highImpact` bayrağını bundan üretir,
+ * `outage-service` ve `work-order-service` kayıt anında bununla yeniden doğrular.
+ * İki yerde ayrı ayrı yazılırsa biri değişip diğeri kalır ve yetki sessizce açılır.
+ */
+export const HIGH_IMPACT_TOPOLOGY_LEVEL = 3;
+
+/**
+ * Yüksek etkili bir elemana kesinti yazma yetkisini doğrular.
+ *
+ * ⚠️ İstemcinin gösterdiği etki önizlemesine **güvenilmez**: önizleme ile kayıt arasında
+ * zaman geçer ve önizleme hiç çağrılmadan da istek atılabilir. Bu yüzden kontrol kayıt
+ * anında, read-model'den okunan `topologyLevel` üzerinden tekrarlanır.
+ */
+export function assertHighImpactAllowed(user: AuthenticatedUser, cbsId: string, topologyLevel: number): void {
+  if (topologyLevel > HIGH_IMPACT_TOPOLOGY_LEVEL) return;
+  if (user.permissions.includes(PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT)) return;
+  throw new HighImpactForbiddenError(cbsId, topologyLevel);
 }
 
 /**

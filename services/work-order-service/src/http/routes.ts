@@ -36,6 +36,12 @@ export function buildRouter(): Router {
     requirePermission(PERMISSIONS.WORKORDER_READ),
     asyncHandler<AuthedRequest>(workOrderController.list),
   );
+  // `/work-orders/map` `/work-orders/:id`'den ÖNCE tanımlanmalı, yoksa "map" bir id sanılır.
+  router.get(
+    '/work-orders/map',
+    requirePermission(PERMISSIONS.WORKORDER_READ),
+    asyncHandler<AuthedRequest>(workOrderController.listForMap),
+  );
   router.get(
     '/work-orders/:id',
     requirePermission(PERMISSIONS.WORKORDER_READ),
