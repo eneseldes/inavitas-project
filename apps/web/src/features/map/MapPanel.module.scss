@@ -1,0 +1,361 @@
+@use '../../styles/variables' as v;
+
+// Sağ şeritten açılan üç panelin (katmanlar · filtreler · alan seçimi) ortak stil dosyası.
+// Panel kabuğu ve içindeki liste/grup/alan biçimleri üçünde de birebir aynı olduğundan
+// tek yerde tutulur; üç kopya birbirinden ayrı düşecek ilk şeydi.
+
+// `.dock`'un `align-items: stretch` kuralı bu paneli varsayılan olarak haritanın tüm
+// yüksekliğine gerer — içerik ne kadar kısa olursa olsun. Rayın kendisi (`MapToolRail`)
+// zaten `align-self: flex-start` kullanıyor, panel de aynı deseni izler; üstüne bir üst
+// sınır konur ki uzun bir grup listesi bile ekranın tamamını kaplamasın.
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-self: flex-start;
+  width: 19rem;
+  max-width: 100%;
+  max-height: 50%;
+  border-radius: v.$radius-lg;
+  border: 1px solid v.$color-hairline;
+  background: v.$color-surface;
+  box-shadow: v.$shadow-sm;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+  flex-shrink: 0;
+  padding: v.$space-3 v.$space-3 v.$space-3 v.$space-4;
+  border-bottom: 1px solid v.$color-hairline;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+// Uzayan içerik paneli büyütmez, burada kayar.
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: v.$space-3 v.$space-4 v.$space-4;
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+}
+
+// --- Katlanabilir grup -------------------------------------------------------
+// Gruplar arası ayrım eskiden bir `border-bottom` ile çizilirdi; çizgi kalkınca (ekranı
+// bölüyordu) kendi dolgusu artık gereksiz — ayrım tek başına `.body`'nin `gap`inden gelir.
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  width: 100%;
+  padding: v.$space-1 0;
+}
+
+// Başlığa tıklamak grubu açar/kapatır; grubun kendi işaret kutusu ayrı bir kontroldür.
+.groupToggle {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  flex: 1;
+  min-width: 0;
+  color: v.$color-ink;
+  font-size: v.$control-font-size;
+  font-weight: 600;
+  text-align: left;
+}
+
+.groupChevron {
+  flex-shrink: 0;
+  color: v.$color-ink-soft;
+  transition: transform 160ms ease;
+}
+
+.groupChevronOpen {
+  transform: rotate(90deg);
+}
+
+.groupBody {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+  padding-left: v.$space-4;
+}
+
+// --- Satırlar ----------------------------------------------------------------
+
+.checkList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-1;
+}
+
+.checkItem {
+  display: flex;
+  flex-direction: column;
+}
+
+// Kullanıcı & rol yönetimindeki izin listesiyle aynı satır boşluğu (bkz. PermissionsPanel).
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+  cursor: pointer;
+  padding: 0.3125rem 0.5rem;
+  border-radius: v.$radius-sm;
+
+  &:hover {
+    background: v.$color-surface-alt;
+  }
+}
+
+// Yerel işaret kutusu görünmez kılınıp yerine rol yönetimindeki aynı yuvarlak kutu
+// konur — tarayıcının varsayılan kutucuğu tasarım sistemiyle uyuşmuyordu.
+.checkbox {
+  display: inline-flex;
+  flex-shrink: 0;
+  position: relative;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.checkboxBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid v.$color-hairline;
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  transition:
+    background v.$transition-fast,
+    border-color v.$transition-fast,
+    color v.$transition-fast;
+
+  svg {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+.checkbox input:checked + .checkboxBox {
+  background: v.$color-brand-500;
+  border-color: v.$color-brand-500;
+  color: v.$color-ink-inverse;
+}
+
+.checkbox input:indeterminate + .checkboxBox {
+  background: v.$color-brand-500;
+  border-color: v.$color-brand-500;
+  color: v.$color-ink-inverse;
+}
+
+.checkbox input:focus-visible + .checkboxBox {
+  outline: none;
+  box-shadow: 0 0 0 2px v.$focus-shadow;
+}
+
+.swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: v.$radius-full;
+  flex-shrink: 0;
+}
+
+// Hat katmanları yuvarlak nokta değil kısa bir çizgi örneğiyle gösterilir.
+.swatchLine {
+  width: 1.125rem;
+  height: 0.1875rem;
+  border-radius: 1px;
+}
+
+// Kesinti/iş emri satırının örneği haritadaki işaretçiyi taklit eder: köşeleri
+// yuvarlatılmış, içi dolu bir kare — böylece efsane ile harita aynı şeyi gösterir.
+.swatchMarker {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0.25rem;
+}
+
+// Örneğin rengi katman başına ayrı bir sınıftır; satır bileşeni renk değeri taşımaz.
+// Harita katmanları ile aynı token'lardan boyanır, böylece efsane ile harita ayrışamaz.
+.swatchHvLine {
+  background: var(--c-map-line-hv);
+}
+.swatchMvMain {
+  background: var(--c-map-line-mv);
+}
+.swatchMvBranch {
+  background: var(--c-map-line-mv-branch);
+}
+.swatchLvLine {
+  background: var(--c-map-line-lv);
+}
+.swatchTm {
+  background: var(--c-map-tm);
+}
+.swatchDm {
+  background: var(--c-map-dm);
+}
+.swatchTransformer {
+  background: var(--c-map-tr);
+}
+.swatchLvJunction {
+  background: var(--c-map-lvj);
+}
+.swatchServiceEntry {
+  background: var(--c-map-breaker);
+}
+.swatchOutage {
+  background: var(--c-map-outage-started);
+}
+.swatchWorkOrder {
+  background: var(--c-map-wo-started);
+}
+.swatchHeatmap {
+  background: var(--c-map-heat-mid);
+}
+.swatchBoundary {
+  background: var(--c-map-unit-band-0);
+}
+
+.subFilterTitle {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: v.$color-ink-soft;
+  margin: v.$space-1 0 v.$space-2;
+}
+
+// Filtreler paneli üç ayrı alandan oluşur (Gerilim · Kesintiler · İş Emirleri) — bu ayrım
+// çoklu-seçim listelerindeki (bkz. `.group` yukarıda) çizgiden FARKLIDIR: o gürültüydü ve
+// kaldırıldı, ama üç ana alan birbirine karışmasın diye burada ince, silik bir üst çizgi
+// kalır. Yalnız Kesintiler/İş Emri sarmalayıcısına uygulanır — Gerilim ilk alan olduğundan
+// üstünde çizgiye gerek yok.
+.filterMainSection {
+  border-top: 1px solid v.$color-hairline;
+  padding-top: v.$space-3;
+}
+
+.zoomHint {
+  margin: 0 0 0 1.375rem;
+  font-size: 0.6875rem;
+  color: v.$color-ink-soft;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-size: v.$control-font-size;
+  color: v.$color-ink;
+}
+
+/** Katman kapalıyken alt filtreler soluklaşır — filtre katmanın altındadır, yanında değil. */
+.subFilters {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+}
+
+.subFiltersDisabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.inlineField {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-size: 0.75rem;
+  color: v.$color-ink-soft;
+
+  input,
+  select {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.75rem;
+    padding: 0.1875rem 0.375rem;
+    border-radius: v.$radius-sm;
+    border: 1px solid v.$color-hairline;
+    background: v.$color-surface;
+    color: v.$color-ink;
+  }
+}
+
+// Değer girilmemiş tarih alanı soluk kalır — dolu/boş ayrımı tarayıcının kendi
+// `date` görünümünden daha belirgin olsun diye elle işaretlenir.
+.dateInputEmpty {
+  color: v.$color-ink-soft;
+  opacity: 0.6;
+}
+
+// Tarih girilince yanında beliren temizle düğmesi — alanı tekrar boşaltmanın tek yolu.
+.dateClear {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: v.$color-ink-soft;
+
+  &:hover {
+    color: v.$color-ink;
+  }
+
+  svg {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+}
+
+/** Sonuç sunucudaki üst sınıra dayandı — kullanıcı filtreyi daraltmalı. */
+.truncatedHint {
+  margin: 0;
+  font-size: 0.6875rem;
+  color: v.$color-danger-soft-ink;
+}
+
+// --- Alan seçimi -------------------------------------------------------------
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-2;
+}
+
+.action {
+  justify-content: flex-start;
+  width: 100%;
+}

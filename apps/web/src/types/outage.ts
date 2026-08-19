@@ -101,6 +101,8 @@ export interface OutageMapItem {
   /** Kesici rolü — katmanın zoom eşiği bundan türer (kofra kesintisi z16,5'te açılır). */
   breakerRole: string | null;
   unitPath: string;
+  unitName: string | null;
+  districtName: string | null;
   startedAt: string;
   endedAt: string | null;
   affectedCustomerCount: number | null;

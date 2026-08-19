@@ -1,0 +1,38 @@
+@use '../../styles/variables' as v;
+
+// Yüksek etkili kesinti (topoloji seviyesi ≤ 3) bir uyarı satırıyla vurgulanır — modalin
+// tamamını grimsi bir kutuya sarmak yerine (eskisi gibi) yalnız bu satır dikkat çeker.
+.highImpactBanner {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  font-weight: 600;
+  color: v.$color-danger-soft-ink;
+  margin: 0 0 v.$space-3;
+
+  svg {
+    flex-shrink: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+}
+
+// `DetailSection`in kendi alt boşluğu SON bölümde sıfırlanır (bkz. `.section:last-of-type`
+// DetailPanel.module.scss) — bu modalde bölümlerden sonra form alanları geldiği için o
+// boşluk burada elle geri konur.
+.info {
+  margin-bottom: v.$space-3;
+}
+
+.pending {
+  font-size: v.$control-font-size;
+  color: v.$color-ink-soft;
+  margin: 0;
+}
+
+.blocked {
+  font-size: v.$control-font-size;
+  font-weight: 500;
+  color: v.$color-danger-soft-ink;
+  margin: 0 0 v.$space-3;
+}

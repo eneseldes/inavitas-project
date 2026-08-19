@@ -98,6 +98,8 @@ export function toOutageMapDto(row: OutageMapRow) {
     componentType: row.componentType,
     breakerRole: row.breakerRole,
     unitPath: row.unitPath,
+    unitName: row.unitName,
+    districtName: row.districtName,
     startedAt: row.startedAt.toISOString(),
     endedAt: row.endedAt ? row.endedAt.toISOString() : null,
     affectedCustomerCount: row.affectedCustomerCount,

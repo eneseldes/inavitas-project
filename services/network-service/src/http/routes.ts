@@ -8,6 +8,7 @@ import { redis } from '../redis.ts';
 import * as componentsController from './controllers/components.controller.ts';
 import * as customersController from './controllers/customers.controller.ts';
 import * as impactController from './controllers/impact.controller.ts';
+import * as queryController from './controllers/query.controller.ts';
 import * as tilesController from './controllers/tiles.controller.ts';
 import * as unitsController from './controllers/units.controller.ts';
 
@@ -87,6 +88,15 @@ export function buildRouter(): Router {
     '/components/:id/impact-preview',
     requirePermission(PERMISSIONS.NETWORK_READ),
     asyncHandler<AuthedRequest>(impactController.impactPreview),
+  );
+
+  // --- Alan (Poligon) Sorgusu ---
+  // Poligon gövdede taşındığı için GET değil POST: bir mahalleyi saran poligon URL
+  // sınırına takılır.
+  networkRouter.post(
+    '/query/within',
+    requirePermission(PERMISSIONS.NETWORK_READ),
+    asyncHandler<AuthedRequest>(queryController.within),
   );
 
   // --- Vector Tile Uç Noktası ---

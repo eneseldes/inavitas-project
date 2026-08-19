@@ -1,10 +1,19 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchComponent, fetchImpactPreview, fetchTrace, fetchUnitLabels, type TraceDirection } from './api.ts';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import {
+  fetchComponent,
+  fetchImpactPreview,
+  fetchTrace,
+  fetchUnitLabels,
+  queryWithin,
+  type AreaQueryBody,
+  type TraceDirection,
+} from './api.ts';
 
 export const NETWORK_COMPONENT_KEY = 'network-component';
 export const NETWORK_UNIT_LABELS_KEY = 'network-unit-labels';
 export const NETWORK_TRACE_KEY = 'network-trace';
 export const NETWORK_IMPACT_PREVIEW_KEY = 'network-impact-preview';
+export const NETWORK_AREA_QUERY_KEY = 'network-area-query';
 
 /** İl ve ilçe adları — harita üzerine yazılan etiketleri besler, oturum boyunca değişmez. */
 export function useUnitLabels() {
@@ -48,5 +57,20 @@ export function useImpactPreview(id: string | undefined) {
     queryFn: () => fetchImpactPreview(id!),
     enabled: id !== undefined,
     staleTime: Infinity,
+  });
+}
+
+/**
+ * Çizilen alanın içindeki şebeke elemanları.
+ *
+ * Sayfa değişiminde önceki sonuç ekranda tutulur (`keepPreviousData`): liste her sayfada
+ * boşalıp yeniden dolarsa panel titrer ve haritadaki vurgu bir an kaybolur.
+ */
+export function useAreaComponents(body: AreaQueryBody | undefined) {
+  return useQuery({
+    queryKey: [NETWORK_AREA_QUERY_KEY, body],
+    queryFn: () => queryWithin(body!),
+    enabled: body !== undefined,
+    placeholderData: keepPreviousData,
   });
 }

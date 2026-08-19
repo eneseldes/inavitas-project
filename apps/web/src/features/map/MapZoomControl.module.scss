@@ -1,0 +1,31 @@
+@use '../../styles/variables' as v;
+
+// Haritanın kendi zoom kontrolü — MapLibre'nin çıplak `NavigationControl`'ü yerine
+// projenin geri kalanıyla aynı kabuk ve düğme dilini kullanır (bkz. MapToolRail.tsx).
+//
+// Kendi konumunu belirlemez: `MapPage.module.scss`'teki `.railColumn` içinde araç
+// şeridiyle aynı sütunda, doğal akışta üst üste dizilir. İkisi eskiden ayrı ayrı
+// `position: absolute` ile konumlanıyordu — boyutları birbirinden habersiz iki sabit
+// sayı çakışınca üst üste binip orantısız duruyorlardı.
+.control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: v.$space-1;
+  border-radius: v.$radius-lg;
+  border: 1px solid v.$color-hairline;
+  background: v.$color-surface;
+  box-shadow: v.$shadow-sm;
+}
+
+.button {
+  border-color: transparent;
+  background: transparent;
+}
+
+.separator {
+  width: 1.25rem;
+  height: 1px;
+  margin: 0.125rem 0;
+  background: v.$color-hairline;
+}

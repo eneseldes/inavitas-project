@@ -52,7 +52,11 @@ export function resolveZoomLod(zoom: number): ZoomLod {
   const unitLevels: UnitLevel[] = [];
   // İl/ilçe dolgusu yalnız z≤13'te çizilir; üstünde birim poligonu göndermek boşuna bayt.
   if (zoom <= 13) unitLevels.push('PROVINCE');
-  if (zoom >= 8 && zoom <= 13) unitLevels.push('DISTRICT');
+  // İl→ilçe geçişi istemcide z7,5-8,5 arası bindirilmiş bir solmayla yapılır (bkz.
+  // apps/web/src/features/map/networkLayers.ts UNIT_FADE_ZOOM_MIN/MAX) — solma z7 tile'ında
+  // BAŞLAR, o yüzden ilçe verisi z8 değil z7'den itibaren gönderilir. z7'de göndermezsek
+  // solma hiçbir geometri olmadan "havada" hesaplanır, ilçe z8'de aniden belirir.
+  if (zoom >= 7 && zoom <= 13) unitLevels.push('DISTRICT');
 
   const componentTypes = Object.entries(TYPE_MIN_ZOOM)
     .filter(([, minZoom]) => zoom >= Math.floor(minZoom))

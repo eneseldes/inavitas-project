@@ -7,6 +7,7 @@ import * as schema from '../../db/schema.ts';
 import { loadGpkgToStaging } from './01-load.ts';
 import { insertAndTransformData } from './02-insert.ts';
 import { validateSeed } from './03-validate.ts';
+import { computeUnitColorBands } from './04-unit-color-band.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +31,7 @@ async function run(): Promise<void> {
   try {
     await loadGpkgToStaging(seedDb, gpkgPath, dbUrl, console.log);
     await insertAndTransformData(seedDb, console.log);
+    await computeUnitColorBands(seedDb, console.log);
     await validateSeed(seedDb, manifestPath, console.log);
 
     const duration = ((Date.now() - start) / 1000).toFixed(2);

@@ -50,6 +50,13 @@
       "when": 1787123956340,
       "tag": "0006_add_ltree_and_jsonb_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787149126144,
+      "tag": "0007_mighty_wendigo",
+      "breakpoints": true
     }
   ]
 }

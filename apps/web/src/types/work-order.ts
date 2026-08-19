@@ -65,6 +65,7 @@ export interface WorkOrderMapItem {
   breakerRole: string | null;
   unitPath: string;
   unitName: string | null;
+  districtName: string | null;
   createdAt: string;
   outageId: string | null;
   lat: number;

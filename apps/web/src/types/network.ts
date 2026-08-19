@@ -67,6 +67,12 @@ export interface NetworkComponentDetail extends NetworkComponent {
   unitAncestors: UnitAncestor[];
 }
 
+/** Alan (poligon) sorgusu satırı — listede `unit_path` kodu değil ilçe/mahalle adı gösterilir. */
+export interface NetworkComponentAreaItem extends NetworkComponent {
+  unitName: string | null;
+  districtName: string | null;
+}
+
 export type Bbox = [minLon: number, minLat: number, maxLon: number, maxLat: number];
 
 export interface DownstreamImpact {

@@ -73,18 +73,8 @@ export const LEGEND_MIN_ZOOM: Record<LegendId, number> = {
 export type LegendId = LineLegendId | UnitLegendId;
 export const LEGEND_IDS: readonly LegendId[] = [...LINE_LEGEND_IDS, ...UNIT_LEGEND_IDS];
 
-/** Efsane satırının rengi (sağ paneldeki nokta/çizgi örneği). */
-export const LEGEND_COLOR_VAR: Record<LegendId, string> = {
-  HV_LINE: 'var(--c-map-line-hv)',
-  MV_MAIN: 'var(--c-map-line-mv)',
-  MV_BRANCH: 'var(--c-map-line-mv-branch)',
-  LV_LINE: 'var(--c-map-line-lv)',
-  TM: 'var(--c-map-tm)',
-  DM: 'var(--c-map-dm)',
-  TRANSFORMER: 'var(--c-map-tr)',
-  LV_JUNCTION: 'var(--c-map-lvj)',
-  SERVICE_ENTRY: 'var(--c-map-breaker)',
-};
+// Efsane satırlarının renk örnekleri katmanla aynı token'lardan gelir ama SCSS tarafında
+// (bkz. MapPanel.module.scss `.swatch*`) tanımlıdır — bileşenler renk değeri taşımaz.
 
 /** Bina izi olan birimler — tile'daki `unit_type` değerleriyle aynı. */
 const BUILDING_UNIT_LEGEND_IDS = ['TM', 'DM', 'TRANSFORMER', 'SERVICE_ENTRY'] as const;
@@ -246,20 +236,27 @@ const EDGE = () => unitTypeMatch(token('--c-map-tm-dark'), token('--c-map-dm-dar
 
 /** Katmanları çizim sırasıyla (alttan üste) döndürür. */
 export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[] {
-  // Pastel bantlar iki temada da açık renktir; koyu zeminde yalnız opaklık düşürülür —
-  // koyulaştırılsalar altlıkla birleşip siyah bir lekeye dönüşüyorlardı.
-  const bandOpacity = theme === 'dark' ? 0.24 : 0.38;
-
   return [
     // 1. İl/ilçe dolgusu — her şeyin altında, sınır çizgisi yok.
+    //
+    // Yalnız BURADA yumuşak geçiş var: kesinti/iş emri rozetlerindeki solma "dandik"
+    // bulunup kaldırıldığından (bkz. operationLayers.ts) bu iki dolgu katmanı artık kendi
+    // başına, açıkça istenen tek solma efekti. Sert `minzoom`/`maxzoom` kesmeleri yerine
+    // `unitFillOpacity` içindeki bindirilmiş bantlarda (z7,5-8,5 il↔ilçe, z13-14 ilçenin
+    // kendi solması) gerçek bir geçiş olur.
     {
       id: UNITS_PROVINCE_FILL_LAYER_ID,
       type: 'fill',
       source: NETWORK_SOURCE_ID,
       'source-layer': 'units',
       filter: ['==', ['get', 'level'], 'PROVINCE'],
-      maxzoom: 8,
-      paint: { 'fill-color': bandColor(), 'fill-opacity': bandOpacity },
+      maxzoom: UNIT_FADE_ZOOM_MID,
+      paint: {
+        'fill-color': bandColor(),
+        'fill-opacity': unitFillOpacity(theme, 'province'),
+        'fill-color-transition': { duration: 400 },
+        'fill-opacity-transition': { duration: 400 },
+      },
     },
     {
       id: UNITS_DISTRICT_FILL_LAYER_ID,
@@ -267,9 +264,14 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       source: NETWORK_SOURCE_ID,
       'source-layer': 'units',
       filter: ['==', ['get', 'level'], 'DISTRICT'],
-      minzoom: 8,
-      maxzoom: 13,
-      paint: { 'fill-color': bandColor(), 'fill-opacity': bandOpacity },
+      minzoom: UNIT_FADE_ZOOM_MIN,
+      maxzoom: DISTRICT_FADE_OUT_END,
+      paint: {
+        'fill-color': bandColor(),
+        'fill-opacity': unitFillOpacity(theme, 'district'),
+        'fill-color-transition': { duration: 400 },
+        'fill-opacity-transition': { duration: 400 },
+      },
     },
 
     // 2. Hatlar — ince olandan kalın olana; her biri kendi zoom eşiğinden sonra çizilir.
@@ -430,7 +432,9 @@ export function componentFilters(voltageLevels: Set<VoltageLevel>): { layerId: s
 
 /**
  * Birimin renk bandı (0-7) — `units.path` "TR.06.021" gibi bir ltree metni olduğundan
- * istemcide sayıya çevrilemez; hash sunucuda (`hashtext`) hesaplanıp `band` kolonunda gelir.
+ * istemcide sayıya çevrilemez; sunucuda komşuluk grafiğine göre ÖNCEDEN boyanıp (bkz.
+ * network-service `db/seed/04-unit-color-band.ts`) `band` kolonunda gelir. İki komşu
+ * birim (ör. iki bitişik ilçe) asla aynı bandı taşımaz.
  */
 function bandColor(): ExpressionSpecification {
   return [
@@ -444,6 +448,47 @@ function bandColor(): ExpressionSpecification {
     5, token('--c-map-unit-band-5'),
     6, token('--c-map-unit-band-6'),
     token('--c-map-unit-band-7'),
+  ];
+}
+
+// --- İl↔ilçe geçişi ve ilçenin kendi solması --------------------------------------
+//
+// İki ayrı geçiş var:
+// 1. İl→ilçe bindirmesi (z7,5-8,5): il solarken ilçe AYNI ARALIKTA tam tersi yönde belirir.
+// 2. İlçenin kendi solması (z13-14): il de aynı şekilde z8,5'te sıfıra indiği için, ilçe de
+//    kendi üst ucunda (yerini alacak bir sonraki seviye yokken) aynı doğallıkla solar —
+//    sert bir `maxzoom` kesmesi yerine.
+//
+// Sunucudaki `zoom-lod.ts` bu aralıkların İKİSİNİ de veri olarak sağlamalı — solma z7
+// tile'ında BAŞLADIĞI için ilçe verisi z8 değil z7'den itibaren gönderilir, aksi halde
+// solma hiç geometri olmadan "havada" hesaplanır ve ilçe z8'de aniden belirir.
+const UNIT_FADE_ZOOM_MIN = 7.5;
+const UNIT_FADE_ZOOM_MID = 8.5;
+const DISTRICT_FADE_OUT_START = 13;
+const DISTRICT_FADE_OUT_END = 14;
+
+/**
+ * İl/ilçe dolgusunun zoom'a göre solan doğallık opaklığı. `MapView.tsx` "İdari Sınırlar"
+ * katmanını kapatıp açarken de AYNI ifadeyi kullanır (bkz. `unitFillOpacity` çağrısı
+ * orada) — `visibility: none` yerine bunu `0`'a çekmek, geçişin `fill-opacity-transition`
+ * ile solarak çalışmasını sağlar; `visibility` bir layout özelliğidir ve solmaz.
+ */
+export function unitFillOpacity(theme: 'light' | 'dark', level: 'province' | 'district'): ExpressionSpecification {
+  // Pastel bantlar iki temada da açık renktir; koyu zeminde yalnız opaklık düşürülür —
+  // koyulaştırılsalar altlıkla birleşip siyah bir lekeye dönüşüyorlardı.
+  const bandOpacity = theme === 'dark' ? 0.24 : 0.38;
+
+  if (level === 'province') {
+    return ['interpolate', ['linear'], ['zoom'], UNIT_FADE_ZOOM_MIN, bandOpacity, UNIT_FADE_ZOOM_MID, 0];
+  }
+  return [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    UNIT_FADE_ZOOM_MIN, 0,
+    UNIT_FADE_ZOOM_MID, bandOpacity,
+    DISTRICT_FADE_OUT_START, bandOpacity,
+    DISTRICT_FADE_OUT_END, 0,
   ];
 }
 

@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowRight, FiLink, FiLock } from 'react-icons/fi';
+import { FiArrowRight, FiLink, FiLock, FiMap } from 'react-icons/fi';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import { DetailSectionLayout, type TabConfig } from '../../shared/components/DetailSectionLayout.tsx';
@@ -169,11 +169,12 @@ function OutageDetailTab({
           {hasPermission('network:read') ? (
             <button
               type="button"
-              className={`link font-mono`}
+              className="link"
               onClick={() => navigate(`/map?focus=${outage.cbsId}`)}
               title={t('map.action.showOnMap')}
             >
-              {outage.cbsId}
+              <FiMap />
+              <span className="font-mono">{outage.cbsId}</span>
             </button>
           ) : (
             <span className={`${styles.infoValue} font-mono`}>{outage.cbsId}</span>
@@ -360,7 +361,7 @@ function OutageHistoryTab({ outageId }: { outageId: string }) {
                 <td>
                   <StatusBadge status={entry.toStatus} />
                 </td>
-                <td>{entry.actor}</td>
+                <td>{labels.actor(entry.actor)}</td>
                 <td>{labels.origin(entry.origin)}</td>
               </tr>
             ))

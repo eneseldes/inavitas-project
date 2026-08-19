@@ -49,6 +49,7 @@ export function toWorkOrderMapDto(row: WorkOrderMapRow) {
     breakerRole: row.breakerRole,
     unitPath: row.unitPath,
     unitName: row.unitName,
+    districtName: row.districtName,
     createdAt: row.createdAt.toISOString(),
     outageId: row.outageId,
     lat: row.lat,

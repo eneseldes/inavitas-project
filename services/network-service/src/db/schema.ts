@@ -60,6 +60,12 @@ export const units = networkSchema.table('units', {
   externalRef: varchar('external_ref', { length: 64 }),
   centerLat: doublePrecision('center_lat'),
   centerLon: doublePrecision('center_lon'),
+  /**
+   * İl/ilçe dolgu rengi bandı (0-7) — komşuluk grafiğinde çatışmasız boyanır (bkz.
+   * `seed/04-unit-color-band.ts`). Eskiden `hashtext(path) % 8` ile anlık hesaplanıyordu;
+   * komşuluğu bilmediğinden iki komşu ilçe aynı bandı alabiliyordu.
+   */
+  colorBand: integer('color_band'),
   geom: geometry('geom'),
   geomSimplified: geometry('geom_simplified'),
   centroid: geometry('centroid'),

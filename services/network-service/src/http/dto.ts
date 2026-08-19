@@ -1,5 +1,5 @@
 import type { DownstreamImpact, ImpactPreview } from '../modules/impact/service.ts';
-import type { Bbox, ComponentRow } from '../repository/components.repository.ts';
+import type { Bbox, ComponentAreaRow, ComponentRow } from '../repository/components.repository.ts';
 import type { CustomerPiiRow, CustomerRow } from '../repository/customers.repository.ts';
 import type { UnitRow } from '../repository/units.repository.ts';
 
@@ -47,6 +47,11 @@ export function toComponentDto(row: ComponentRow) {
     name: row.name,
     attributes: row.attributes,
   };
+}
+
+/** Alan sorgusu satırı — liste mahalle ve ilçe adını gösterir, ltree kodunu değil. */
+export function toComponentAreaDto(row: ComponentAreaRow) {
+  return { ...toComponentDto(row), unitName: row.unitName, districtName: row.districtName };
 }
 
 /** Eleman detayını idari ata zinciriyle (il → ilçe → mahalle) birlikte döner. */

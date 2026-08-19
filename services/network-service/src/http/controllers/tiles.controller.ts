@@ -14,7 +14,11 @@ const TILE_CONTENT_TYPE = 'application/vnd.mapbox-vector-tile';
  * eklenmeli, yoksa bir kullanıcının tile'ı kapsam dışı başka bir kullanıcıya servis edilir.
  */
 function cacheKey(z: number, x: number, y: number): string {
-  return `network:tile:v1:${z}:${x}:${y}`;
+  // `v3` — bkz. apps/web/src/features/map/api.ts TILE_SCHEMA_VERSION 9 notu. Sürüm
+  // istemcinin `?v=` sorgu parametresinden BAĞIMSIZDIR (Redis anahtarı sorguyu görmez);
+  // MVT SQL'i (ya da zoom-lod.ts) her değiştiğinde burası da elle artırılmalı, aksi halde
+  // eski tile'lar TTL dolana kadar (1 saat) servis edilmeye devam eder.
+  return `network:tile:v3:${z}:${x}:${y}`;
 }
 
 /** `GET /tiles/:z/:x/:y.mvt` — Redis cache + ETag; isteklerin çoğu DB'ye ulaşmaz. */

@@ -24,6 +24,7 @@ interface ComponentRow {
   topology_level: number;
   unit_path: string;
   unit_name: string | null;
+  district_name: string | null;
   lat: number;
   lon: number;
 }
@@ -38,11 +39,13 @@ export async function seedNetworkComponentsRo(
 
   try {
     log('[network-ro] network_db okunuyor...');
-    // Mahalle adı `units` tablosundan yolun kendisiyle eşleştirilerek alınır; kesinti/iş emri
-    // satırında yolu her seferinde ada çevirmek zorunda kalmayalım diye denormalize ediliyor.
+    // Mahalle ve ilçe adı `units` tablosundan yolun kendisiyle eşleştirilerek alınır;
+    // kesinti/iş emri satırında yolu her seferinde ada çevirmek zorunda kalmayalım diye
+    // denormalize ediliyor. `district_name` `units` satırının kendi kolonudur (bkz.
+    // network-service/db/schema.ts) — mahalle satırında bile ayrıca ltree ata gezmez.
     const { rows } = await networkPool.query<ComponentRow>(
       `SELECT c.id, c.type, c.category, c.breaker_role, c.name, c.voltage_level, c.topology_level,
-              c.unit_path::text AS unit_path, u.name AS unit_name, c.lat, c.lon
+              c.unit_path::text AS unit_path, u.name AS unit_name, u.district_name AS district_name, c.lat, c.lon
          FROM network.components c
          LEFT JOIN network.units u ON u.path = c.unit_path`,
     );
@@ -50,7 +53,7 @@ export async function seedNetworkComponentsRo(
 
     await targetPool.query('TRUNCATE TABLE network_components_ro');
 
-    const COLUMN_COUNT = 11;
+    const COLUMN_COUNT = 12;
 
     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
@@ -67,15 +70,16 @@ export async function seedNetworkComponentsRo(
           row.topology_level,
           row.unit_path,
           row.unit_name,
+          row.district_name,
           row.lat,
           row.lon,
         );
-        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}::ltree, $${base + 9}, $${base + 10}, $${base + 11})`;
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, $${base + 8}::ltree, $${base + 9}, $${base + 10}, $${base + 11}, $${base + 12})`;
       });
 
       await targetPool.query(
         `INSERT INTO network_components_ro
-           (id, type, category, breaker_role, name, voltage_level, topology_level, unit_path, unit_name, lat, lon)
+           (id, type, category, breaker_role, name, voltage_level, topology_level, unit_path, unit_name, district_name, lat, lon)
          VALUES ${placeholders.join(', ')}
          ON CONFLICT (id) DO NOTHING`,
         values,

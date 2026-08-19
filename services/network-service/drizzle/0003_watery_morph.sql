@@ -1,0 +1,1 @@
+ALTER TABLE "network"."units" ADD COLUMN "color_band" integer;

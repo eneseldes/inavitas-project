@@ -46,6 +46,31 @@ export const TraceQuery = z.object({
 });
 export type TraceQuery = z.infer<typeof TraceQuery>;
 
+/**
+ * Alan (poligon) sorgusu gövdesi.
+ *
+ * ⚠️ Poligon **gövdede** taşınır, query string'de değil: bir mahalleyi saran poligon
+ * kolayca birkaç kilobayt tutar ve URL sınırına takılır.
+ */
+const GeoJsonPolygon = z.object({
+  type: z.literal('Polygon'),
+  // Dış halka + delikler. Kapalı bir halkanın en az 4 noktası vardır (son nokta ilkiyle aynı).
+  coordinates: z.array(z.array(z.tuple([z.number(), z.number()])).min(4)).min(1),
+});
+export type GeoJsonPolygon = z.infer<typeof GeoJsonPolygon>;
+
+export const QueryWithinBody = PaginationQuery.extend({
+  polygon: GeoJsonPolygon,
+  // Filtreler `/components` ile aynı sözlükten gelir; alan sorgusuna paralel bir filtre
+  // modeli kurulmaz. Gövdede taşındıkları için virgüllü metin değil, dizi olarak gelirler.
+  type: z.array(z.enum(COMPONENT_TYPES)).optional(),
+  category: z.array(z.enum(COMPONENT_CATEGORIES)).optional(),
+  breakerRole: z.array(z.enum(BREAKER_ROLES)).optional(),
+  voltageLevel: z.array(z.enum(VOLTAGE_LEVELS)).optional(),
+  q: z.string().min(1).optional(),
+});
+export type QueryWithinBody = z.infer<typeof QueryWithinBody>;
+
 /** Abone listeleme sorgu parametreleri şeması. */
 export const ListCustomersQuery = PaginationQuery.extend({
   sort: z.string().optional(),

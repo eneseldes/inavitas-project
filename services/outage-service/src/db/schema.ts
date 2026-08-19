@@ -68,6 +68,8 @@ export const networkComponentsRo = pgTable(
     unitPath: ltree('unit_path').notNull(),
     /** Mahalle adı — her kesinti satırında yolu ada çevirmek için denormalize edilir. */
     unitName: varchar('unit_name', { length: 255 }),
+    /** İlçe adı — haritadaki alan sonuç listesi mahalleyle birlikte bunu da gösterir. */
+    districtName: varchar('district_name', { length: 255 }),
     lat: doublePrecision('lat').notNull(),
     lon: doublePrecision('lon').notNull(),
     syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),

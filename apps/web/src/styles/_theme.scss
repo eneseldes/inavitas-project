@@ -98,6 +98,18 @@
   --c-map-wo-cancelled: #bdc3c7;
   /** İşletim noktalarının kenar çizgisi — altlıktan ayrışsın diye. */
   --c-map-op-stroke: #ffffff;
+  /** İşaretçinin içindeki ikon rengi — durum rengi zemin olduğu için ters kontrast. */
+  --c-map-marker-ink: #ffffff;
+  /**
+   * Küme rozeti (uzaktayken birleştirilen kesinti/iş emri sayısı). Kümede birden çok
+   * durum bir arada olduğundan durum rengi kullanılamaz; tür başına tek nötr renk.
+   */
+  --c-map-outage-cluster: #c0392b;
+  --c-map-wo-cluster: #1f618d;
+  /** Poligon çizim aracı — seçim renginden ayrıdır, ikisi aynı anda ekranda olur. */
+  --c-map-draw-fill: rgba(62, 184, 117, 0.18);
+  --c-map-draw-line: #2ea062;
+  --c-map-draw-vertex: #ffffff;
   /** Isı haritası bantları; sıfır yoğunluk saydamdır, aksi halde tüm harita boyanır. */
   --c-map-heat-zero: rgba(231, 76, 60, 0);
   --c-map-heat-low: rgba(241, 196, 15, 0.55);
@@ -209,6 +221,12 @@
   --c-map-wo-done: #4ecdc4;
   --c-map-wo-cancelled: #6b7580;
   --c-map-op-stroke: #11161b;
+  --c-map-marker-ink: #11161b;
+  --c-map-outage-cluster: #ff8a7a;
+  --c-map-wo-cluster: #7dc7ee;
+  --c-map-draw-fill: rgba(111, 227, 155, 0.2);
+  --c-map-draw-line: #6fe39b;
+  --c-map-draw-vertex: #11161b;
   --c-map-heat-zero: rgba(255, 112, 96, 0);
   --c-map-heat-low: rgba(241, 196, 15, 0.45);
   --c-map-heat-mid: rgba(230, 126, 34, 0.6);

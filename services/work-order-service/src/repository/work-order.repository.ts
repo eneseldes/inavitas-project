@@ -43,6 +43,7 @@ export interface WorkOrderMapRow {
   breakerRole: string | null;
   unitPath: string;
   unitName: string | null;
+  districtName: string | null;
   createdAt: Date;
   outageId: string | null;
   lat: number;
@@ -207,6 +208,7 @@ export async function listForMap(filters: WorkOrderFilters, limit: number): Prom
       breakerRole: networkComponentsRo.breakerRole,
       unitPath: workOrders.unitPath,
       unitName: workOrders.unitName,
+      districtName: networkComponentsRo.districtName,
       createdAt: workOrders.createdAt,
       outageId: workOrders.outageId,
       lat: networkComponentsRo.lat,

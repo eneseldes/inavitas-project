@@ -71,9 +71,11 @@ export async function renderTile({ z, x, y }: TileCoord, user: AuthenticatedUser
         ${units.path}::text AS path,
         ${units.level} AS level,
         ${units.name} AS name,
-        -- İl/ilçe dolgu rengi bandı (0-7) — path "TR.06.021" gibi bir ltree metni olduğundan
-        -- istemcide sayıya çevrilemez; deterministik hash burada, hashtext ile hesaplanır.
-        abs(hashtext(${units.path}::text)) % 8 AS band
+        -- İl/ilçe dolgu rengi bandı (0-7) — komşuluk grafiğine göre ÖNCEDEN boyanmıştır
+        -- (bkz. db/seed/04-unit-color-band.ts); iki komşu ilçe asla aynı bandı taşımaz.
+        -- Eskiden hashtext(path) % 8 ile anlık hesaplanıyordu ve komşuluğu bilmediğinden
+        -- çakışabiliyordu.
+        ${units.colorBand} AS band
       FROM ${units}, bounds
       WHERE ${unitCondition}
         AND ${units.geomSimplified} && ST_Transform(bounds.tile_3857, 4326)

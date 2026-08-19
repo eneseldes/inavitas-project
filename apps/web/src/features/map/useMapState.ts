@@ -17,14 +17,19 @@ export const DEFAULT_VIEW = { lng: 32.85, lat: 39.92, zoom: 10 };
 const NO_LAYERS = 'none';
 
 /**
- * Kesinti katmanının varsayılan durum filtresi. Şebeke katmanlarının aksine kesintiler
- * **varsayılan olarak yalnız süren** kayıtları gösterir: arşivlenmiş binlerce kesintiyi
- * haritaya boca etmek görüntüyü okunmaz yapar.
+ * Seçilebilir ısı haritası türleri. Bugün yalnız kesinti yoğunluğu var ama liste bilerek
+ * çoğul — yeni bir tür eklendiğinde de aynı anda yalnız biri anlamlı olacağından yapı
+ * (tekil seçim) baştan buna göre kurulur.
  */
-const DEFAULT_OUTAGE_STATUSES: OutageStatus[] = ['STARTED'];
+export const HEATMAP_IDS = ['outage'] as const;
+export type HeatmapId = (typeof HEATMAP_IDS)[number];
 
-/** İş emri katmanının varsayılan durum filtresi — kapanmamış işler. */
-const DEFAULT_WORK_ORDER_STATUSES: WorkOrderStatus[] = ['STARTED', 'ASSIGNED', 'IN_PROGRESS'];
+/**
+ * Kesinti/iş emri katmanlarının varsayılan durum filtresi: İPTAL EDİLENLER dışında hepsi.
+ * Diğer çoklu-seçim filtreleriyle aynı ilke — varsayılan "hepsi açık", kullanıcı daraltır.
+ */
+const DEFAULT_OUTAGE_STATUSES: OutageStatus[] = OUTAGE_STATUSES.filter((status) => status !== 'CANCELLED');
+const DEFAULT_WORK_ORDER_STATUSES: WorkOrderStatus[] = WORK_ORDER_STATUSES.filter((status) => status !== 'CANCELLED');
 
 /** Virgülle ayrılmış bir query param'ı bilinen değerlere göre süzer. */
 function parseCsv<T extends string>(raw: string | null, allowed: readonly T[], fallback: T[]): T[] {
@@ -67,16 +72,21 @@ export function useMapState() {
 
   const voltageLevels = useMemo<Set<VoltageLevel>>(() => {
     const raw = params.get('voltage');
-    if (!raw) return new Set(VOLTAGE_LEVELS);
+    // Parametre HİÇ YOKSA varsayılan (hepsi); BOŞ STRING ise kullanıcı hepsini bilerek
+    // kapatmıştır — `!raw` boş string'i de "yok" sayardı ve seçim bir sonraki render'da
+    // sessizce hepsine geri dönerdi.
+    if (raw === null) return new Set(VOLTAGE_LEVELS);
     return new Set(raw.split(',').filter((v): v is VoltageLevel => (VOLTAGE_LEVELS as readonly string[]).includes(v)));
   }, [params]);
 
   const showAdminBoundaries = params.get('boundaries') !== '0';
-  // Kesinti/iş emri katmanları varsayılan olarak KAPALIDIR: harita önce şebekeyi gösterir,
-  // işletim katmanı kullanıcının açtığı bir üst katmandır.
-  const showOutages = params.get('outages') === '1';
-  const showWorkOrders = params.get('workOrders') === '1';
-  const showOutageHeatmap = params.get('heatmap') === '1';
+  // Kesinti/iş emri katmanları varsayılan olarak AÇIKTIR — diğer çoklu-seçimlerle aynı
+  // ilke. Isı haritası bunun dışında kalır: birden çok ısı haritası türü eklenirse bile
+  // aynı anda yalnız biri anlamlıdır, o yüzden varsayılan olarak hiçbiri seçili değildir.
+  const showOutages = params.get('outages') !== '0';
+  const showWorkOrders = params.get('workOrders') !== '0';
+  const heatmapId = params.get('heatmap') as HeatmapId | null;
+  const activeHeatmap = heatmapId !== null && HEATMAP_IDS.includes(heatmapId) ? heatmapId : undefined;
 
   /**
    * Harita kesinti filtreleri — **mevcut `OutageFilters` arayüzünü yeniden kullanır**;
@@ -100,7 +110,7 @@ export function useMapState() {
   const workOrderFilters = useMemo<WorkOrderFilters>(() => {
     return {
       status: parseCsv(params.get('wStatus'), WORK_ORDER_STATUSES, DEFAULT_WORK_ORDER_STATUSES),
-      type: parseCsv(params.get('wType'), WORK_ORDER_TYPES, []),
+      type: parseCsv(params.get('wType'), WORK_ORDER_TYPES, [...WORK_ORDER_TYPES]),
       origin: parseCsv(params.get('wOrigin'), ['USER', 'SYSTEM'] as const, []),
       createdAtFrom: params.get('wFrom') ?? undefined,
       createdAtTo: params.get('wTo') ?? undefined,
@@ -151,20 +161,52 @@ export function useMapState() {
     [legend, patch],
   );
 
-  const toggleVoltageLevel = useCallback(
-    (level: VoltageLevel) => {
-      const next = new Set(voltageLevels);
-      if (next.has(level)) next.delete(level);
-      else next.add(level);
-      patch({ voltage: next.size === VOLTAGE_LEVELS.length ? undefined : Array.from(next).join(',') });
+  /**
+   * Bir grubun tamamını birlikte açar/kapatır (katman grubunun başlığındaki "hepsini seç"
+   * kutusu). Satır satır `toggleLegend` çağırmak YANLIŞ: her çağrı aynı render'daki
+   * `legend`'i (bu render'ın kapadığı bayat kopya) taban alır, bir önceki çağrının eklediği
+   * kimliği görmez — döngü sonunda yalnız SON satırın etkisi kalırdı. Burada tek `Set`
+   * üzerinde toplu değişip TEK `patch` çağrısıyla yazılır.
+   */
+  const toggleLegendGroup = useCallback(
+    (ids: readonly LegendId[]) => {
+      const allOn = ids.every((id) => legend.has(id));
+      const next = new Set(legend);
+      for (const id of ids) {
+        if (allOn) next.delete(id);
+        else next.add(id);
+      }
+      patch({ layers: next.size === 0 ? NO_LAYERS : Array.from(next).join(',') });
     },
-    [voltageLevels, patch],
+    [legend, patch],
+  );
+
+  /**
+   * Gerilim seçimini TEK PARÇA yazar (tekil `toggle` değil). Filtre panelindeki grup
+   * "hepsini seç" kutusu bir defada birden çok seviyeyi değiştirir; her biri için ayrı
+   * `toggle` çağırmak aynı render'ın bayat `voltageLevels` kopyasını taban alır ve döngü
+   * sonunda yalnız SON çağrının etkisi kalırdı (bkz. `toggleLegendGroup`'taki aynı not).
+   */
+  const setVoltageLevels = useCallback(
+    (levels: VoltageLevel[]) => {
+      patch({ voltage: levels.length === VOLTAGE_LEVELS.length ? undefined : levels.join(',') });
+    },
+    [patch],
   );
 
   const setShowAdminBoundaries = useCallback((value: boolean) => patch({ boundaries: value ? undefined : '0' }), [patch]);
-  const setShowOutages = useCallback((value: boolean) => patch({ outages: value ? '1' : undefined }), [patch]);
-  const setShowWorkOrders = useCallback((value: boolean) => patch({ workOrders: value ? '1' : undefined }), [patch]);
-  const setShowOutageHeatmap = useCallback((value: boolean) => patch({ heatmap: value ? '1' : undefined }), [patch]);
+  const setShowOutages = useCallback((value: boolean) => patch({ outages: value ? undefined : '0' }), [patch]);
+  const setShowWorkOrders = useCallback((value: boolean) => patch({ workOrders: value ? undefined : '0' }), [patch]);
+  // `setShowOutages` + `setShowWorkOrders`'ı ayrı ayrı çağırmak aynı `resolveFocus`
+  // notundaki tuzağa düşer: ikisi de aynı render'ın bayat `searchParams`'ını taban alır,
+  // ikincisi birincisini ezer — "İşletim Kayıtları" grubunun "hepsini seç" kutusu yalnız
+  // son çağrılanı (iş emirlerini) değiştirmiş gibi görünürdü. Tek `patch` çağrısıyla atomik.
+  const setShowOperationsLayers = useCallback(
+    (value: boolean) => patch({ outages: value ? undefined : '0', workOrders: value ? undefined : '0' }),
+    [patch],
+  );
+  /** Isı haritaları birbirini dışlar — yeni bir tür seçmek eskisini kapatır. */
+  const setActiveHeatmap = useCallback((id: HeatmapId | undefined) => patch({ heatmap: id }), [patch]);
 
   /** Bir kesinti filtresi alanını URL'e yazar; varsayılana dönen alan URL'den silinir. */
   const patchOutageFilters = useCallback(
@@ -217,16 +259,18 @@ export function useMapState() {
     setView,
     legend,
     toggleLegend,
+    toggleLegendGroup,
     voltageLevels,
-    toggleVoltageLevel,
+    setVoltageLevels,
     showAdminBoundaries,
     setShowAdminBoundaries,
     showOutages,
     setShowOutages,
     showWorkOrders,
     setShowWorkOrders,
-    showOutageHeatmap,
-    setShowOutageHeatmap,
+    setShowOperationsLayers,
+    activeHeatmap,
+    setActiveHeatmap,
     outageFilters,
     patchOutageFilters,
     workOrderFilters,

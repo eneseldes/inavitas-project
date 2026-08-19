@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { FiAlertTriangle, FiArrowDownCircle, FiArrowUpCircle, FiTool, FiX, FiZap } from 'react-icons/fi';
+import { FiAlertTriangle, FiArrowDownCircle, FiArrowUpCircle, FiExternalLink, FiTool, FiX, FiZap } from 'react-icons/fi';
 import { clsx } from 'clsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
@@ -8,6 +8,7 @@ import { useOutages } from '../outages/useOutages.ts';
 import { useWorkOrders } from '../work-orders/useWorkOrders.ts';
 import type { DownstreamImpact, UpstreamChain } from '../../types/network.ts';
 import type { TraceDirection } from './api.ts';
+import { DetailRow, DetailSection, unitAncestorName } from './MapDetailRows.tsx';
 import { useComponent } from './useNetwork.ts';
 import styles from './DetailPanel.module.scss';
 
@@ -21,8 +22,12 @@ interface DetailPanelProps {
   isTraceLoading: boolean;
   onCreateOutage: () => void;
   onCreateWorkOrder: () => void;
-  /** Haritadaki bir kesinti/iş emri kaydını kendi detay sayfasında açar. */
-  onOpenRecord: (kind: 'outage' | 'workOrder', id: string) => void;
+  /**
+   * Elemana bağlı bir kesinti/iş emri kaydına tıklanınca çağrılır. Kaydın kendi sayfasına
+   * DOĞRUDAN atlamaz — haritadaki işaretçi tıklamasıyla aynı yolu izler: önce
+   * `OperationDetailPanel` özetini açar, tam kayda geçiş oradaki id bağlantısından yapılır.
+   */
+  onSelectOperation: (kind: 'outage' | 'workOrder', id: string) => void;
 }
 
 /** Elemana bağlı kayıtların panelde gösterilen sayısı — panel bir liste ekranı değildir. */
@@ -44,7 +49,7 @@ export function DetailPanel({
   isTraceLoading,
   onCreateOutage,
   onCreateWorkOrder,
-  onOpenRecord,
+  onSelectOperation,
 }: DetailPanelProps) {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
@@ -73,129 +78,139 @@ export function DetailPanel({
   const { data: outages } = useOutages(outageQuery, selectedId !== undefined && hasPermission('outage:read'));
   const { data: workOrders } = useWorkOrders(workOrderQuery, selectedId !== undefined && hasPermission('workorder:read'));
 
+  // Panel yalnız bir eleman seçiliyken vardır: boş bir "haritada bir eleman seçin" kutusu
+  // haritanın beşte birini sürekli kaplıyordu.
+  if (!selectedId) return null;
+
   return (
     <aside className={styles.panel}>
-      {!selectedId && <p className={styles.empty}>{t('map.panel.detail.empty')}</p>}
+      <header className={styles.header}>
+        <h2 className={styles.title}>{t('map.panel.detail.componentTitle', undefined, 'Eleman Detayı')}</h2>
+        <button type="button" className="icon-btn icon-btn--sm" aria-label={t('common.action.close')} onClick={onClose}>
+          <FiX />
+        </button>
+      </header>
 
-      {selectedId && isLoading && <p className={styles.empty}>{t('common.loading')}</p>}
+      <div className={styles.body}>
+        {isLoading && <p className={styles.empty}>{t('common.loading')}</p>}
 
-      {selectedId && component && (
-        <>
-          <div className={styles.header}>
-            <h2 className={styles.id}>{component.id}</h2>
-            <button type="button" className="icon-btn icon-btn--sm" aria-label={t('common.action.close')} onClick={onClose}>
-              <FiX />
-            </button>
-          </div>
-          <p className={styles.typeBadge}>
-            {t(`network.enum.componentType.${component.type}`)}
-            {component.breakerRole && ` · ${t(`network.enum.breakerRole.${component.breakerRole}`)}`}
-          </p>
+        {component && (
+          <>
+            <DetailSection title={t('map.panel.detail.section.general', undefined, 'Genel')}>
+              <DetailRow label="ID">
+                <span className="font-mono">{selectedId}</span>
+              </DetailRow>
+              <DetailRow label={t('map.result.column.type')}>
+                {t(`network.enum.componentType.${component.type}`)}
+                {component.breakerRole && ` · ${t(`network.enum.breakerRole.${component.breakerRole}`)}`}
+              </DetailRow>
+              <DetailRow label={t('map.panel.detail.field.voltageLevel')}>
+                {t(`network.enum.voltageLevel.${component.voltageLevel}`)}
+              </DetailRow>
+              <DetailRow label={t('map.panel.detail.field.capacity')}>
+                {formatAttribute(component.attributes?.capacity_kva)
+                  ? `${formatAttribute(component.attributes?.capacity_kva)} kVA`
+                  : undefined}
+              </DetailRow>
+              <DetailRow label={t('map.panel.detail.field.status')}>
+                {component.status ? t(`network.enum.status.${component.status}`) : undefined}
+              </DetailRow>
+              <DetailRow label={t('map.panel.detail.field.customerCount')}>
+                {formatAttribute(component.attributes?.customer_count)}
+              </DetailRow>
+            </DetailSection>
 
-          <dl className={styles.fields}>
-            <div className={styles.field}>
-              <dt>{t('map.panel.detail.field.voltageLevel')}</dt>
-              <dd>{t(`network.enum.voltageLevel.${component.voltageLevel}`)}</dd>
+            <DetailSection title={t('map.panel.detail.section.location', undefined, 'Konum')}>
+              <DetailRow label={t('map.panel.detail.field.province', undefined, 'İl')}>
+                {unitAncestorName(component.unitAncestors, 'PROVINCE')}
+              </DetailRow>
+              <DetailRow label={t('map.panel.detail.field.district', undefined, 'İlçe')}>
+                {unitAncestorName(component.unitAncestors, 'DISTRICT')}
+              </DetailRow>
+              <DetailRow label={t('map.panel.detail.field.unitPath')}>
+                {unitAncestorName(component.unitAncestors, 'NEIGHBORHOOD')}
+              </DetailRow>
+            </DetailSection>
+
+            {/* --- İz aksiyonları: seçili yön ikinci kez tıklanınca kapanır. --- */}
+            <div className={styles.actionsGrid}>
+              <button
+                type="button"
+                className={clsx('btn', 'btn--ghost', styles.action, traceDirection === 'up' && styles.actionActive)}
+                aria-pressed={traceDirection === 'up'}
+                onClick={() => onToggleTrace('up')}
+              >
+                <FiArrowUpCircle /> {t('map.action.traceUp')}
+              </button>
+              <button
+                type="button"
+                className={clsx('btn', 'btn--ghost', styles.action, traceDirection === 'down' && styles.actionActive)}
+                aria-pressed={traceDirection === 'down'}
+                onClick={() => onToggleTrace('down')}
+              >
+                <FiArrowDownCircle /> {t('map.action.traceDown')}
+              </button>
             </div>
-            {formatAttribute(component.attributes?.capacity_kva) && (
-              <div className={styles.field}>
-                <dt>{t('map.panel.detail.field.capacity')}</dt>
-                <dd>{formatAttribute(component.attributes?.capacity_kva)} kVA</dd>
+
+            {traceDirection && <TraceSummary trace={trace} isLoading={isTraceLoading} />}
+
+            {/* --- Kayıt aksiyonları: yetkisiz kullanıcıda hiç görünmez. Kesinti düğmesi
+                satırın sağında kalsın diye markup'ta İş Emri'nden SONRA gelir. --- */}
+            {(hasPermission('outage:write') || hasPermission('workorder:write')) && (
+              <div className={styles.actionsGrid}>
+                {hasPermission('workorder:write') && (
+                  <button type="button" className={clsx('btn', 'btn--ghost', styles.action)} onClick={onCreateWorkOrder}>
+                    <FiTool /> {t('map.action.createWorkOrder')}
+                  </button>
+                )}
+                {hasPermission('outage:write') && (
+                  <button type="button" className={clsx('btn', 'btn--primary', styles.action)} onClick={onCreateOutage}>
+                    <FiZap /> {t('map.action.createOutage')}
+                  </button>
+                )}
               </div>
             )}
-            {component.status && (
-              <div className={styles.field}>
-                <dt>{t('map.panel.detail.field.status')}</dt>
-                <dd>{component.status}</dd>
-              </div>
-            )}
-            <div className={styles.field}>
-              <dt>{t('map.panel.detail.field.unitPath')}</dt>
-              <dd>{component.unitAncestors.map((u) => u.name).join(' › ')}</dd>
-            </div>
-            {formatAttribute(component.attributes?.customer_count) && (
-              <div className={styles.field}>
-                <dt>{t('map.panel.detail.field.customerCount')}</dt>
-                <dd>{formatAttribute(component.attributes?.customer_count)}</dd>
-              </div>
-            )}
-          </dl>
 
-          {/* --- İz aksiyonları: seçili yön ikinci kez tıklanınca kapanır. --- */}
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={clsx('btn', 'btn--ghost', styles.action, traceDirection === 'up' && styles.actionActive)}
-              aria-pressed={traceDirection === 'up'}
-              onClick={() => onToggleTrace('up')}
-            >
-              <FiArrowUpCircle /> {t('map.action.traceUp')}
-            </button>
-            <button
-              type="button"
-              className={clsx('btn', 'btn--ghost', styles.action, traceDirection === 'down' && styles.actionActive)}
-              aria-pressed={traceDirection === 'down'}
-              onClick={() => onToggleTrace('down')}
-            >
-              <FiArrowDownCircle /> {t('map.action.traceDown')}
-            </button>
-          </div>
-
-          {traceDirection && <TraceSummary trace={trace} isLoading={isTraceLoading} />}
-
-          {/* --- Kayıt aksiyonları: yetkisiz kullanıcıda hiç görünmez. --- */}
-          {(hasPermission('outage:write') || hasPermission('workorder:write')) && (
-            <div className={styles.actions}>
-              {hasPermission('outage:write') && (
-                <button type="button" className={clsx('btn', 'btn--primary', styles.action)} onClick={onCreateOutage}>
-                  <FiZap /> {t('map.action.createOutage')}
-                </button>
-              )}
-              {hasPermission('workorder:write') && (
-                <button type="button" className={clsx('btn', 'btn--ghost', styles.action)} onClick={onCreateWorkOrder}>
-                  <FiTool /> {t('map.action.createWorkOrder')}
-                </button>
-              )}
-            </div>
-          )}
-
-          {(outages?.items.length ?? 0) > 0 && (
-            <section className={styles.linked}>
-              <h3 className={styles.linkedTitle}>{t('map.panel.detail.linkedOutages')}</h3>
-              <ul className={styles.linkedList}>
+            {(outages?.items.length ?? 0) > 0 && (
+              <DetailSection title={t('map.panel.detail.linkedOutages')}>
                 {outages!.items.map((outage) => (
-                  <li key={outage.id}>
-                    <button type="button" className={styles.linkedItem} onClick={() => onOpenRecord('outage', outage.id)}>
-                      <span className="font-mono">{outage.id.slice(0, 8)}</span>
-                      <StatusBadge status={outage.status} />
-                    </button>
-                  </li>
+                  <button
+                    key={outage.id}
+                    type="button"
+                    className={styles.linkedRow}
+                    onClick={() => onSelectOperation('outage', outage.id)}
+                  >
+                    <span className={clsx(styles.linkedId, 'font-mono')}>
+                      {outage.id.slice(0, 8)}
+                      <FiExternalLink />
+                    </span>
+                    <StatusBadge status={outage.status} />
+                  </button>
                 ))}
-              </ul>
-            </section>
-          )}
+              </DetailSection>
+            )}
 
-          {(workOrders?.items.length ?? 0) > 0 && (
-            <section className={styles.linked}>
-              <h3 className={styles.linkedTitle}>{t('map.panel.detail.linkedWorkOrders')}</h3>
-              <ul className={styles.linkedList}>
+            {(workOrders?.items.length ?? 0) > 0 && (
+              <DetailSection title={t('map.panel.detail.linkedWorkOrders')}>
                 {workOrders!.items.map((workOrder) => (
-                  <li key={workOrder.id}>
-                    <button
-                      type="button"
-                      className={styles.linkedItem}
-                      onClick={() => onOpenRecord('workOrder', workOrder.id)}
-                    >
-                      <span className="font-mono">{workOrder.id.slice(0, 8)}</span>
-                      <StatusBadge status={workOrder.status} />
-                    </button>
-                  </li>
+                  <button
+                    key={workOrder.id}
+                    type="button"
+                    className={styles.linkedRow}
+                    onClick={() => onSelectOperation('workOrder', workOrder.id)}
+                  >
+                    <span className={clsx(styles.linkedId, 'font-mono')}>
+                      {workOrder.id.slice(0, 8)}
+                      <FiExternalLink />
+                    </span>
+                    <StatusBadge status={workOrder.status} />
+                  </button>
                 ))}
-              </ul>
-            </section>
-          )}
-        </>
-      )}
+              </DetailSection>
+            )}
+          </>
+        )}
+      </div>
     </aside>
   );
 }

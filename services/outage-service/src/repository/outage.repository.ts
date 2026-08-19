@@ -29,6 +29,8 @@ export interface OutageMapRow {
   /** Kesici rolü — harita katmanının zoom eşiği bundan türer (kofra kesintisi z16,5'te açılır). */
   breakerRole: string | null;
   unitPath: string;
+  unitName: string | null;
+  districtName: string | null;
   startedAt: Date;
   endedAt: Date | null;
   affectedCustomerCount: number | null;
@@ -432,6 +434,8 @@ export async function listForMap(filters: OutageFilters, limit: number): Promise
       componentType: outages.componentType,
       breakerRole: networkComponentsRo.breakerRole,
       unitPath: outages.unitPath,
+      unitName: networkComponentsRo.unitName,
+      districtName: networkComponentsRo.districtName,
       startedAt: outages.startedAt,
       endedAt: outages.endedAt,
       affectedCustomerCount: outages.affectedCustomerCount,

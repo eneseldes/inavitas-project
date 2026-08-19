@@ -59,6 +59,8 @@ export interface DataGridProps<T> {
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
   isRowSelected?: (item: T) => boolean;
+  /** Araç çubuğunu (filtre/yenile) gizler — ör. sütun filtresi olmayan salt liste görünümleri. */
+  hideToolbar?: boolean;
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -102,6 +104,7 @@ export function DataGrid<T>({
   emptyMessage,
   onRowClick,
   isRowSelected,
+  hideToolbar,
 }: DataGridProps<T>) {
   const { t } = useTranslation();
   const resolvedEmptyMessage = emptyMessage ?? t('common.table.empty');
@@ -221,23 +224,25 @@ export function DataGrid<T>({
 
   return (
     <div className={styles.grid}>
-      <div className={styles.toolbar}>
-        <button
-          ref={filterBtnRef}
-          type="button"
-          onClick={() => (isFilterMenuOpen ? setFilterMenuOpen(false) : openFilterMenu())}
-          title={t('common.filter.activeTitle', undefined, 'Aktif Filtreler')}
-          className={clsx('icon-btn', styles.filterMenuBtn, activeFilters.length > 0 && styles.filterMenuBtnActive)}
-        >
-          <FiFilter />
-          {activeFilters.length > 0 && <span className={styles.badge}>{activeFilters.length}</span>}
-        </button>
+      {!hideToolbar && (
+        <div className={styles.toolbar}>
+          <button
+            ref={filterBtnRef}
+            type="button"
+            onClick={() => (isFilterMenuOpen ? setFilterMenuOpen(false) : openFilterMenu())}
+            title={t('common.filter.activeTitle', undefined, 'Aktif Filtreler')}
+            className={clsx('icon-btn', styles.filterMenuBtn, activeFilters.length > 0 && styles.filterMenuBtnActive)}
+          >
+            <FiFilter />
+            {activeFilters.length > 0 && <span className={styles.badge}>{activeFilters.length}</span>}
+          </button>
 
-        <button type="button" onClick={onRefresh} title={t('common.action.refresh')} className="icon-btn">
-          <FiRefreshCw className={clsx(isFetching && 'spin')} />
-        </button>
-        {toolbarActions}
-      </div>
+          <button type="button" onClick={onRefresh} title={t('common.action.refresh')} className="icon-btn">
+            <FiRefreshCw className={clsx(isFetching && 'spin')} />
+          </button>
+          {toolbarActions}
+        </div>
+      )}
 
       {isFilterMenuOpen &&
         createPortal(

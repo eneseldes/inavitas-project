@@ -1,9 +1,14 @@
 @use '../../styles/variables' as v;
 @use '../../styles/mixins' as m;
 
+// Kabuk görünümü tam kaplar ve KENDİSİ kaymaz; kaydırma `.main`'in içindedir. Bunun
+// nedeni harita gibi "ekranı tam dolduran" sayfaların yüzde yüksekliğe ihtiyaç duyması:
+// `min-height` ile kabuğun yüksekliği belirsiz kalıyor, sayfa kendi yüksekliğini
+// hesaplayamıyor ve panelleri gövdeyi aşağı doğru büyütüyordu.
 .shell {
   display: flex;
-  min-height: 100svh;
+  height: 100svh;
+  overflow: hidden;
   background: v.$color-bg;
 }
 
@@ -288,17 +293,18 @@
   display: flex;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
 }
 
+// `position: relative` — sayfa yüksekliğini kendisi yönetmek isteyen ekranlar (harita)
+// `position: absolute; inset: 0` ile bu kutuya oturur; akış dışında kaldıkları için
+// kaydırma çubuğu doğurmazlar.
 .main {
+  position: relative;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: v.$space-6;
+  overflow-y: auto;
 }
-
-
-
-
-
-

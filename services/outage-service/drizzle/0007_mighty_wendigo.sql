@@ -1,0 +1,1 @@
+ALTER TABLE "network_components_ro" ADD COLUMN "district_name" varchar(255);

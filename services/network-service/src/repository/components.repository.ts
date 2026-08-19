@@ -1,5 +1,5 @@
 import type { PaginationQuery, SortOrder } from '@inavitas/shared';
-import { and, asc, count, desc, eq, ilike, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, getTableColumns, ilike, inArray, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { components, units } from '../db/schema.ts';
 import type { UnitRow } from './units.repository.ts';
@@ -91,6 +91,76 @@ export async function list(
   ]);
 
   return { items, total: totalRows[0]?.value ?? 0 };
+}
+
+/**
+ * Alan sorgusunun sunucu tarafı üst sınırı. Ankara'nın tamamını saran bir poligon 593 bin
+ * satır demektir; kullanıcıya "daralt" demek, listeyi sonsuza kadar akıtmaktan iyidir.
+ */
+export const WITHIN_ROW_LIMIT = 5000;
+
+/** Alan sorgusu satırı — eleman kaydı + mahalle ve ilçe adı. */
+export type ComponentAreaRow = ComponentRow & { unitName: string | null; districtName: string | null };
+
+/** Poligonu SRID'i belli, kendini kesiyorsa onarılmış bir geometriye çevirir. */
+function searchArea(polygon: unknown): SQL {
+  return sql`ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(polygon)}), 4326))`;
+}
+
+/**
+ * Poligonun kullanılabilir olup olmadığını söyler. Kendini kesen bir poligon `ST_MakeValid`
+ * ile onarılır; onarım sonucu boş ya da alansız kalıyorsa sorgu hiç çalıştırılmaz — boş bir
+ * liste dönmek kullanıcıya "bu alanda hiçbir şey yok" der, oysa sorun poligonun kendisidir.
+ */
+export async function checkSearchArea(polygon: unknown): Promise<{ usable: boolean; reason: string | null }> {
+  const area = searchArea(polygon);
+  const result = await db.execute(sql`
+    SELECT NOT ST_IsEmpty(${area}) AND ST_Dimension(${area}) = 2 AS usable,
+           ST_IsValidReason(ST_SetSRID(ST_GeomFromGeoJSON(${JSON.stringify(polygon)}), 4326)) AS reason
+  `);
+
+  const row = result.rows[0] as unknown as { usable: boolean; reason: string | null } | undefined;
+  return { usable: row?.usable ?? false, reason: row?.reason ?? null };
+}
+
+/**
+ * Poligonun içine düşen elemanları sayfalı olarak getirir.
+ *
+ * Toplam sayı `WITHIN_ROW_LIMIT + 1` satıra kadar sayılır: tam sayım için tüm poligonu
+ * taramak (mekânsal indeks bir yere kadar yardım eder) pahalıdır ve sınırı aşan bir sonuçta
+ * kesin sayının hiçbir değeri yoktur — kullanıcıya söylenecek şey zaten "daraltın".
+ */
+export async function listWithin(
+  polygon: unknown,
+  filters: ComponentFilters,
+  pagination: PaginationQuery,
+): Promise<{ items: ComponentAreaRow[]; total: number; overflowed: boolean }> {
+  const conditions = buildConditions(filters);
+  conditions.push(sql`ST_Intersects(${components.geom}, ${searchArea(polygon)})`);
+  const where = and(...conditions);
+  const offset = (pagination.page - 1) * pagination.pageSize;
+
+  const [items, countRows] = await Promise.all([
+    db
+      // Mahalle ve ilçe adı listede gösterilir; `unit_path` ("TR.06.012.0137") kullanıcıya
+      // bir şey söylemez. `districtName` mahalle satırında zaten denormalize durur, ikinci
+      // bir birleştirme gerekmez. Tek satırlık bir birleştirme, her satır için ayrı sorgudan ucuzdur.
+      .select({ ...getTableColumns(components), unitName: units.name, districtName: units.districtName })
+      .from(components)
+      .leftJoin(units, eq(units.path, components.unitPath))
+      .where(where)
+      .orderBy(asc(components.topologyLevel), asc(components.id))
+      .limit(pagination.pageSize)
+      .offset(offset),
+    db
+      .select({ value: count() })
+      .from(db.select({ id: components.id }).from(components).where(where).limit(WITHIN_ROW_LIMIT + 1).as('capped')),
+  ]);
+
+  const counted = countRows[0]?.value ?? 0;
+  const overflowed = counted > WITHIN_ROW_LIMIT;
+
+  return { items, total: overflowed ? WITHIN_ROW_LIMIT : counted, overflowed };
 }
 
 /** Eleman ID ile tek kaydı arar. */

@@ -412,6 +412,11 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['network', 'enum.voltageLevel.LV', '0,4 kV', '0.4 kV'],
   ['network', 'enum.voltageLevel.MV_LV', '34,5 / 0,4 kV', '34.5 / 0.4 kV'],
 
+  // Veri setinde yalnız bu üç durum var (ölçüldü: `SELECT DISTINCT status FROM network.components`).
+  ['network', 'enum.status.ENERGIZED', 'Enerjili', 'Energized'],
+  ['network', 'enum.status.CLOSED', 'Kapalı', 'Closed'],
+  ['network', 'enum.status.OPEN', 'Açık', 'Open'],
+
   // --- Harita ekranı ---
   ['map', 'page.title', 'Harita', 'Map'],
   ['map', 'panel.detail.title', 'Seçili Eleman', 'Selected Element'],
@@ -422,7 +427,15 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'panel.detail.field.capacity', 'Kapasite', 'Capacity'],
   ['map', 'panel.detail.field.status', 'Durum', 'Status'],
   ['map', 'panel.detail.field.unitPath', 'Mahalle', 'Administrative Unit'],
+  ['map', 'panel.detail.field.province', 'İl', 'Province'],
+  ['map', 'panel.detail.field.district', 'İlçe', 'District'],
   ['map', 'panel.detail.field.customerCount', 'Abone Sayısı', 'Customer Count'],
+  ['map', 'panel.detail.componentTitle', 'Eleman Detayı', 'Element Detail'],
+  ['map', 'panel.detail.outageTitle', 'Kesinti Detayı', 'Outage Detail'],
+  ['map', 'panel.detail.workOrderTitle', 'İş Emri Detayı', 'Work Order Detail'],
+  ['map', 'panel.detail.section.general', 'Genel', 'General'],
+  ['map', 'panel.detail.section.location', 'Konum', 'Location'],
+  ['map', 'panel.detail.section.component', 'Eleman', 'Element'],
   ['map', 'panel.mode.title', 'Katmanlar', 'Layers'],
   ['map', 'panel.mode.collapse', 'Paneli daralt', 'Collapse panel'],
   ['map', 'panel.mode.expand', 'Paneli genişlet', 'Expand panel'],
@@ -457,6 +470,8 @@ const SEED_KEYS: [string, string, string, string][] = [
   // Kesinti ve iş emri haritada ayrı bir "mod" değil, efsanede kendi katman satırıdır.
   ['map', 'legend.section.outages', 'Kesintiler', 'Outages'],
   ['map', 'legend.section.workOrders', 'İş Emirleri', 'Work Orders'],
+  ['map', 'legend.section.operations', 'Kesinti ve İş Emirleri', 'Outages and Work Orders'],
+  ['map', 'legend.section.heatmap', 'Isı Haritası', 'Heat Map'],
   ['map', 'legend.section.independent', 'Bağımsız Katmanlar', 'Independent Layers'],
   ['map', 'layer.outages', 'Kesintileri göster', 'Show outages'],
   ['map', 'layer.workOrders', 'İş emirlerini göster', 'Show work orders'],
@@ -485,11 +500,14 @@ const SEED_KEYS: [string, string, string, string][] = [
 
   // --- Haritadan aksiyon ---
   // Sol paneldeki iz aksiyonları, etki onay adımı ve haritadan kayıt açma.
-  ['map', 'action.traceUp', 'Besleme zincirini göster', 'Show supply chain'],
-  ['map', 'action.traceDown', 'Etkilenenleri göster', 'Show affected'],
+  ['map', 'action.traceUp', 'Upstream', 'Upstream'],
+  ['map', 'action.traceDown', 'Downstream', 'Downstream'],
   ['map', 'action.createOutage', 'Kesinti Aç', 'Open Outage'],
   ['map', 'action.createWorkOrder', 'İş Emri Aç', 'Open Work Order'],
   ['map', 'action.showOnMap', 'Haritada göster', 'Show on map'],
+  ['map', 'action.zoomIn', 'Yakınlaştır', 'Zoom in'],
+  ['map', 'action.zoomOut', 'Uzaklaştır', 'Zoom out'],
+  ['map', 'action.openRecord', 'Kaydı aç', 'Open record'],
 
   [
     'map',
@@ -517,19 +535,15 @@ const SEED_KEYS: [string, string, string, string][] = [
     'This element is fed from more than one source (closed ring) — impact cannot be computed reliably.',
   ],
 
-  ['map', 'confirm.outageTitle', 'Kesinti Onayı', 'Outage Confirmation'],
-  ['map', 'confirm.workOrderTitle', 'İş Emri Onayı', 'Work Order Confirmation'],
+  ['map', 'confirm.outageTitle', 'Yeni Kesinti', 'New Outage'],
+  ['map', 'confirm.workOrderTitle', 'Yeni İş Emri', 'New Work Order'],
+  ['map', 'confirm.outageInfoTitle', 'Kesinti Bilgileri', 'Outage Information'],
+  ['map', 'confirm.workOrderInfoTitle', 'İş Emri Bilgileri', 'Work Order Information'],
   ['map', 'confirm.componentLabel', 'Eleman', 'Element'],
   ['map', 'confirm.locationLabel', 'Konum', 'Location'],
-  ['map', 'confirm.impactLead', 'Bu işlem aşağıdakileri etkileyecek:', 'This operation will affect:'],
-  ['map', 'confirm.impactElements', 'şebeke elemanı', 'network elements'],
-  ['map', 'confirm.impactCustomers', 'abone', 'customers'],
-  [
-    'map',
-    'confirm.highImpactWarning',
-    'Yüksek etkili kesinti — bu eleman bir fider veya üstüdür.',
-    'High-impact outage — this element is a feeder or above.',
-  ],
+  ['map', 'confirm.affectedAssetsTitle', 'Etkilenecek Varlıklar', 'Affected Assets'],
+  ['map', 'confirm.affectedElementsLabel', 'Şebeke Elemanı Sayısı', 'Network Element Count'],
+  ['map', 'confirm.highImpactWarning', 'Yüksek etkili kesinti', 'High-impact outage'],
   [
     'map',
     'confirm.highImpactForbidden',
@@ -543,6 +557,73 @@ const SEED_KEYS: [string, string, string, string][] = [
     'Outage-causing work order types (planned/unplanned) need extra authorization on this element; non-outage types do not.',
   ],
   ['map', 'confirm.previewFailed', 'Etki önizlemesi alınamadı.', 'Impact preview could not be loaded.'],
+
+  // --- Harita araç şeridi ve panelleri ---
+  // Şerit dar kalsın diye düğmelerde yazı yok; etiket yalnız ipucu olarak görünür.
+  ['map', 'tool.layers', 'Katmanlar', 'Layers'],
+  ['map', 'tool.filters', 'Filtreler', 'Filters'],
+  ['map', 'tool.area', 'Alan Seç', 'Select Area'],
+  [
+    'map',
+    'filter.layerOff',
+    'Bu katman kapalı; filtreler açıldığında uygulanır.',
+    'This layer is off; the filters apply once it is turned on.',
+  ],
+
+  // --- Alan (poligon) seçimi ---
+  ['map', 'area.startDrawing', 'Alan çiz', 'Draw area'],
+  ['map', 'area.cancelDrawing', 'Çizimi iptal et', 'Cancel drawing'],
+  ['map', 'area.clear', 'Alanı temizle', 'Clear area'],
+  [
+    'map',
+    'area.drawingHint',
+    'Köşe eklemek için haritaya tıklayın; kapatmak için çift tıklayın veya ilk köşeye basın. Esc iptal eder.',
+    'Click the map to add corners; double-click or click the first corner to close. Esc cancels.',
+  ],
+  [
+    'map',
+    'area.idleHint',
+    'Bir alan çizin; içindeki elemanlar ve kayıtlar solda listelenir.',
+    'Draw an area; the elements and records inside are listed on the left.',
+  ],
+  ['map', 'area.noteLabel', 'Not:', 'Note:'],
+  [
+    'map',
+    'area.noteScope',
+    'Alanın içinde ne aranacağı Katmanlar ve Filtreler panellerindeki o anki seçime göre belirlenir.',
+    'What is searched inside the area follows the current selection in the Layers and Filters panels.',
+  ],
+  ['map', 'area.categories', 'Aranacak Kategoriler', 'Searched Categories'],
+  ['map', 'area.records', 'Kayıtlar', 'Records'],
+  [
+    'map',
+    'area.recordsHint',
+    'Kayıtlar Filtreler panelindeki durum ve tür filtreleriyle süzülür.',
+    'Records are filtered by the status and type filters in the Filters panel.',
+  ],
+  ['map', 'area.result', 'Sonuç', 'Result'],
+  ['map', 'area.countComponents', 'Şebeke elemanı', 'Network elements'],
+  [
+    'map',
+    'area.overflowed',
+    'Alan çok geniş — sonuç üst sınıra dayandı. Alanı daraltın veya kategori seçimini azaltın.',
+    'The area is too large — the result hit the limit. Narrow the area or select fewer categories.',
+  ],
+
+  // --- Alan sonuç listesi (sol panel) ---
+  ['map', 'result.title', 'Alan Sonuçları', 'Area Results'],
+  ['map', 'result.empty', 'Bu alanda kayıt yok', 'Nothing in this area'],
+  ['map', 'result.tab.components', 'Elemanlar', 'Elements'],
+  ['map', 'result.tab.outages', 'Kesintiler', 'Outages'],
+  ['map', 'result.tab.workOrders', 'İş Emirleri', 'Work Orders'],
+  ['map', 'result.column.id', 'CBS ID', 'GIS ID'],
+  ['map', 'result.column.type', 'Tip', 'Type'],
+  ['map', 'result.column.name', 'Ad', 'Name'],
+  ['map', 'result.column.unit', 'Mahalle', 'Neighborhood'],
+  ['map', 'result.column.district', 'İlçe', 'District'],
+  ['map', 'result.column.record', 'Kayıt', 'Record'],
+  ['map', 'result.column.status', 'Durum', 'Status'],
+  ['map', 'result.column.component', 'Eleman', 'Element'],
 
   ['map', 'panel.detail.linkedOutages', 'Bu elemandaki kesintiler', 'Outages on this element'],
   ['map', 'panel.detail.linkedWorkOrders', 'Bu elemandaki iş emirleri', 'Work orders on this element'],

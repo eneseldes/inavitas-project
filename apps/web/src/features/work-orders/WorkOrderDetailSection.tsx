@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowRight, FiLink } from 'react-icons/fi';
+import { FiArrowRight, FiLink, FiMap } from 'react-icons/fi';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import { DetailSectionLayout, type TabConfig } from '../../shared/components/DetailSectionLayout.tsx';
@@ -139,11 +139,12 @@ function WorkOrderDetailTab({
           {hasPermission('network:read') ? (
             <button
               type="button"
-              className={`link font-mono`}
+              className="link"
               onClick={() => navigate(`/map?focus=${workOrder.cbsId}`)}
               title={t('map.action.showOnMap')}
             >
-              {workOrder.cbsId}
+              <FiMap />
+              <span className="font-mono">{workOrder.cbsId}</span>
             </button>
           ) : (
             <span className={`${styles.infoValue} font-mono`}>{workOrder.cbsId}</span>
@@ -169,7 +170,7 @@ function WorkOrderDetailTab({
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('work-order.dialog.edit.createdByLabel', undefined, 'Oluşturan')}</span>
-          <span className={styles.infoValue}>{workOrder.createdBy}</span>
+          <span className={styles.infoValue}>{labels.actor(workOrder.createdBy)}</span>
         </div>
         <div className={styles.infoItem}>
           <span className={styles.infoLabel}>{t('work-order.column.outageId')}</span>
@@ -272,7 +273,7 @@ function WorkOrderHistoryTab({ workOrderId }: { workOrderId: string }) {
                 <td>
                   <StatusBadge status={entry.toStatus} />
                 </td>
-                <td>{entry.actor}</td>
+                <td>{labels.actor(entry.actor)}</td>
                 <td>{labels.origin(entry.origin)}</td>
               </tr>
             ))

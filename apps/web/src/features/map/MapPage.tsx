@@ -1,40 +1,52 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { clsx } from 'clsx';
+import type { Polygon } from 'geojson';
+import { AreaResultPanel } from './AreaResultPanel.tsx';
+import { AreaSelectPanel } from './AreaSelectPanel.tsx';
+import { CreateOperationDialog } from './CreateOperationDialog.tsx';
 import { DetailPanel } from './DetailPanel.tsx';
-import { ImpactConfirmDialog } from './ImpactConfirmDialog.tsx';
-import { MapView } from './MapView.tsx';
-import { ModePanel } from './ModePanel.tsx';
+import { FiltersPanel } from './FiltersPanel.tsx';
+import { LayersPanel } from './LayersPanel.tsx';
+import { MapToolRail, type MapTool } from './MapToolRail.tsx';
+import { MapView, type MapZoomApi } from './MapView.tsx';
+import { MapZoomControl } from './MapZoomControl.tsx';
+import { OperationDetailPanel } from './OperationDetailPanel.tsx';
+import { useAreaResults, useAreaSelectionState } from './useAreaSelection.ts';
 import { useMapState } from './useMapState.ts';
 import { useComponent, useTrace } from './useNetwork.ts';
 import type { TraceDirection } from './api.ts';
-import { CreateOutageDialog } from '../outages/CreateOutageDialog.tsx';
 import { useOutageMapItems } from '../outages/useOutages.ts';
 import { useOutageStream } from '../outages/useOutageStream.ts';
-import { CreateWorkOrderDialog } from '../work-orders/CreateWorkOrderDialog.tsx';
 import { useWorkOrderMapItems } from '../work-orders/useWorkOrders.ts';
 import { useWorkOrderStream } from '../work-orders/useWorkOrderStream.ts';
 import styles from './MapPage.module.scss';
 
-/** Haritadan başlatılan kayıt akışının adımı: önce etki onayı, sonra kayıt formu. */
-type ActionStep = 'confirm' | 'form';
+/** Bir elemana odaklanırken gidilen zoom — bina izinin açıldığı seviyenin üstü. */
+const FOCUS_ZOOM = 17;
 
-/** `/map` — sol panel (seçim özeti), harita, sağ panel (katmanlar ve filtreler). */
+/** Listeden bir kayda gidilirken kullanılan en küçük zoom; işaretçiler burada teker teker açılır. */
+const RECORD_ZOOM = 15;
+
+/** `/map` — harita tam alanı kaplar, paneller üstüne biner. */
 export function MapPage() {
   const {
     view,
     setView,
     legend,
     toggleLegend,
+    toggleLegendGroup,
     voltageLevels,
-    toggleVoltageLevel,
+    setVoltageLevels,
     showAdminBoundaries,
     setShowAdminBoundaries,
     showOutages,
     setShowOutages,
     showWorkOrders,
     setShowWorkOrders,
-    showOutageHeatmap,
-    setShowOutageHeatmap,
+    setShowOperationsLayers,
+    activeHeatmap,
+    setActiveHeatmap,
     outageFilters,
     patchOutageFilters,
     workOrderFilters,
@@ -44,15 +56,22 @@ export function MapPage() {
     focusId,
     resolveFocus,
   } = useMapState();
-  const [isModePanelExpanded, setIsModePanelExpanded] = useState(true);
+  const [activeTool, setActiveTool] = useState<MapTool | undefined>(undefined);
+  const [mapZoomApi, setMapZoomApi] = useState<MapZoomApi | undefined>(undefined);
   const navigate = useNavigate();
   const { data: focusComponent } = useComponent(focusId);
   const { data: selectedComponent } = useComponent(selectedId);
 
-  // İz ve aksiyon durumu URL'e yazılmaz: ikisi de sol panele bağlı geçici bir görünümdür,
-  // panel kapanınca (ya da başka bir eleman seçilince) düşerler.
+  // İz, aksiyon ve kamera hedefi URL'e yazılmaz: üçü de geçici görünüm durumudur.
   const [traceDirection, setTraceDirection] = useState<TraceDirection | undefined>(undefined);
-  const [action, setAction] = useState<{ kind: 'outage' | 'workOrder'; step: ActionStep } | undefined>(undefined);
+  const [action, setAction] = useState<'outage' | 'workOrder' | undefined>(undefined);
+  const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom: number } | undefined>(undefined);
+  const [isAreaDrawing, setIsAreaDrawing] = useState(false);
+  const [selectedOperationId, setSelectedOperationId] = useState<string | undefined>(undefined);
+  /** Haritada tıklanan kesinti/iş emri işaretçisinin özet paneli — bkz. `selectOperation`. */
+  const [operationDetail, setOperationDetail] = useState<{ kind: 'outage' | 'workOrder'; id: string } | undefined>(
+    undefined,
+  );
 
   const { data: trace, isLoading: isTraceLoading } = useTrace(selectedId, traceDirection);
 
@@ -61,11 +80,19 @@ export function MapPage() {
   useOutageStream();
   useWorkOrderStream();
 
+  // Alan seçiminin durumu sorgulardan ÖNCE kurulur: hangi kayıt sorgularının açılacağını
+  // bu durum belirler, sonuçları da bir alt satırdaki `useAreaResults` süzer.
+  const area = useAreaSelectionState();
+
   // Katman kapalıyken sorgu hiç atılmaz — harita açılışında iki gereksiz istek olmaz.
   // Hiçbir durum seçili değilse de sorgu atılmaz: boş durum listesi sunucuda "filtre yok"
   // demektir ve kullanıcının hepsini kapatması yanlışlıkla TÜM kayıtları çizerdi.
+  // Alan seçimi kayıtları da aynı veriden süzdüğü için sorguyu o da açabilir.
   const hasOutageStatus = (outageFilters.status?.length ?? 0) > 0;
   const hasWorkOrderStatus = (workOrderFilters.status?.length ?? 0) > 0;
+  // Alan içindeki kesinti/iş emri dahiliyeti artık ayrı bir seçim değil — Katmanlar
+  // panelindeki görünürlükle birebir aynıdır (bkz. AreaSelectPanel.tsx).
+  const showOutageHeatmap = activeHeatmap === 'outage';
   const outageQueryEnabled = (showOutages || showOutageHeatmap) && hasOutageStatus;
   const workOrderQueryEnabled = showWorkOrders && hasWorkOrderStatus;
   const { data: outageData } = useOutageMapItems(outageFilters, outageQueryEnabled);
@@ -76,9 +103,21 @@ export function MapPage() {
   const outageItems = outageQueryEnabled ? outageData?.items : undefined;
   const workOrderItems = workOrderQueryEnabled ? workOrderData?.items : undefined;
 
+  const areaResults = useAreaResults({
+    state: area,
+    outages: outageItems,
+    workOrders: workOrderItems,
+    voltageLevels,
+    includeOutages: showOutages,
+    includeWorkOrders: showWorkOrders,
+  });
+
   useEffect(() => {
     if (!focusComponent) return;
     resolveFocus(focusComponent.id);
+    if (focusComponent.lat !== null && focusComponent.lon !== null) {
+      setFlyTo({ lng: focusComponent.lon, lat: focusComponent.lat, zoom: FOCUS_ZOOM });
+    }
     // Yalnız dışarıdan gelen `focus` id'si değişince tetiklenir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusComponent]);
@@ -89,11 +128,6 @@ export function MapPage() {
     setTraceDirection(undefined);
     setAction(undefined);
   }, [selectedId]);
-
-  const flyTo =
-    focusComponent && focusComponent.lat !== null && focusComponent.lon !== null
-      ? { lng: focusComponent.lon, lat: focusComponent.lat, zoom: view.zoom }
-      : undefined;
 
   /**
    * Vurgulanacak kimlikler. Tıklanan elemanın kendisi de listeye girer — iz onunla başlar,
@@ -110,24 +144,93 @@ export function MapPage() {
    * harita bir liste değil, kaydın kendisi kendi ekranında yönetilir. Yönlendirme mevcut
    * `related*Id` desenini kullanır (tablolar arası geçişte de bu kullanılıyor).
    */
-  const handleSelectOperation = (kind: 'outage' | 'workOrder', id: string) => {
-    navigate(kind === 'outage' ? `/outages?relatedOutageId=${id}` : `/work-orders?relatedWorkOrderId=${id}`);
-  };
+  const openRecord = useCallback(
+    (kind: 'outage' | 'workOrder', id: string) => {
+      navigate(kind === 'outage' ? `/outages?relatedOutageId=${id}` : `/work-orders?relatedWorkOrderId=${id}`);
+    },
+    [navigate],
+  );
+
+  /**
+   * Haritadaki bir kesinti/iş emri işaretçisine tıklamak artık kaydın kendi sayfasına
+   * atlamaz — önce özet panel açılır (bkz. `OperationDetailPanel`), sayfaya geçiş oradaki
+   * id bağlantısından yapılır. Eleman seçimiyle aynı anda görünmesin diye ikisi birbirini
+   * kapatır.
+   */
+  const selectOperation = useCallback((kind: 'outage' | 'workOrder', id: string) => {
+    setOperationDetail({ kind, id });
+    setSelectedOperationId(id);
+    setSelectedId(undefined);
+  }, [setSelectedId]);
+
+  const selectComponent = useCallback(
+    (id: string | undefined) => {
+      setOperationDetail(undefined);
+      setSelectedId(id);
+    },
+    [setSelectedId],
+  );
+
+  /**
+   * Alan sonuçları listesinden bir kesinti/iş emri satırına tıklamak — özet paneli AÇAR
+   * (`selectOperation`) VE kamerayı üstüne getirir. Eskiden yalnız kamerayı getirip paneli
+   * açmıyordu; eleman satırları paneli açıyordu ama kamerayı getirmiyordu — ikisi tutarsızdı.
+   */
+  const selectAreaOperation = useCallback(
+    (kind: 'outage' | 'workOrder', id: string) => {
+      selectOperation(kind, id);
+      const item =
+        kind === 'outage'
+          ? areaResults.outagesInArea.find((row) => row.id === id)
+          : areaResults.workOrdersInArea.find((row) => row.id === id);
+      if (item) setFlyTo({ lng: item.lon, lat: item.lat, zoom: Math.max(view.zoom, RECORD_ZOOM) });
+    },
+    [selectOperation, areaResults.outagesInArea, areaResults.workOrdersInArea, view.zoom],
+  );
+
+  /** Alan sonuçları listesinden bir eleman satırına tıklamak — bkz. `selectAreaOperation`. */
+  const selectAreaComponent = useCallback(
+    (id: string) => {
+      selectComponent(id);
+      const item = areaResults.components?.items.find((row) => row.id === id);
+      if (item && item.lat !== null && item.lon !== null) {
+        setFlyTo({ lng: item.lon, lat: item.lat, zoom: Math.max(view.zoom, RECORD_ZOOM) });
+      }
+    },
+    [selectComponent, areaResults.components, view.zoom],
+  );
+
+  const { applyPolygon } = area;
+
+  const startDrawing = useCallback(() => {
+    applyPolygon(null);
+    setIsAreaDrawing(true);
+  }, [applyPolygon]);
+
+  const handleAreaDrawn = useCallback(
+    (polygon: Polygon) => {
+      applyPolygon(polygon);
+      setIsAreaDrawing(false);
+    },
+    [applyPolygon],
+  );
+
+  const clearArea = useCallback(() => {
+    applyPolygon(null);
+    setSelectedOperationId(undefined);
+    setIsAreaDrawing(false);
+  }, [applyPolygon]);
+
+  // Alan aracı seçilir seçilmez çizim kendiliğinden başlar — ayrı bir "çizimi başlat"
+  // düğmesi yok, imlecin artıya dönmesi zaten başladığını söyler. Alandan çıkılırken
+  // yarım kalan çizim de burada iptal edilir.
+  useEffect(() => {
+    if (activeTool === 'area' && !area.polygon && !isAreaDrawing) startDrawing();
+    if (activeTool !== 'area' && isAreaDrawing) setIsAreaDrawing(false);
+  }, [activeTool, area.polygon, isAreaDrawing, startDrawing]);
 
   return (
     <div className={styles.page}>
-      <DetailPanel
-        selectedId={selectedId}
-        onClose={() => setSelectedId(undefined)}
-        traceDirection={traceDirection}
-        onToggleTrace={(direction) => setTraceDirection((prev) => (prev === direction ? undefined : direction))}
-        trace={trace}
-        isTraceLoading={isTraceLoading}
-        onCreateOutage={() => setAction({ kind: 'outage', step: 'confirm' })}
-        onCreateWorkOrder={() => setAction({ kind: 'workOrder', step: 'confirm' })}
-        onOpenRecord={handleSelectOperation}
-      />
-
       <div className={styles.mapArea}>
         <MapView
           view={view}
@@ -136,7 +239,7 @@ export function MapPage() {
           voltageLevels={voltageLevels}
           showAdminBoundaries={showAdminBoundaries}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={selectComponent}
           flyTo={flyTo}
           tracedIds={tracedIds}
           traceDirection={traceDirection}
@@ -146,50 +249,125 @@ export function MapPage() {
           showOutages={showOutages}
           showWorkOrders={showWorkOrders}
           showOutageHeatmap={showOutageHeatmap}
-          onSelectOperation={handleSelectOperation}
+          selectedOperationId={selectedOperationId}
+          onSelectOperation={selectOperation}
+          isAreaDrawing={isAreaDrawing}
+          areaPolygon={area.polygon}
+          onAreaDrawn={handleAreaDrawn}
+          onAreaDrawingChange={setIsAreaDrawing}
+          onMapReady={setMapZoomApi}
         />
       </div>
 
-      <ModePanel
-        isExpanded={isModePanelExpanded}
-        onToggleExpanded={() => setIsModePanelExpanded((prev) => !prev)}
-        legend={legend}
-        onToggleLegend={toggleLegend}
-        voltageLevels={voltageLevels}
-        onToggleVoltageLevel={toggleVoltageLevel}
-        showAdminBoundaries={showAdminBoundaries}
-        onShowAdminBoundariesChange={setShowAdminBoundaries}
-        showOutages={showOutages}
-        onShowOutagesChange={setShowOutages}
-        showWorkOrders={showWorkOrders}
-        onShowWorkOrdersChange={setShowWorkOrders}
-        showOutageHeatmap={showOutageHeatmap}
-        onShowOutageHeatmapChange={setShowOutageHeatmap}
-        outageFilters={outageFilters}
-        onOutageFiltersChange={patchOutageFilters}
-        workOrderFilters={workOrderFilters}
-        onWorkOrderFiltersChange={patchWorkOrderFilters}
-        outageTruncated={outageData?.truncated ?? false}
-        workOrderTruncated={workOrderData?.truncated ?? false}
-      />
+      {/* Sol yaka — yalnız gösterecek bir şey varken vardır: seçili eleman ve/veya alan sonucu. */}
+      <div className={clsx(styles.dock, styles.dockLeft)}>
+        {area.polygon && (
+          <AreaResultPanel
+            onClose={clearArea}
+            components={areaResults.components}
+            isLoadingComponents={areaResults.isLoading}
+            isFetchingComponents={areaResults.isFetching}
+            onRefreshComponents={() => void areaResults.refetch()}
+            page={area.page}
+            pageSize={area.pageSize}
+            onPageChange={area.setPage}
+            onPageSizeChange={area.setPageSize}
+            outages={areaResults.outagesInArea}
+            workOrders={areaResults.workOrdersInArea}
+            includeOutages={showOutages}
+            includeWorkOrders={showWorkOrders}
+            selectedComponentId={selectedId}
+            onSelectComponent={selectAreaComponent}
+            selectedOperationId={selectedOperationId}
+            onSelectOperation={selectAreaOperation}
+          />
+        )}
 
-      {/* Etki onayı → kayıt formu. Form yeni değil: tablodaki ile aynı dialog, CBS ID'si
-          dolu ve kilitli gelir; istek de aynı `POST /outages` ucuna gider. */}
-      {action?.step === 'confirm' && selectedComponent && (
-        <ImpactConfirmDialog
-          component={selectedComponent}
-          kind={action.kind}
-          onCancel={() => setAction(undefined)}
-          onConfirm={() => setAction({ kind: action.kind, step: 'form' })}
+        <DetailPanel
+          selectedId={selectedId}
+          onClose={() => setSelectedId(undefined)}
+          traceDirection={traceDirection}
+          onToggleTrace={(direction) => setTraceDirection((prev) => (prev === direction ? undefined : direction))}
+          trace={trace}
+          isTraceLoading={isTraceLoading}
+          onCreateOutage={() => setAction('outage')}
+          onCreateWorkOrder={() => setAction('workOrder')}
+          onSelectOperation={selectOperation}
         />
-      )}
 
-      {action?.step === 'form' && action.kind === 'outage' && selectedId && (
-        <CreateOutageDialog presetCbsId={selectedId} onClose={() => setAction(undefined)} />
-      )}
+        {operationDetail && (
+          <OperationDetailPanel
+            kind={operationDetail.kind}
+            id={operationDetail.id}
+            onClose={() => {
+              setOperationDetail(undefined);
+              setSelectedOperationId(undefined);
+            }}
+            onOpenRecord={openRecord}
+            onSelectOperation={selectOperation}
+            onSelectComponent={selectComponent}
+          />
+        )}
+      </div>
 
-      {action?.step === 'form' && action.kind === 'workOrder' && selectedId && (
-        <CreateWorkOrderDialog presetCbsId={selectedId} onClose={() => setAction(undefined)} />
+      {/* Sağ yaka — araç şeridi her zaman görünür, panel yalnız seçili araç için açılır. */}
+      <div className={clsx(styles.dock, styles.dockRight)}>
+        {activeTool === 'layers' && (
+          <LayersPanel
+            onClose={() => setActiveTool(undefined)}
+            legend={legend}
+            onToggleLegend={toggleLegend}
+            onToggleLegendGroup={toggleLegendGroup}
+            showAdminBoundaries={showAdminBoundaries}
+            onShowAdminBoundariesChange={setShowAdminBoundaries}
+            showOutages={showOutages}
+            onShowOutagesChange={setShowOutages}
+            showWorkOrders={showWorkOrders}
+            onShowWorkOrdersChange={setShowWorkOrders}
+            onShowOperationsLayersChange={setShowOperationsLayers}
+            activeHeatmap={activeHeatmap}
+            onActiveHeatmapChange={setActiveHeatmap}
+          />
+        )}
+
+        {activeTool === 'filters' && (
+          <FiltersPanel
+            onClose={() => setActiveTool(undefined)}
+            voltageLevels={voltageLevels}
+            onVoltageLevelsChange={setVoltageLevels}
+            showOutages={showOutages}
+            showWorkOrders={showWorkOrders}
+            outageFilters={outageFilters}
+            onOutageFiltersChange={patchOutageFilters}
+            workOrderFilters={workOrderFilters}
+            onWorkOrderFiltersChange={patchWorkOrderFilters}
+            outageTruncated={outageData?.truncated ?? false}
+            workOrderTruncated={workOrderData?.truncated ?? false}
+          />
+        )}
+
+        {activeTool === 'area' && (
+          <AreaSelectPanel
+            onClose={() => setActiveTool(undefined)}
+            isDrawing={isAreaDrawing}
+            hasArea={area.polygon !== null}
+            onClearArea={clearArea}
+          />
+        )}
+
+        <div className={styles.railColumn}>
+          {mapZoomApi && <MapZoomControl onZoomIn={mapZoomApi.zoomIn} onZoomOut={mapZoomApi.zoomOut} />}
+          <MapToolRail
+            activeTool={activeTool}
+            onToggleTool={(tool) => setActiveTool((prev) => (prev === tool ? undefined : tool))}
+          />
+        </div>
+      </div>
+
+      {/* Etki önizlemesi ve kayıt formu TEK modalde — istek `POST /outages` (ya da
+          `/work-orders`) ucuna aynı doğrulamalarla gider. */}
+      {action && selectedComponent && (
+        <CreateOperationDialog component={selectedComponent} kind={action} onClose={() => setAction(undefined)} />
       )}
     </div>
   );

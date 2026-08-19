@@ -50,6 +50,13 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setLocale(fallback);
   }, [activeLocales, locale]);
 
+  // `text-transform: uppercase` Türkçe küçük "i"yi yalnız kök `lang` "tr" olduğunda
+  // noktalı "İ"ye çevirir (CSS'in yerel-farkında büyük harf kuralı) — `<html lang>`
+  // sabit "en" kaldığı sürece "İş Emirleri" gibi başlıklar "IS EMIRLERI" görünürdü.
+  useEffect(() => {
+    document.documentElement.lang = locale.split('-')[0]!;
+  }, [locale]);
+
   const { data: dictionary = {} } = useQuery<Dictionary>({
     queryKey: ['i18n', locale],
     // namespace verilmez — sunucu tüm namespace'leri tek düz sözlükte döner (bkz. E3).

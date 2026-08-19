@@ -1,5 +1,15 @@
+import type { Polygon } from 'geojson';
 import { apiFetch } from '../../shared/api/client.ts';
-import type { DownstreamImpact, ImpactPreview, NetworkComponentDetail, UpstreamChain } from '../../types/network.ts';
+import type { PageResult } from '../../types/api.ts';
+import type {
+  ComponentCategory,
+  DownstreamImpact,
+  ImpactPreview,
+  NetworkComponentAreaItem,
+  NetworkComponentDetail,
+  UpstreamChain,
+  VoltageLevel,
+} from '../../types/network.ts';
 
 /**
  * Tile MVT şemasının sürümü. Tile yanıtları `max-age=3600` ile önbelleğe alındığından,
@@ -15,8 +25,12 @@ import type { DownstreamImpact, ImpactPreview, NetworkComponentDetail, UpstreamC
  * 6 — düzgün çokgen (TM 8 · DM 5 · trafo 4 · kofra 3), kısa yelpaze, kare sınırında
  *     kopmayan hat çapası.
  * 7 — kofranın yönü ebeveyni olan buattan türetiliyor (irtibat hattı kardeşi, ebeveyni değil).
+ * 8 — il/ilçe dolgu bandı artık komşuluk grafiğine göre önceden boyanmış `color_band`
+ *     kolonundan geliyor (`hashtext(path) % 8` yerine) — iki komşu ilçe artık aynı renk olamaz.
+ * 9 — ilçe verisi z8 değil z7'den itibaren gönderiliyor (bkz. zoom-lod.ts) — il↔ilçe
+ *     bindirmeli solması (z7,5-8,5) z7 tile'ında geometri bulabilsin diye.
  */
-const TILE_SCHEMA_VERSION = 7;
+const TILE_SCHEMA_VERSION = 9;
 
 /** MapLibre'nin doğrudan `vector` kaynağı olarak kullanacağı MVT şablonu — aynı origin, gateway proxy'sinden geçer. */
 export const NETWORK_TILE_URL_TEMPLATE = `/api/network/tiles/{z}/{x}/{y}.mvt?v=${TILE_SCHEMA_VERSION}`;
@@ -69,4 +83,28 @@ export function fetchTrace(id: string, direction: TraceDirection): Promise<Downs
 /** Kesinti/iş emri açmadan önceki zorunlu onay adımının beslediği etki özeti. */
 export function fetchImpactPreview(id: string): Promise<ImpactPreview> {
   return apiFetch(`/api/network/components/${id}/impact-preview`);
+}
+
+/** Alan sorgusunun gövdesi — poligon + `/components` ile aynı sözlükten gelen filtreler. */
+export interface AreaQueryBody {
+  polygon: Polygon;
+  category?: ComponentCategory[];
+  voltageLevel?: VoltageLevel[];
+  page: number;
+  pageSize: number;
+}
+
+/** Alan sorgusunun yanıtı; `overflowed` sonucun sunucudaki üst sınıra dayandığını söyler. */
+export interface AreaQueryResult extends PageResult<NetworkComponentAreaItem> {
+  overflowed: boolean;
+}
+
+/**
+ * Haritada çizilen alanın içindeki şebeke elemanları.
+ *
+ * ⚠️ **POST**, çünkü poligon gövdede taşınır: bir mahalleyi saran poligon kolayca birkaç
+ * kilobayt tutar ve query string sınırına takılır.
+ */
+export function queryWithin(body: AreaQueryBody): Promise<AreaQueryResult> {
+  return apiFetch('/api/network/query/within', { method: 'POST', body });
 }

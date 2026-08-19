@@ -1,15 +1,57 @@
 @use '../../styles/variables' as v;
 
-// AppShell'in `.main`'ine uygulanan v.$space-6 dolguyu iptal eder — harita her zaman ana alan
-// olduğundan kenarlara kadar dolu olmalı.
+// Harita ekranı `.main`'in dolgusunu kullanmaz, kutunun tamamına oturur. Akış dışında
+// (`absolute`) durduğu için sayfaya kaydırma çubuğu doğurmaz — paneller ne kadar uzarsa
+// uzasın gövde aşağı büyümez, uzayan panelin kendisi kayar.
 .page {
-  display: flex;
-  height: calc(100% + #{v.$space-6 * 2});
-  margin: -#{v.$space-6};
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
+// Harita HER ZAMAN tüm alanı kaplar; paneller üstüne biner. Panel açılıp kapanınca
+// haritanın ölçüsü değişmediğinden MapLibre yeniden boyutlanmaz — panel animasyonu
+// sırasındaki takılma bundan geliyordu.
 .mapArea {
-  position: relative;
-  flex: 1;
-  min-width: 0;
+  position: absolute;
+  inset: 0;
+}
+
+// Panel katmanı. Haritanın üstünde durur ama boşluğu tıklamayı yutmaz: yalnız panellerin
+// kendisi olayları alır, aralarındaki boşlukta harita sürüklenmeye devam eder.
+.dock {
+  position: absolute;
+  top: v.$space-3;
+  bottom: v.$space-3;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  gap: v.$space-3;
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.dockLeft {
+  left: v.$space-3;
+  max-width: calc(100% - 8rem);
+}
+
+// Sağ kenar: araç şeridi ve açık panel.
+.dockRight {
+  right: v.$space-3;
+  max-width: calc(100% - 8rem);
+}
+
+// Zoom kontrolü ve araç şeridi aynı sütunda, doğal akışta üst üste dizilir — ikisi de
+// `.dock`'un `align-items: stretch` kuralından `align-self: flex-start` ile kaçar,
+// aksi halde tüm dock yüksekliğine gerilirlerdi.
+.railColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: flex-start;
+  gap: v.$space-3;
 }

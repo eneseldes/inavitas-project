@@ -1,0 +1,49 @@
+@use '../../styles/variables' as v;
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: v.$space-1;
+  align-self: flex-start;
+  padding: v.$space-1;
+  border-radius: v.$radius-lg;
+  border: 1px solid v.$color-hairline;
+  background: v.$color-surface;
+  box-shadow: v.$shadow-sm;
+}
+
+// İpucu düğmenin YANINDA doğar; şerit haritanın sağ kenarında olduğu için sola açılır.
+.slot {
+  position: relative;
+  display: flex;
+
+  &:hover .tooltip,
+  &:focus-within .tooltip {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+.button {
+  border-color: transparent;
+  background: transparent;
+}
+
+.tooltip {
+  position: absolute;
+  right: calc(100% + #{v.$space-2});
+  top: 50%;
+  transform: translate(0.25rem, -50%);
+  padding: 0.25rem v.$space-2;
+  border-radius: v.$radius-sm;
+  background: v.$color-ink;
+  color: v.$color-bg;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity v.$transition-fast,
+    transform v.$transition-fast;
+}

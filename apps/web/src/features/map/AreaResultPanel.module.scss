@@ -1,0 +1,81 @@
+@use '../../styles/variables' as v;
+
+// Sol panelin liste hâli. Tekil seçim panelinden geniştir: içinde bir tablo var ve
+// dört sütun 20rem'e sığmıyor.
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 27rem;
+  max-width: 100%;
+  border-radius: v.$radius-lg;
+  border: 1px solid v.$color-hairline;
+  background: v.$color-surface;
+  box-shadow: v.$shadow-sm;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+  flex-shrink: 0;
+  padding: v.$space-3 v.$space-3 v.$space-3 v.$space-4;
+  border-bottom: 1px solid v.$color-hairline;
+}
+
+.title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: v.$color-ink;
+  margin: 0;
+}
+
+.tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: v.$space-1;
+  padding: v.$space-2 v.$space-3 0;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: v.$space-1;
+  padding: 0.3125rem v.$space-2;
+  border-radius: v.$radius-sm v.$radius-sm 0 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: v.$color-ink-soft;
+  border-bottom: 2px solid transparent;
+
+  &:hover {
+    color: v.$color-ink;
+  }
+}
+
+.tabActive {
+  color: v.$color-brand-soft-ink;
+  border-bottom-color: v.$color-brand-500;
+  font-weight: 600;
+}
+
+.tabCount {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.6875rem;
+  color: v.$color-ink-soft;
+}
+
+// Liste uzayınca panel büyümez, burası kayar.
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: v.$space-3;
+}
+
+.overflowHint {
+  margin: v.$space-2 0 0;
+  font-size: 0.6875rem;
+  color: v.$color-danger-soft-ink;
+}
