@@ -1,4 +1,5 @@
 @use '../../styles/variables' as v;
+@use '../../styles/mixins' as m;
 
 // Sağ şeritten açılan üç panelin (katmanlar · filtreler · alan seçimi) ortak stil dosyası.
 // Panel kabuğu ve içindeki liste/grup/alan biçimleri üçünde de birebir aynı olduğundan
@@ -92,6 +93,24 @@
   padding-left: v.$space-4;
 }
 
+// Grid'in `0fr`↔`1fr` satırı içeriği anlık göstermek/gizlemek yerine yüksekliğini
+// animasyonlar; `overflow: hidden` olan iç sarmalayıcı taşımayı keser. Katmanlar ve
+// filtreler panelindeki HER katlanabilir seviye (üst grup, iç içe alt grup) bunu kullanır.
+.collapsibleWrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows v.$transition-base;
+}
+
+.collapsibleWrapOpen {
+  grid-template-rows: 1fr;
+}
+
+.collapsibleInner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 // --- Satırlar ----------------------------------------------------------------
 
 .checkList {
@@ -118,9 +137,31 @@
   cursor: pointer;
   padding: 0.3125rem 0.5rem;
   border-radius: v.$radius-sm;
+  transition: background v.$transition-fast;
 
   &:hover {
     background: v.$color-surface-alt;
+  }
+}
+
+// Bağımsız/idari sınır satırı artık kendi başlığı altında ayrı bir grup değil, tek
+// satırlık düz bir katmandır — diğer grup başlıklarıyla aynı görsel ağırlıkta durur.
+.simpleRow {
+  font-weight: 600;
+}
+
+// Haritadaki işaretçinin (kesinti/iş emri rozeti) küçültülmüş birebir kopyası — renk
+// CSS değişkeninden gelir, tema değişince ayrıca yeniden üretilmesi gerekmez.
+.markerBadge {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 }
 
@@ -217,20 +258,27 @@
 .swatchLvLine {
   background: var(--c-map-line-lv);
 }
+// Birim örnekleri haritadaki düğüm katmanının kendisiyle aynı çift renk: gövde + kenar
+// (bkz. networkLayers.ts `pointLayer` — `circle-color` + `circle-stroke-color`).
 .swatchTm {
   background: var(--c-map-tm);
+  border: 1.5px solid var(--c-map-tm-dark);
 }
 .swatchDm {
   background: var(--c-map-dm);
+  border: 1.5px solid var(--c-map-dm-dark);
 }
 .swatchTransformer {
   background: var(--c-map-tr);
+  border: 1.5px solid var(--c-map-tr-dark);
 }
 .swatchLvJunction {
   background: var(--c-map-lvj);
+  border: 1.5px solid var(--c-map-lvj-dark);
 }
 .swatchServiceEntry {
   background: var(--c-map-breaker);
+  border: 1.5px solid var(--c-map-breaker-dark);
 }
 .swatchOutage {
   background: var(--c-map-outage-started);
@@ -240,9 +288,6 @@
 }
 .swatchHeatmap {
   background: var(--c-map-heat-mid);
-}
-.swatchBoundary {
-  background: var(--c-map-unit-band-0);
 }
 
 .subFilterTitle {
@@ -303,6 +348,9 @@
   font-size: 0.75rem;
   color: v.$color-ink-soft;
 
+  // Boyut/boşluk bilerek `control-base`'ten FARKLI (panel dar, standart kontrol yüksekliği
+  // sığmaz) — ama renk/geçiş/odak davranışı projenin geri kalanıyla AYNI olmalı, o yüzden
+  // `focus-ring` buradan gelir ve renkler `control-base`'teki ile birebir aynı token'lardır.
   input,
   select {
     flex: 1;
@@ -313,6 +361,16 @@
     border: 1px solid v.$color-hairline;
     background: v.$color-surface;
     color: v.$color-ink;
+    transition:
+      border-color v.$transition-fast,
+      box-shadow v.$transition-fast;
+
+    &::placeholder {
+      color: v.$color-placeholder;
+      opacity: 1;
+    }
+
+    @include m.focus-ring;
   }
 }
 
@@ -329,6 +387,7 @@
   width: 1.25rem;
   height: 1.25rem;
   color: v.$color-ink-soft;
+  transition: color v.$transition-fast;
 
   &:hover {
     color: v.$color-ink;

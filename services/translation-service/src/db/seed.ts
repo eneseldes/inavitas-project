@@ -443,16 +443,16 @@ const SEED_KEYS: [string, string, string, string][] = [
 
   // Efsane — hat katmanları birim katmanlarından ayrı satırlardır.
   ['map', 'legend.section.lines', 'Hatlar', 'Lines'],
-  ['map', 'legend.section.units', 'Birimler', 'Units'],
+  ['map', 'legend.section.units', 'Elemanlar', 'Components'],
   ['map', 'legend.line.hv', '154/400 kV HV hattı', '154/400 kV HV line'],
   ['map', 'legend.line.mvMain', '34,5 kV MV ana hat + yedek', '34.5 kV MV main line + tie'],
   ['map', 'legend.line.mvBranch', '34,5 kV MV dağıtım kolu', '34.5 kV MV branch'],
   ['map', 'legend.line.lv', '0,4 kV LV hattı', '0.4 kV LV line'],
-  ['map', 'legend.unit.tm', 'TM — Trafo Merkezi (+ kesicileri)', 'TM — Substation (+ breakers)'],
-  ['map', 'legend.unit.dm', 'DM — Dağıtım Merkezi (+ kesicisi)', 'DM — Distribution Center (+ breaker)'],
-  ['map', 'legend.unit.transformer', 'Trafo (+ kesicisi)', 'Transformer (+ breaker)'],
+  ['map', 'legend.unit.tm', 'TM — Trafo Merkezi', 'TM — Substation'],
+  ['map', 'legend.unit.dm', 'DM — Dağıtım Merkezi', 'DM — Distribution Center'],
+  ['map', 'legend.unit.transformer', 'Trafo', 'Transformer'],
   ['map', 'legend.unit.lvJunction', 'LV bağlantı noktası', 'LV connection point'],
-  ['map', 'legend.unit.serviceEntry', 'Kofra kesicisi / ev girişi', 'Service entry breaker / house'],
+  ['map', 'legend.unit.serviceEntry', 'Kofra', 'Enclosure'],
   ['map', 'legend.unit.customer', 'Abone', 'Customer'],
   [
     'map',
@@ -489,9 +489,12 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'filter.startedAtTo', 'Başlangıç (en geç)', 'Started before'],
   ['map', 'filter.createdAtFrom', 'Oluşturulma (en erken)', 'Created after'],
   ['map', 'filter.createdAtTo', 'Oluşturulma (en geç)', 'Created before'],
-  ['map', 'filter.minAffectedCustomers', 'En az etkilenen abone', 'Min affected customers'],
-  ['map', 'filter.minDuration', 'En kısa süre (dk)', 'Min duration (min)'],
+  ['map', 'filter.minAffectedCustomers', 'Etkilenen abone sayısı en az', 'Min. affected customer count'],
+  ['map', 'filter.minDuration', 'Kesinti süresi en az (dakika)', 'Min. outage duration (minutes)'],
   ['map', 'filter.maxDuration', 'En uzun süre (dk)', 'Max duration (min)'],
+  ['map', 'filter.sinceDate', 'Şu tarihten itibaren', 'Since date'],
+  ['map', 'filter.outageSpecific.title', 'Kesintiye Özel', 'Outage-specific'],
+  ['map', 'filter.dateSection.title', 'Kesinti ve İş Emri Tarihi', 'Outage & Work Order Date'],
   ['map', 'filter.hasWorkOrder', 'İş emri bağı', 'Work order link'],
   ['map', 'filter.hasOutage', 'Kesinti bağı', 'Outage link'],
   ['map', 'filter.any', 'Farketmez', 'Any'],
@@ -662,6 +665,15 @@ async function main(): Promise<void> {
    * önbellekten okumaya devam eder ve ekranda ham anahtar adı (`map.action.traceUp`) görünür.
    */
   const namespacesWithNewKeys = new Set<string>();
+  /**
+   * Yeni anahtar eklenmese bile bir anahtarın METNİ değişmiş olabilir (ör. bir çeviriyi
+   * düzeltip seed'i yeniden çalıştırmak). `namespacesWithNewKeys` bunu YAKALAMIYORDU — versiyon
+   * artmayınca Redis'teki eski bundle 24 saat boyunca güncel metni hiç göstermiyordu. Her
+   * `onConflictDoUpdate` gerçek bir değişiklik olsun olmasın satırı döndürdüğü için burada
+   * "namespace'e bu seed çalışmasında dokunuldu mu" izlenir — gereksiz bir versiyon artışı,
+   * sessiz kalan bir metin değişikliğinden çok daha ucuz bir bedel.
+   */
+  const namespacesWithUpdatedTranslations = new Set<string>();
 
   for (const [namespaceName, keySuffix, tr, en] of SEED_KEYS) {
     const namespaceId = namespaceIds[namespaceName];
@@ -710,19 +722,24 @@ async function main(): Promise<void> {
         })
         .returning({ id: translations.id });
 
-      if (inserted.length > 0) translationCount++;
+      if (inserted.length > 0) {
+        translationCount++;
+        namespacesWithUpdatedTranslations.add(namespaceName);
+      }
     }
   }
 
   // 4. Bundle versiyonları — yayınlanmış içerik v1'dir (bkz. translation.repository.ts D1 notu).
-  //    Var olan bir namespace'e yeni anahtar geldiyse versiyon artırılır: seed zaten
-  //    `published_value`'yu doldurduğu için "Yayınla"ya basmaya gerek yok, ama versiyon
-  //    sabit kalırsa ETag da sabit kalır ve istemci 304 alıp eski sözlüğü kullanmaya devam eder.
+  //    Var olan bir namespace'e yeni anahtar geldiyse YA DA mevcut bir anahtarın metni
+  //    değiştiyse versiyon artırılır: seed zaten `published_value`'yu doldurduğu için
+  //    "Yayınla"ya basmaya gerek yok, ama versiyon sabit kalırsa ETag da sabit kalır ve
+  //    istemci 304 alıp eski (Redis'te önbelleklenmiş) sözlüğü kullanmaya devam eder.
   let versionCount = 0;
   let bumpedCount = 0;
   for (const ns of SEED_NAMESPACES) {
     const namespaceId = namespaceIds[ns.name]!;
     const hasNewKeys = namespacesWithNewKeys.has(ns.name);
+    const hasUpdatedTranslations = namespacesWithUpdatedTranslations.has(ns.name);
     for (const loc of SEED_LOCALES) {
       const inserted = await db
         .insert(bundleVersions)
@@ -735,8 +752,9 @@ async function main(): Promise<void> {
         continue;
       }
 
-      // Satır zaten vardı — yalnız içeriği değişen namespace'in versiyonu artırılır.
-      if (!hasNewKeys) continue;
+      // Satır zaten vardı — yalnız içeriği değişen (yeni anahtar VEYA metni güncellenen)
+      // namespace'in versiyonu artırılır.
+      if (!hasNewKeys && !hasUpdatedTranslations) continue;
       await db
         .update(bundleVersions)
         .set({ version: sql`${bundleVersions.version} + 1`, publishedAt: new Date() })

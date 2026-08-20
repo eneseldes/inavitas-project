@@ -4,6 +4,9 @@ import { WORK_ORDERS_KEY } from './useWorkOrders.ts';
 
 const RECONNECT_DELAY_MS = 3_000;
 
+/** Art arda gelen olayları TEK invalidate'e toplar — bkz. useOutageStream.ts'teki aynı not. */
+const INVALIDATE_DEBOUNCE_MS = 300;
+
 /** Gateway'in iş emri SSE kanalını dinler, yeni mesajda iş emri sorgularını invalidate eder. */
 export function useWorkOrderStream(): boolean {
   const queryClient = useQueryClient();
@@ -12,6 +15,7 @@ export function useWorkOrderStream(): boolean {
   useEffect(() => {
     let source: EventSource | undefined;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let invalidateTimer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
 
     function connect(): void {
@@ -19,7 +23,12 @@ export function useWorkOrderStream(): boolean {
 
       source = new EventSource('/api/work-orders/stream', { withCredentials: true });
       source.onopen = () => setConnected(true);
-      source.onmessage = () => void queryClient.invalidateQueries({ queryKey: [WORK_ORDERS_KEY] });
+      source.onmessage = () => {
+        clearTimeout(invalidateTimer);
+        invalidateTimer = setTimeout(() => {
+          void queryClient.invalidateQueries({ queryKey: [WORK_ORDERS_KEY] });
+        }, INVALIDATE_DEBOUNCE_MS);
+      };
       source.onerror = () => {
         setConnected(false);
         source?.close();
@@ -32,6 +41,7 @@ export function useWorkOrderStream(): boolean {
     return () => {
       stopped = true;
       clearTimeout(retryTimer);
+      clearTimeout(invalidateTimer);
       source?.close();
     };
   }, [queryClient]);

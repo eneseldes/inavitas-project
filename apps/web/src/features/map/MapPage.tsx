@@ -37,14 +37,12 @@ export function MapPage() {
     toggleLegend,
     toggleLegendGroup,
     voltageLevels,
-    setVoltageLevels,
     showAdminBoundaries,
     setShowAdminBoundaries,
     showOutages,
     setShowOutages,
     showWorkOrders,
     setShowWorkOrders,
-    setShowOperationsLayers,
     activeHeatmap,
     setActiveHeatmap,
     outageFilters,
@@ -324,19 +322,19 @@ export function MapPage() {
             onShowOutagesChange={setShowOutages}
             showWorkOrders={showWorkOrders}
             onShowWorkOrdersChange={setShowWorkOrders}
-            onShowOperationsLayersChange={setShowOperationsLayers}
             activeHeatmap={activeHeatmap}
             onActiveHeatmapChange={setActiveHeatmap}
+            outageFilters={outageFilters}
+            onOutageFiltersChange={patchOutageFilters}
+            workOrderFilters={workOrderFilters}
+            onWorkOrderFiltersChange={patchWorkOrderFilters}
           />
         )}
 
         {activeTool === 'filters' && (
           <FiltersPanel
             onClose={() => setActiveTool(undefined)}
-            voltageLevels={voltageLevels}
-            onVoltageLevelsChange={setVoltageLevels}
             showOutages={showOutages}
-            showWorkOrders={showWorkOrders}
             outageFilters={outageFilters}
             onOutageFiltersChange={patchOutageFilters}
             workOrderFilters={workOrderFilters}

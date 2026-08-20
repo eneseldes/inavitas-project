@@ -53,6 +53,15 @@ export function clusterImageIdPrefix(kind: OperationKind): string {
  */
 const registeredClusterImages = new Set<string>();
 
+/**
+ * Bu aralıktaki küme sayıları `registerMarkerImages` ile ÖNCEDEN çizilir. `styleimagemissing`
+ * yine de her sayı için çalışır (üsttekini aşan büyük kümeler için) ama küçük sayılar en sık
+ * karşılaşılanlardır — bunlar önceden hazır olmazsa her YENİ görülen küçük sayı için bir kare
+ * boyunca rozet hiç çizilmiyor, sonra beliriyordu; sürekli zoom'da "bir kaybolup bir görünme"
+ * hissi büyük ölçüde buradan geliyordu.
+ */
+const PRE_REGISTERED_CLUSTER_COUNTS = 30;
+
 /** Durum → renk token'ı. Katman ifadeleriyle aynı eşleme, tek yerde. */
 const OUTAGE_STATUS_TOKEN: Record<string, string> = {
   STARTED: '--c-map-outage-started',
@@ -105,7 +114,8 @@ function iconMarkup(kind: OperationKind): string {
   return renderToStaticMarkup(createElement(kind === 'outage' ? FiZap : FiTool));
 }
 
-function markerSvg(kind: OperationKind, fill: string, stroke: string, ink: string): string {
+/** Rozet SVG'sinin markup'ı — harita için rasterize edilir, panel için doğrudan gömülür. */
+export function markerSvg(kind: OperationKind, fill: string, stroke: string, ink: string): string {
   const width = BODY_SIZE + STROKE_WIDTH;
   const height = BODY_SIZE + TAIL_HEIGHT + STROKE_WIDTH;
   const half = STROKE_WIDTH / 2;
@@ -158,6 +168,13 @@ export async function registerMarkerImages(map: MapLibreMap): Promise<void> {
     if (map.hasImage(entry.id)) map.removeImage(entry.id);
     map.addImage(entry.id, images[index]!, { pixelRatio: PIXEL_RATIO });
   });
+
+  // Sık görülen küme sayılarını önceden çiz — bkz. `PRE_REGISTERED_CLUSTER_COUNTS` yorumu.
+  for (const kind of Object.keys(OPERATION_STATUS_TOKENS) as OperationKind[]) {
+    for (let count = 2; count <= PRE_REGISTERED_CLUSTER_COUNTS; count++) {
+      addClusterImage(map, `${clusterImageIdPrefix(kind)}${count}`);
+    }
+  }
 }
 
 /**

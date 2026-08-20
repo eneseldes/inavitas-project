@@ -221,6 +221,15 @@ export function MapView({
         zoom: view.zoom,
         maxBounds: TURKEY_MAX_BOUNDS,
         attributionControl: false,
+        // MapLibre'nin sembol yerleşim motoru, harita "idle" olduktan SONRA her simge
+        // görünüşünde/kayboluşunda kendi ~300ms solmasını uygular — bu, katman
+        // paint'indeki `icon-opacity-transition: { duration: 0 }` (bkz. operationLayers.ts)
+        // TARAFINDAN KAPATILAMAZ, ayrı bir mekanizmadır. Kesinti/iş emri rozetleri (harita
+        // üzerindeki TEK sembol katmanları) bu yüzden solarak belirip kayboluyordu; bazen de
+        // bir sonraki render kare'si gelmediği için solma yarım kalmış gibi hiç görünmüyordu.
+        // İl/ilçe dolgusunun kasıtlı solması (`fill-opacity-transition`) bambaşka bir
+        // mekanizmadır ve bundan ETKİLENMEZ.
+        fadeDuration: 0,
       });
       mapRef.current = map;
       onMapReadyRef.current?.({ zoomIn: () => map!.zoomIn(), zoomOut: () => map!.zoomOut() });
@@ -273,7 +282,14 @@ export function MapView({
 
       // İşletim katmanları ayrı bir tıklama kuralı izler: nokta bir şebeke elemanını
       // değil, bir kesinti/iş emri kaydını temsil eder.
-      for (const sourceId of [OUTAGE_SOURCE_ID, WORK_ORDER_SOURCE_ID]) {
+      //
+      // ⚠️ İş emri ÖNCE, kesinti SONRA kaydedilir: bir kesinti açıldığında aynı konumda
+      // otomatik bir iş emri de oluşuyor, ikisi tam aynı noktada üst üste biniyor. MapLibre
+      // her katmanın delege tıklama dinleyicisini BAĞIMSIZ çalıştırır — aynı tıklama ikisini
+      // de tetikler ve SON çalışan seçimi ezer. Kesinti zaten üstte ÇİZİLİYOR (aşağıdaki
+      // `buildOperationLayers` çağrı sırasına bkz.); tıklama da görsel sırayla tutarlı olsun
+      // diye kesinti dinleyicisi en son kaydedilir ki son çalışan (kazanan) o olsun.
+      for (const sourceId of [WORK_ORDER_SOURCE_ID, OUTAGE_SOURCE_ID]) {
         const kind = sourceId === OUTAGE_SOURCE_ID ? 'outage' : 'workOrder';
         for (const layerId of operationLayerIds(sourceId)) {
           map.on('click', layerId, (e: MapLayerMouseEvent) => {

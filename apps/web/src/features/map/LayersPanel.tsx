@@ -1,11 +1,16 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { FiCheck, FiChevronRight } from 'react-icons/fi';
 import { clsx } from 'clsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
+import { useLabels } from '../i18n/useLabels.ts';
 import { MapPanel } from './MapPanel.tsx';
+import { CollapsibleBody } from './CollapsibleBody.tsx';
 import { LINE_LEGEND_IDS, UNIT_LEGEND_IDS, type LegendId } from './networkLayers.ts';
-import { HEATMAP_IDS, type HeatmapId } from './useMapState.ts';
+import { HEATMAP_IDS, MAP_VISIBLE_OUTAGE_STATUSES, MAP_VISIBLE_WORK_ORDER_STATUSES, type HeatmapId } from './useMapState.ts';
 import { useGroupExpanded } from './useGroupExpanded.ts';
+import { markerSvg, OPERATION_STATUS_TOKENS, type OperationKind } from './markerIcons.ts';
+import type { OutageFilters, OutageStatus } from '../../types/outage.ts';
+import { WORK_ORDER_TYPES, type WorkOrderFilters, type WorkOrderStatus, type WorkOrderType } from '../../types/work-order.ts';
 import styles from './MapPanel.module.scss';
 
 /**
@@ -68,20 +73,29 @@ interface LayersPanelProps {
   onShowOutagesChange: (value: boolean) => void;
   showWorkOrders: boolean;
   onShowWorkOrdersChange: (value: boolean) => void;
-  /** İkisini TEK ATOMİK yazımla değiştirir — bkz. `onToggleAll` yorumu. */
-  onShowOperationsLayersChange: (value: boolean) => void;
   /** Aynı anda yalnız biri seçili olabilir — birden çok ısı haritası mantıken karışırdı. */
   activeHeatmap: HeatmapId | undefined;
   onActiveHeatmapChange: (id: HeatmapId | undefined) => void;
+  outageFilters: OutageFilters;
+  onOutageFiltersChange: (next: Partial<OutageFilters>) => void;
+  workOrderFilters: WorkOrderFilters;
+  onWorkOrderFiltersChange: (next: Partial<WorkOrderFilters>) => void;
+}
+
+/** Bir çoklu-seçim listesinde bir değeri açar/kapatır. */
+function toggleIn<T>(values: T[] | undefined, value: T): T[] {
+  const current = values ?? [];
+  return current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
 }
 
 /**
  * Katman paneli — düz bir katman listesi, başlığa göre katlanabilir gruplara ayrılmış.
  *
  * Grup başlığındaki işaret kutusu gruptaki tüm satırları birlikte açıp kapatır; bir kısmı
- * açıksa kararsız (indeterminate) görünür. Kesinti ve iş emri kayıtları tek bir grupta
- * ("İşletim Kayıtları"), ısı haritası ise onlardan ayrı — türü ne olursa olsun ısı
- * haritaları birbirini dışlar, o yüzden burada tekil seçim (radyo) olarak çalışır.
+ * açıksa kararsız (indeterminate) görünür. Kesinti ve iş emri satırlarının kendi durum
+ * (ve iş emrinde ayrıca tür) alt filtreleri VAR — her satır kendi başına bir daha
+ * katlanabilir, tıpkı üst gruplar gibi. Isı haritası ise onlardan ayrı — türü ne olursa
+ * olsun ısı haritaları birbirini dışlar, o yüzden burada tekil seçim (radyo) olarak çalışır.
  */
 export function LayersPanel({
   onClose,
@@ -94,11 +108,15 @@ export function LayersPanel({
   onShowOutagesChange,
   showWorkOrders,
   onShowWorkOrdersChange,
-  onShowOperationsLayersChange,
   activeHeatmap,
   onActiveHeatmapChange,
+  outageFilters,
+  onOutageFiltersChange,
+  workOrderFilters,
+  onWorkOrderFiltersChange,
 }: LayersPanelProps) {
   const { t } = useTranslation();
+  const labels = useLabels();
 
   const legendRow = (id: LegendId, swatchKind: SwatchKind): LayerRow => ({
     key: id,
@@ -124,50 +142,78 @@ export function LayersPanel({
         title={t('map.legend.section.units')}
         rows={UNIT_LEGEND_IDS.map((id) => legendRow(id, 'dot'))}
         onToggleAll={() => onToggleLegendGroup(UNIT_LEGEND_IDS)}
-        footer={<p className={styles.zoomHint}>{t('map.legend.buildingHint')}</p>}
       />
 
-      <LayerGroup
-        groupKey="layers.operations"
-        title={t('map.legend.section.operations', undefined, 'Kesinti ve İş Emirleri')}
-        rows={[
-          {
-            key: 'outages',
-            label: t('map.layer.outages'),
-            checked: showOutages,
-            onToggle: () => onShowOutagesChange(!showOutages),
-            swatchClass: styles.swatchOutage!,
-            swatchKind: 'marker',
-          },
-          {
-            key: 'workOrders',
-            label: t('map.layer.workOrders'),
-            checked: showWorkOrders,
-            onToggle: () => onShowWorkOrdersChange(!showWorkOrders),
-            swatchClass: styles.swatchWorkOrder!,
-            swatchKind: 'marker',
-          },
-        ]}
-        onToggleAll={() => onShowOperationsLayersChange(!(showOutages && showWorkOrders))}
-      />
+      {/* Kesintiler ve iş emirleri artık İKİ AYRI satır — eskiden ortak "Kesinti ve İş
+          Emirleri" başlığı altında tek bir grup halindeydi, kendi durum (ve iş emrinde
+          ayrıca tür) alt filtreleri de dahil olmak üzere birbirinden bağımsız katmanlar. */}
+      {/* Kesintiler'in TEK alt filtresi var (durum) — ayrı bir "Durum" başlığına/katlanmasına
+          gerek yok, liste açılınca doğrudan görünür. Birden fazla alt filtresi olan İş
+          Emirleri'nde (Tür + Durum) ise her biri kendi başlığıyla ayrı kalır, altta. */}
+      <OperationGroup
+        groupKey="layers.outages"
+        title={t('map.legend.section.outages')}
+        kind="outage"
+        checked={showOutages}
+        onToggle={() => onShowOutagesChange(!showOutages)}
+      >
+        <StatusChecklist
+          kind="outage"
+          values={MAP_VISIBLE_OUTAGE_STATUSES}
+          selected={outageFilters.status}
+          labelOf={labels.outageStatus}
+          onChange={(status: OutageStatus[]) => onOutageFiltersChange({ status })}
+        />
+      </OperationGroup>
+
+      <OperationGroup
+        groupKey="layers.workOrders"
+        title={t('map.legend.section.workOrders')}
+        kind="workOrder"
+        checked={showWorkOrders}
+        onToggle={() => onShowWorkOrdersChange(!showWorkOrders)}
+      >
+        <SubGroup
+          groupKey="layers.workOrders.type"
+          title={t('map.filter.type')}
+          values={WORK_ORDER_TYPES}
+          selected={workOrderFilters.type}
+          labelOf={labels.workOrderType}
+          onChange={(type: WorkOrderType[]) => onWorkOrderFiltersChange({ type })}
+        />
+        <SubGroup
+          groupKey="layers.workOrders.status"
+          title={t('map.filter.status')}
+          values={MAP_VISIBLE_WORK_ORDER_STATUSES}
+          selected={workOrderFilters.status}
+          labelOf={labels.workOrderStatus}
+          onChange={(status: WorkOrderStatus[]) => onWorkOrderFiltersChange({ status })}
+          badge={(value) => <MarkerBadge kind="workOrder" colorToken={OPERATION_STATUS_TOKENS.workOrder[value]!} />}
+        />
+      </OperationGroup>
 
       <HeatmapGroup activeHeatmap={activeHeatmap} onActiveHeatmapChange={onActiveHeatmapChange} />
 
-      <LayerGroup
-        groupKey="layers.independent"
-        title={t('map.legend.section.independent')}
-        rows={[
-          {
-            key: 'boundaries',
-            label: t('map.layer.adminBoundaries'),
-            checked: showAdminBoundaries,
-            onToggle: () => onShowAdminBoundariesChange(!showAdminBoundaries),
-            swatchClass: styles.swatchBoundary!,
-            swatchKind: 'dot',
-          },
-        ]}
-        onToggleAll={() => onShowAdminBoundariesChange(!showAdminBoundaries)}
-      />
+      {/* Bugün tek eleman: idari sınırlar. Kendi başına bir grup gövdesine ihtiyacı yok —
+          eskiden "Bağımsız Katmanlar" başlığı altında tek satır olarak durup gereksiz bir
+          isim katmanı ekliyordu. */}
+      <section className={styles.group}>
+        <div className={styles.groupHeader}>
+          <label className={clsx(styles.checkLabel, styles.simpleRow)}>
+            <span className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={showAdminBoundaries}
+                onChange={() => onShowAdminBoundariesChange(!showAdminBoundaries)}
+              />
+              <span className={styles.checkboxBox}>
+                <FiCheck />
+              </span>
+            </span>
+            {t('map.layer.adminBoundaries')}
+          </label>
+        </div>
+      </section>
     </MapPanel>
   );
 }
@@ -215,7 +261,7 @@ function LayerGroup({
         </button>
       </div>
 
-      {isOpen && (
+      <CollapsibleBody isOpen={isOpen}>
         <div className={styles.groupBody}>
           <ul className={styles.checkList}>
             {rows.map((row) => (
@@ -244,8 +290,193 @@ function LayerGroup({
           </ul>
           {footer}
         </div>
-      )}
+      </CollapsibleBody>
     </section>
+  );
+}
+
+/** Haritadaki işaretçinin küçük, birebir aynı görünümlü kopyası — durum rengiyle boyanır. */
+function MarkerBadge({ kind, colorToken }: { kind: OperationKind; colorToken: string }) {
+  const svg = useMemo(
+    () => markerSvg(kind, `var(${colorToken})`, 'var(--c-map-op-stroke)', 'var(--c-map-marker-ink)'),
+    [kind, colorToken],
+  );
+  // Görsel tamamen bu dosyada üretilir (kullanıcı girdisi yok) — güvenli.
+  return <span className={styles.markerBadge} dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+/**
+ * Kesinti/iş emri katmanı — "Hatlar"/"Birimler" ile AYNI görsel ağırlıkta, bağımsız bir üst
+ * grup satırı (eskiden ikisi ortak bir "Kesinti ve İş Emirleri" başlığı altında tek gruptu).
+ * Kendi görünürlük kutusu + haritadaki rozetin küçük kopyası + alt filtrelere açılan kendi
+ * katlanır gövdesi var; alt filtreler (`SubGroup`) BİR ALT SEVİYE — kendi "hepsini seç"
+ * kutusu olan ama daha küçük/soluk göründüğü için ana grup başlığıyla karıştırılmayan
+ * ayrı bir hiyerarşi kademesi.
+ */
+function OperationGroup({
+  groupKey,
+  title,
+  kind,
+  checked,
+  onToggle,
+  children,
+}: {
+  groupKey: string;
+  title: string;
+  kind: OperationKind;
+  checked: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const [isOpen, toggleOpen] = useGroupExpanded(groupKey);
+
+  return (
+    <section className={styles.group}>
+      <div className={styles.groupHeader}>
+        <label className={styles.checkbox}>
+          <input type="checkbox" checked={checked} onChange={onToggle} />
+          <span className={styles.checkboxBox}>
+            <FiCheck />
+          </span>
+        </label>
+        <button type="button" className={styles.groupToggle} aria-expanded={isOpen} onClick={toggleOpen}>
+          <FiChevronRight className={clsx(styles.groupChevron, isOpen && styles.groupChevronOpen)} />
+          <MarkerBadge kind={kind} colorToken={OPERATION_STATUS_TOKENS[kind].STARTED!} />
+          {title}
+        </button>
+      </div>
+      <CollapsibleBody isOpen={isOpen}>
+        <div className={styles.groupBody}>{children}</div>
+      </CollapsibleBody>
+    </section>
+  );
+}
+
+/**
+ * Alt filtre grubu (İş Emirleri'ndeki Tür, Durum) — `OperationGroup`'un İÇİNDE yaşar ama
+ * BİRDEN FAZLA alt filtre olduğu için (Kesintiler'de tek filtre var, bkz. `StatusChecklist`)
+ * her biri kendi başına tam teşekküllü bir grup gibi görünür: üst gruple (Hatlar, Elemanlar,
+ * Kesintiler, İş Emirleri) BİREBİR AYNI görsel ağırlık (`.groupHeader`/`.groupToggle`) —
+ * küçültülmüş/soluk bir "alt kademe" değil, sadece konum olarak içeride. Kendi "hepsini seç"
+ * kutusu var. `badge` verilirse (durum gibi haritada renk taşıyan bir alan) her satırın
+ * solunda haritadaki rozetin o değere ait küçük kopyası durur; tür gibi renksiz bir alanda
+ * `badge` hiç verilmez.
+ */
+function SubGroup<T extends string>({
+  groupKey,
+  title,
+  values,
+  selected,
+  labelOf,
+  onChange,
+  badge,
+}: {
+  groupKey: string;
+  title: string;
+  values: readonly T[];
+  selected: T[] | undefined;
+  labelOf: (value: T) => string;
+  onChange: (next: T[]) => void;
+  badge?: (value: T) => ReactNode;
+}) {
+  const { t } = useTranslation();
+  const [isOpen, toggleOpen] = useGroupExpanded(groupKey);
+  const selectedValues = selected ?? [];
+  const checkedCount = values.filter((value) => selectedValues.includes(value)).length;
+  const allChecked = values.length > 0 && checkedCount === values.length;
+  const toggleAll = () => onChange(allChecked ? [] : [...values]);
+
+  return (
+    <section className={styles.group}>
+      <div className={styles.groupHeader}>
+        <label className={styles.checkbox}>
+          <input
+            type="checkbox"
+            checked={allChecked}
+            ref={(node) => {
+              if (node) node.indeterminate = checkedCount > 0 && !allChecked;
+            }}
+            onChange={toggleAll}
+            aria-label={t('common.action.selectAll')}
+          />
+          <span className={styles.checkboxBox}>
+            <FiCheck />
+          </span>
+        </label>
+        <button type="button" className={styles.groupToggle} aria-expanded={isOpen} onClick={toggleOpen}>
+          <FiChevronRight className={clsx(styles.groupChevron, isOpen && styles.groupChevronOpen)} />
+          {title}
+        </button>
+      </div>
+      <CollapsibleBody isOpen={isOpen}>
+        <div className={styles.groupBody}>
+          <ul className={styles.checkList}>
+            {values.map((value) => (
+              <li key={value} className={styles.checkItem}>
+                <label className={styles.checkLabel}>
+                  <span className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={selectedValues.includes(value)}
+                      onChange={() => onChange(toggleIn(selectedValues, value))}
+                    />
+                    <span className={styles.checkboxBox}>
+                      <FiCheck />
+                    </span>
+                  </span>
+                  {badge?.(value)}
+                  {labelOf(value)}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </CollapsibleBody>
+    </section>
+  );
+}
+
+/**
+ * Kesintiler'in tek alt filtresi (durum) — `SubGroup`'un aksine ayrı bir başlığı/katlanması
+ * YOK: tek şey olduğu için isimlendirilecek bir "kategori" yok, `OperationGroup` açılınca
+ * liste doğrudan görünür.
+ */
+function StatusChecklist<T extends string>({
+  kind,
+  values,
+  selected,
+  labelOf,
+  onChange,
+}: {
+  kind: OperationKind;
+  values: readonly T[];
+  selected: T[] | undefined;
+  labelOf: (value: T) => string;
+  onChange: (next: T[]) => void;
+}) {
+  const selectedValues = selected ?? [];
+
+  return (
+    <ul className={styles.checkList}>
+      {values.map((value) => (
+        <li key={value} className={styles.checkItem}>
+          <label className={styles.checkLabel}>
+            <span className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={selectedValues.includes(value)}
+                onChange={() => onChange(toggleIn(selectedValues, value))}
+              />
+              <span className={styles.checkboxBox}>
+                <FiCheck />
+              </span>
+            </span>
+            <MarkerBadge kind={kind} colorToken={OPERATION_STATUS_TOKENS[kind][value]!} />
+            {labelOf(value)}
+          </label>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -273,7 +504,7 @@ function HeatmapGroup({
         </button>
       </div>
 
-      {isOpen && (
+      <CollapsibleBody isOpen={isOpen}>
         <div className={styles.groupBody}>
           <ul className={styles.checkList}>
             {HEATMAP_IDS.map((id) => (
@@ -296,7 +527,7 @@ function HeatmapGroup({
             ))}
           </ul>
         </div>
-      )}
+      </CollapsibleBody>
     </section>
   );
 }

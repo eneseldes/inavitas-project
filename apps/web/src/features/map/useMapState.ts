@@ -10,8 +10,40 @@ import {
 } from '../../types/work-order.ts';
 import { LEGEND_IDS, type LegendId } from './networkLayers.ts';
 
-/** Ankara il merkezi — bir dış odaklama (`focus`/`unit`) yoksa haritanın açılış görünümü. */
-export const DEFAULT_VIEW = { lng: 32.85, lat: 39.92, zoom: 10 };
+/**
+ * Hiçbir kayıtlı görünüm yokken (tarayıcı ilk kez açılmış, `localStorage` boş) düşülecek
+ * görünüm — URL'de `lng`/`lat`/`zoom` YOKSA ve daha önce kaydedilmiş bir konum da yoksa kullanılır.
+ */
+export const DEFAULT_VIEW = { lng: 32.62293, lat: 39.70565, zoom: 7.71 };
+
+/**
+ * Son görünümü sekmeler arası hayatta tutan `localStorage` anahtarı. `/map`'ten çıkıp geri
+ * dönüldüğünde (nav linkleri sorgu parametresiz `/map`'e gider) URL kamerayı taşımaz — bu
+ * yüzden en son konum burada, sayfa yenilense de kaybolmayacak şekilde ayrıca tutulur.
+ */
+const VIEW_STORAGE_KEY = 'inavitas.map.lastView';
+
+function readStoredView(): MapView | undefined {
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as Partial<MapView>;
+    if (typeof parsed.lng === 'number' && typeof parsed.lat === 'number' && typeof parsed.zoom === 'number') {
+      return { lng: parsed.lng, lat: parsed.lat, zoom: parsed.zoom };
+    }
+  } catch {
+    // localStorage kapalı/dolu olabilir (gizli sekme vb.) — sessizce varsayılana düş.
+  }
+  return undefined;
+}
+
+function writeStoredView(view: MapView): void {
+  try {
+    localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
+  } catch {
+    // bkz. readStoredView — yazılamıyorsa konum sadece bu oturumda hatırlanmaz.
+  }
+}
 
 /** `?layers=` için "hiçbiri" sentinel'i — boş string varsayılan kümeye düşerdi. */
 const NO_LAYERS = 'none';
@@ -25,11 +57,18 @@ export const HEATMAP_IDS = ['outage'] as const;
 export type HeatmapId = (typeof HEATMAP_IDS)[number];
 
 /**
- * Kesinti/iş emri katmanlarının varsayılan durum filtresi: İPTAL EDİLENLER dışında hepsi.
- * Diğer çoklu-seçim filtreleriyle aynı ilke — varsayılan "hepsi açık", kullanıcı daraltır.
+ * Harita yalnız BU durumları çizer — iptal edilmiş/arşivlenmiş/tamamlanmış kayıtlar
+ * harita gürültüsü yaratır ve zaten kendi listesinde durur, haritada asla gösterilmez.
+ * `parseCsv`'ye hem varsayılan hem de İZİN VERİLEN küme olarak verilir: URL elle
+ * `oStatus=ARCHIVED` diye değiştirilse bile bu yüzden süzülür, katmanlar panelindeki
+ * durum alt filtresi de yalnız bu listeleri gösterir (bkz. LayersPanel.tsx).
  */
-const DEFAULT_OUTAGE_STATUSES: OutageStatus[] = OUTAGE_STATUSES.filter((status) => status !== 'CANCELLED');
-const DEFAULT_WORK_ORDER_STATUSES: WorkOrderStatus[] = WORK_ORDER_STATUSES.filter((status) => status !== 'CANCELLED');
+export const MAP_VISIBLE_OUTAGE_STATUSES: OutageStatus[] = OUTAGE_STATUSES.filter(
+  (status) => status !== 'ARCHIVED' && status !== 'CANCELLED',
+);
+export const MAP_VISIBLE_WORK_ORDER_STATUSES: WorkOrderStatus[] = WORK_ORDER_STATUSES.filter(
+  (status) => status !== 'DONE' && status !== 'CANCELLED',
+);
 
 /** Virgülle ayrılmış bir query param'ı bilinen değerlere göre süzer. */
 function parseCsv<T extends string>(raw: string | null, allowed: readonly T[], fallback: T[]): T[] {
@@ -60,24 +99,31 @@ export interface MapView {
 export function useMapState() {
   const [params, setParams] = useSearchParams();
 
+  // ⚠️ `params` her URL değişiminde (harita her `moveend`'de lng/lat/zoom'u YAZAR — bkz.
+  // `setView` altta) YENİ bir `URLSearchParams` nesnesidir. Aşağıdaki `useMemo`'lar `params`'ın
+  // KENDİSİNE değil, okudukları TEKİL anahtarların ham metin değerine bağımlı — aksi halde
+  // (eskiden olduğu gibi) her pan/zoom, harita katmanı hiç ilgilenmese de `legend`/
+  // `voltageLevels`/filtreler için YENİ `Set`/nesne örnekleri üretirdi; `MapView.tsx`'teki
+  // efektler bunları referansla karşılaştırdığından her hareket sonunda gereksiz yere onlarca
+  // `setFilter`/`setLayoutProperty` çağrısı tetiklenip harita her pan/zoom'da bir an takılırdı.
+  const layersParam = params.get('layers');
   const legend = useMemo<Set<LegendId>>(() => {
-    const raw = params.get('layers');
     // Varsayılan: HEPSİ açık. Ne kadarının çizileceğini efsane değil zoom belirler
     // (bkz. networkLayers.ts LEGEND_MIN_ZOOM) — kullanıcı katmanı kapatmadıkça kaybolmaz.
     // `none` sentinel'i "hepsi kapalı"yı temsil eder — boş string varsayılana düşerdi.
-    if (raw === null) return new Set<LegendId>(LEGEND_IDS);
-    if (raw === NO_LAYERS) return new Set<LegendId>();
-    return new Set(raw.split(',').filter((v): v is LegendId => (LEGEND_IDS as readonly string[]).includes(v)));
-  }, [params]);
+    if (layersParam === null) return new Set<LegendId>(LEGEND_IDS);
+    if (layersParam === NO_LAYERS) return new Set<LegendId>();
+    return new Set(layersParam.split(',').filter((v): v is LegendId => (LEGEND_IDS as readonly string[]).includes(v)));
+  }, [layersParam]);
 
+  const voltageParam = params.get('voltage');
   const voltageLevels = useMemo<Set<VoltageLevel>>(() => {
-    const raw = params.get('voltage');
     // Parametre HİÇ YOKSA varsayılan (hepsi); BOŞ STRING ise kullanıcı hepsini bilerek
     // kapatmıştır — `!raw` boş string'i de "yok" sayardı ve seçim bir sonraki render'da
     // sessizce hepsine geri dönerdi.
-    if (raw === null) return new Set(VOLTAGE_LEVELS);
-    return new Set(raw.split(',').filter((v): v is VoltageLevel => (VOLTAGE_LEVELS as readonly string[]).includes(v)));
-  }, [params]);
+    if (voltageParam === null) return new Set(VOLTAGE_LEVELS);
+    return new Set(voltageParam.split(',').filter((v): v is VoltageLevel => (VOLTAGE_LEVELS as readonly string[]).includes(v)));
+  }, [voltageParam]);
 
   const showAdminBoundaries = params.get('boundaries') !== '0';
   // Kesinti/iş emri katmanları varsayılan olarak AÇIKTIR — diğer çoklu-seçimlerle aynı
@@ -92,47 +138,62 @@ export function useMapState() {
    * Harita kesinti filtreleri — **mevcut `OutageFilters` arayüzünü yeniden kullanır**;
    * haritaya paralel bir filtre modeli kurulmaz.
    */
-  const outageFilters = useMemo<OutageFilters>(() => {
-    const minAffected = params.get('oMinCustomers');
-    return {
-      status: parseCsv(params.get('oStatus'), OUTAGE_STATUSES, DEFAULT_OUTAGE_STATUSES),
-      origin: parseCsv(params.get('oOrigin'), ['USER', 'SYSTEM'] as const, []),
-      startedAtFrom: params.get('oFrom') ?? undefined,
-      startedAtTo: params.get('oTo') ?? undefined,
-      durationMinMinutes: params.get('oMinDuration') ? Number(params.get('oMinDuration')) : undefined,
-      durationMaxMinutes: params.get('oMaxDuration') ? Number(params.get('oMaxDuration')) : undefined,
-      minAffectedCustomers: minAffected ? Number(minAffected) : undefined,
-      hasWorkOrder: parseTriState(params.get('oHasWorkOrder')),
-    };
-  }, [params]);
+  const oStatus = params.get('oStatus');
+  const oOrigin = params.get('oOrigin');
+  const oFrom = params.get('oFrom');
+  const oTo = params.get('oTo');
+  const oMinDuration = params.get('oMinDuration');
+  const oMaxDuration = params.get('oMaxDuration');
+  const oMinCustomers = params.get('oMinCustomers');
+  const oHasWorkOrder = params.get('oHasWorkOrder');
+  const outageFilters = useMemo<OutageFilters>(
+    () => ({
+      status: parseCsv(oStatus, MAP_VISIBLE_OUTAGE_STATUSES, MAP_VISIBLE_OUTAGE_STATUSES),
+      origin: parseCsv(oOrigin, ['USER', 'SYSTEM'] as const, []),
+      startedAtFrom: oFrom ?? undefined,
+      startedAtTo: oTo ?? undefined,
+      durationMinMinutes: oMinDuration ? Number(oMinDuration) : undefined,
+      durationMaxMinutes: oMaxDuration ? Number(oMaxDuration) : undefined,
+      minAffectedCustomers: oMinCustomers ? Number(oMinCustomers) : undefined,
+      hasWorkOrder: parseTriState(oHasWorkOrder),
+    }),
+    [oStatus, oOrigin, oFrom, oTo, oMinDuration, oMaxDuration, oMinCustomers, oHasWorkOrder],
+  );
 
   /** Harita iş emri filtreleri — mevcut `WorkOrderFilters` arayüzünden. */
-  const workOrderFilters = useMemo<WorkOrderFilters>(() => {
-    return {
-      status: parseCsv(params.get('wStatus'), WORK_ORDER_STATUSES, DEFAULT_WORK_ORDER_STATUSES),
-      type: parseCsv(params.get('wType'), WORK_ORDER_TYPES, [...WORK_ORDER_TYPES]),
-      origin: parseCsv(params.get('wOrigin'), ['USER', 'SYSTEM'] as const, []),
-      createdAtFrom: params.get('wFrom') ?? undefined,
-      createdAtTo: params.get('wTo') ?? undefined,
-      hasOutage: parseTriState(params.get('wHasOutage')),
-    };
-  }, [params]);
+  const wStatus = params.get('wStatus');
+  const wType = params.get('wType');
+  const wOrigin = params.get('wOrigin');
+  const wFrom = params.get('wFrom');
+  const wTo = params.get('wTo');
+  const wHasOutage = params.get('wHasOutage');
+  const workOrderFilters = useMemo<WorkOrderFilters>(
+    () => ({
+      status: parseCsv(wStatus, MAP_VISIBLE_WORK_ORDER_STATUSES, MAP_VISIBLE_WORK_ORDER_STATUSES),
+      type: parseCsv(wType, WORK_ORDER_TYPES, [...WORK_ORDER_TYPES]),
+      origin: parseCsv(wOrigin, ['USER', 'SYSTEM'] as const, []),
+      createdAtFrom: wFrom ?? undefined,
+      createdAtTo: wTo ?? undefined,
+      hasOutage: parseTriState(wHasOutage),
+    }),
+    [wStatus, wType, wOrigin, wFrom, wTo, wHasOutage],
+  );
   const selectedId = params.get('selected') ?? undefined;
   const focusId = params.get('focus') ?? undefined;
 
+  const lngRaw = params.get('lng');
+  const latRaw = params.get('lat');
+  const zoomRaw = params.get('zoom');
   const view = useMemo<MapView>(() => {
-    const lngRaw = params.get('lng');
-    const latRaw = params.get('lat');
-    const zoomRaw = params.get('zoom');
     // `Number(null) === 0` — parametre hiç yoksa `Number()` sessizce 0'a düşer ve
     // `Number.isFinite` bunu geçerli sanır, DEFAULT_VIEW'e hiç düşülmez. Önce varlığı kontrol edilir.
-    if (lngRaw === null || latRaw === null || zoomRaw === null) return DEFAULT_VIEW;
+    if (lngRaw === null || latRaw === null || zoomRaw === null) return readStoredView() ?? DEFAULT_VIEW;
     const lng = Number(lngRaw);
     const lat = Number(latRaw);
     const zoom = Number(zoomRaw);
     if (Number.isFinite(lng) && Number.isFinite(lat) && Number.isFinite(zoom)) return { lng, lat, zoom };
-    return DEFAULT_VIEW;
-  }, [params]);
+    return readStoredView() ?? DEFAULT_VIEW;
+  }, [lngRaw, latRaw, zoomRaw]);
 
   const patch = useCallback(
     (next: Record<string, string | undefined>) => {
@@ -197,14 +258,6 @@ export function useMapState() {
   const setShowAdminBoundaries = useCallback((value: boolean) => patch({ boundaries: value ? undefined : '0' }), [patch]);
   const setShowOutages = useCallback((value: boolean) => patch({ outages: value ? undefined : '0' }), [patch]);
   const setShowWorkOrders = useCallback((value: boolean) => patch({ workOrders: value ? undefined : '0' }), [patch]);
-  // `setShowOutages` + `setShowWorkOrders`'ı ayrı ayrı çağırmak aynı `resolveFocus`
-  // notundaki tuzağa düşer: ikisi de aynı render'ın bayat `searchParams`'ını taban alır,
-  // ikincisi birincisini ezer — "İşletim Kayıtları" grubunun "hepsini seç" kutusu yalnız
-  // son çağrılanı (iş emirlerini) değiştirmiş gibi görünürdü. Tek `patch` çağrısıyla atomik.
-  const setShowOperationsLayers = useCallback(
-    (value: boolean) => patch({ outages: value ? undefined : '0', workOrders: value ? undefined : '0' }),
-    [patch],
-  );
   /** Isı haritaları birbirini dışlar — yeni bir tür seçmek eskisini kapatır. */
   const setActiveHeatmap = useCallback((id: HeatmapId | undefined) => patch({ heatmap: id }), [patch]);
 
@@ -250,7 +303,12 @@ export function useMapState() {
   const resolveFocus = useCallback((id: string) => patch({ selected: id, focus: undefined }), [patch]);
 
   const setView = useCallback(
-    (next: MapView) => patch({ lng: next.lng.toFixed(5), lat: next.lat.toFixed(5), zoom: next.zoom.toFixed(2) }),
+    (next: MapView) => {
+      // Son konum URL'in yanında `localStorage`'a da yazılır — bkz. `VIEW_STORAGE_KEY` yorumu:
+      // `/map`'ten çıkıp geri dönüldüğünde URL'de kamera bilgisi olmaz, buradan geri okunur.
+      writeStoredView(next);
+      patch({ lng: next.lng.toFixed(5), lat: next.lat.toFixed(5), zoom: next.zoom.toFixed(2) });
+    },
     [patch],
   );
 
@@ -268,7 +326,6 @@ export function useMapState() {
     setShowOutages,
     showWorkOrders,
     setShowWorkOrders,
-    setShowOperationsLayers,
     activeHeatmap,
     setActiveHeatmap,
     outageFilters,
