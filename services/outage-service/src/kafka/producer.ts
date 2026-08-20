@@ -2,6 +2,7 @@ import {
   createEnvelope,
   SYSTEM_ACTOR,
   TOPICS,
+  type OutageCancelledPayload,
   type OutageCascadedPayload,
   type OutageCreatedPayload,
   type OutageEnergizedPayload,
@@ -22,7 +23,7 @@ export interface PublishOptions {
 /**
  * Yeni kesinti oluşturulduğunda 'outage.created' olayını outbox tablosuna yazar.
  *
- * ⚠️ **Kesinti nasıl doğarsa doğsun bu olay yayınlanmak zorundadır.** Etki hesabı
+ * **Kesinti nasıl doğarsa doğsun bu olay yayınlanmak zorundadır.** Etki hesabı
  * (`network-service` → `outage.impact.calculated`) yalnız bu olayla tetiklenir; iş emrinden
  * otomatik doğan sistem kesintisi için atlanırsa o kesintinin etkilenen abone kümesi
  * sonsuza kadar `PENDING` kalır.
@@ -79,6 +80,44 @@ export async function enqueueOutageEnergizedIfNeededTx(
   });
 
   await enqueueTx(tx, TOPICS.OUTAGE_ENERGIZED, row.cbsId, envelope);
+}
+
+/**
+ * Kesinti iptal edildiğinde 'outage.cancelled' olayını outbox'a yazar.
+ *
+ * **Kesinti nasıl iptal edilirse edilsin bu olay yayınlanmak zorundadır.**
+ * `network-service`'in şebekeyi yeniden enerjilendirmesi yalnız buna bağlıdır; olayı
+ * "gereksiz" diye atlamak, karanlık bölgenin sonsuza kadar karanlık kalması demektir.
+ * Sonsuz döngü koruması olayı **yayınlamamakla** değil, tüketirken
+ * `shouldTriggerCounterpart` ile yapılır.
+ *
+ * `enqueueOutageEnergizedIfNeededTx`'in birebir eşi: no-op koruması dahil.
+ */
+export async function enqueueOutageCancelledIfNeededTx(
+  tx: Tx,
+  previousStatus: string,
+  row: OutageRow,
+  opts: PublishOptions,
+): Promise<void> {
+  if (previousStatus === 'CANCELLED' || row.status !== 'CANCELLED') return;
+
+  const payload: OutageCancelledPayload = {
+    outageId: row.id,
+    cbsId: row.cbsId,
+    cancelledAt: (row.updatedAt ?? new Date()).toISOString(),
+    workOrderId: row.workOrderId,
+  };
+
+  const envelope = createEnvelope({
+    eventType: TOPICS.OUTAGE_CANCELLED,
+    payload,
+    origin: opts.origin,
+    actor: opts.actor,
+    correlationId: opts.correlationId,
+    causedBy: opts.causedBy,
+  });
+
+  await enqueueTx(tx, TOPICS.OUTAGE_CANCELLED, row.cbsId, envelope);
 }
 
 /** Kesintiye bir iş emri bağlandığında 'outage.linked' event'ini outbox'a yazar. */

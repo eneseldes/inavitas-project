@@ -40,3 +40,4 @@ export async function isBasemapAvailable(): Promise<boolean> {
 export function buildBasemapLayers(theme: 'light' | 'dark'): LayerSpecification[] {
   return protomapsLayers(BASEMAP_SOURCE_ID, theme === 'dark' ? DARK : LIGHT, { lang: 'tr' });
 }
+

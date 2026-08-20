@@ -4,6 +4,7 @@ import {
   shouldTriggerCounterpart,
   SYSTEM_ACTOR,
   TOPICS,
+  type OutageCancelledEvent,
   type OutageCreatedEvent,
   type OutageEnergizedEvent,
   type OutageLinkedEvent,
@@ -20,7 +21,7 @@ import { markProcessed } from '../repository/idempotency.repository.ts';
 import { createTx, linkOutageTx, updateWithVersionTx } from '../repository/work-order.repository.ts';
 import { redis } from '../redis.ts';
 import { notifyWorkOrderChanged } from '../realtime.ts';
-import { enqueueWorkOrderLinkedTx } from './producer.ts';
+import { enqueueWorkOrderCancelledIfNeededTx, enqueueWorkOrderLinkedTx } from './producer.ts';
 
 /**
  * 'outage.created' event'i işleyicisi: Kullanıcı kaynaklı bir kesinti açıldığında otomatik sistem iş emri oluşturur.
@@ -155,10 +156,84 @@ export async function handleOutageEnergized(envelope: OutageEnergizedEvent, log:
   await notifyWorkOrderChanged(result.row, log);
 }
 
+/**
+ * 'outage.cancelled' işleyicisi: kesinti iptal edilince bağlı iş emri de iptal edilir
+ * (iptal simetrisi).
+ *
+ * `shouldTriggerCounterpart` kontrolü **zorunludur**: bu iptal `work-order.cancelled`
+ * yayınlar, o da `outage-service`'te bağlı kesintiyi iptal etmeye çalışır. Kontrol olmazsa
+ * iki servis birbirini sonsuza kadar iptal eder.
+ */
+export async function handleOutageCancelled(envelope: OutageCancelledEvent, log: Logger): Promise<void> {
+  if (!shouldTriggerCounterpart(envelope)) {
+    log.debug({ eventId: envelope.eventId }, 'sistem kaynaklı/derinlik aşıldı, karşı iptal tetiklenmiyor');
+    return;
+  }
+  if (!envelope.payload.workOrderId) {
+    log.debug({ eventId: envelope.eventId }, 'kesinti bir iş emrine bağlı değil, atlanıyor');
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const processed = await markProcessed(tx, envelope.eventId, TOPICS.OUTAGE_CANCELLED);
+    if (!processed) return null;
+
+    const [current] = await tx.select().from(workOrders).where(eq(workOrders.id, envelope.payload.workOrderId!));
+    if (!current) {
+      log.warn({ workOrderId: envelope.payload.workOrderId }, 'bağlı iş emri bulunamadı');
+      return null;
+    }
+
+    // Tamamlanmış iş emri iptal edilmez — sessizce atlanır ve loglanır.
+    if (!canTransition(current.status, 'CANCELLED')) {
+      return { previousStatus: current.status, row: current };
+    }
+
+    const updated = await updateWithVersionTx(
+      tx,
+      current.id,
+      current.version,
+      { status: 'CANCELLED' },
+      { fromStatus: current.status, actor: SYSTEM_ACTOR, origin: 'SYSTEM', correlationId: envelope.correlationId },
+    );
+
+    if (!updated) return null;
+
+    // Karşılık olayı `origin: 'SYSTEM'` ile yayınlanır; `outage-service` bunu tüketirken
+    // `shouldTriggerCounterpart` false döner ve zincir burada durur.
+    await enqueueWorkOrderCancelledIfNeededTx(tx, current.status, updated, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    return { previousStatus: current.status, row: updated };
+  });
+
+  if (!result) {
+    log.debug({ eventId: envelope.eventId }, 'zaten işlenmiş veya version çakışması, atlanıyor');
+    return;
+  }
+
+  if (result.previousStatus === result.row.status) {
+    log.info(
+      { workOrderId: result.row.id, status: result.row.status },
+      'iş emri iptal edilebilir durumda değil, atlandı',
+    );
+    return;
+  }
+
+  log.info({ workOrderId: result.row.id }, 'kesinti iptal edildi, bağlı iş emri otomatik CANCELLED yapıldı');
+
+  await notifyWorkOrderChanged(result.row, log);
+}
+
 const VALIDATORS = {
   [TOPICS.OUTAGE_CREATED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_CREATED, raw),
   [TOPICS.OUTAGE_LINKED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_LINKED, raw),
   [TOPICS.OUTAGE_ENERGIZED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_ENERGIZED, raw),
+  [TOPICS.OUTAGE_CANCELLED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_CANCELLED, raw),
 } as const;
 
 /** work-order-service Kafka event dinleyici işleyicisi (event handler). */
@@ -195,6 +270,8 @@ export function createWorkOrderEventHandler(logger: Logger): EventHandler {
         return handleOutageLinked(envelope as OutageLinkedEvent, log);
       case TOPICS.OUTAGE_ENERGIZED:
         return handleOutageEnergized(envelope as OutageEnergizedEvent, log);
+      case TOPICS.OUTAGE_CANCELLED:
+        return handleOutageCancelled(envelope as OutageCancelledEvent, log);
     }
   };
 }

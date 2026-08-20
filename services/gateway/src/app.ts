@@ -81,6 +81,8 @@ export function createApp(logger: Logger): Express {
   app.get('/api/outages/stream', (req, res) => sseHubs.outage.handle(req, res));
   app.get('/api/work-orders/stream', (req, res) => sseHubs.workOrder.handle(req, res));
   app.get('/api/translations/stream', (req, res) => sseHubs.translation.handle(req, res));
+  // Yetkilendirmesi mevcut SSE uçlarıyla aynı hizada bırakıldı; farklı bir düzen kurulmadı.
+  app.get('/api/network/energization/stream', (req, res) => sseHubs.energization.handle(req, res));
 
   // outage/work-order/translation servislerine Cookie header'ı iletilmez (yalnızca x-user-* güvenilir).
   app.use(buildProxy('/api/auth/**', SERVICE_TARGETS.access, { '^/api/auth': '/auth' }));

@@ -99,7 +99,7 @@ export interface MapView {
 export function useMapState() {
   const [params, setParams] = useSearchParams();
 
-  // ⚠️ `params` her URL değişiminde (harita her `moveend`'de lng/lat/zoom'u YAZAR — bkz.
+  // `params` her URL değişiminde (harita her `moveend`'de lng/lat/zoom'u YAZAR — bkz.
   // `setView` altta) YENİ bir `URLSearchParams` nesnesidir. Aşağıdaki `useMemo`'lar `params`'ın
   // KENDİSİNE değil, okudukları TEKİL anahtarların ham metin değerine bağımlı — aksi halde
   // (eskiden olduğu gibi) her pan/zoom, harita katmanı hiç ilgilenmese de `legend`/
@@ -126,6 +126,9 @@ export function useMapState() {
   }, [voltageParam]);
 
   const showAdminBoundaries = params.get('boundaries') !== '0';
+  // Enerjisiz bölgeler de varsayılan olarak açıktır: kesinti açıldığında haritanın onu
+  // göstermesi beklenen davranıştır, kullanıcının ayrıca açması gereken bir şey değil.
+  const showDeEnergized = params.get('deenergized') !== '0';
   // Kesinti/iş emri katmanları varsayılan olarak AÇIKTIR — diğer çoklu-seçimlerle aynı
   // ilke. Isı haritası bunun dışında kalır: birden çok ısı haritası türü eklenirse bile
   // aynı anda yalnız biri anlamlıdır, o yüzden varsayılan olarak hiçbiri seçili değildir.
@@ -256,6 +259,7 @@ export function useMapState() {
   );
 
   const setShowAdminBoundaries = useCallback((value: boolean) => patch({ boundaries: value ? undefined : '0' }), [patch]);
+  const setShowDeEnergized = useCallback((value: boolean) => patch({ deenergized: value ? undefined : '0' }), [patch]);
   const setShowOutages = useCallback((value: boolean) => patch({ outages: value ? undefined : '0' }), [patch]);
   const setShowWorkOrders = useCallback((value: boolean) => patch({ workOrders: value ? undefined : '0' }), [patch]);
   /** Isı haritaları birbirini dışlar — yeni bir tür seçmek eskisini kapatır. */
@@ -321,7 +325,9 @@ export function useMapState() {
     voltageLevels,
     setVoltageLevels,
     showAdminBoundaries,
+    showDeEnergized,
     setShowAdminBoundaries,
+    setShowDeEnergized,
     showOutages,
     setShowOutages,
     showWorkOrders,

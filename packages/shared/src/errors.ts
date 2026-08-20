@@ -8,6 +8,12 @@ export const ERROR_CODES = {
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   CONFLICT: 409,
+  /** Elemanın enerjisi hâlihazırda kesik; üzerine yeni kesinti açılamaz. */
+  COMPONENT_DE_ENERGIZED: 409,
+  /** Bu elemanda süren (STARTED) bir kesinti zaten var. */
+  OUTAGE_ALREADY_ACTIVE: 409,
+  /** Bu elemanda süren (DONE/CANCELLED olmayan) bir iş emri zaten var. */
+  WORK_ORDER_ALREADY_ACTIVE: 409,
   RATE_LIMITED: 429,
   INTERNAL: 500,
 } as const;
@@ -18,6 +24,11 @@ export type ErrorCode = keyof typeof ERROR_CODES;
 export interface ErrorDetail {
   field: string;
   issue: string;
+  /**
+   * Engelin sebebi olan kesinti/iş emri kimliği. Arayüz "hangi kayıt yüzünden engellendim"
+   * sorusunu bu alandan cevaplar ve o kayda bağlantı verir (bkz. 409 kapıları).
+   */
+  blockedBy?: string;
 }
 
 /** Standart API hata yanıtı yapısı. */
@@ -119,6 +130,38 @@ export class HighImpactForbiddenError extends AppError {
       `Yüksek etkili kesinti için ek izin gerekiyor (${cbsId}, topoloji seviyesi ${topologyLevel})`,
       { details: [{ field: 'cbsId', issue: 'HIGH_IMPACT_FORBIDDEN' }] },
     );
+  }
+}
+
+/**
+ * Enerjisi hâlihazırda kesik bir elemana yeni kesinti açılmaya çalışıldığında fırlatılır.
+ * Kapı sunucudadır; arayüz onu yalnız erkenden ve anlaşılır biçimde gösterir.
+ */
+export class ComponentDeEnergizedError extends AppError {
+  constructor(cbsId: string, blockingOutageId: string) {
+    super('COMPONENT_DE_ENERGIZED', `Şebeke elemanının elektriği hâlihazırda kesik: ${cbsId}`, {
+      details: [{ field: 'cbsId', issue: 'DE_ENERGIZED', blockedBy: blockingOutageId }],
+    });
+  }
+}
+
+/** Aynı elemanda süren bir kesinti varken ikinci kesinti açılmaya çalışıldığında fırlatılır. */
+export class OutageAlreadyActiveError extends AppError {
+  constructor(cbsId: string, activeOutageId: string) {
+    super('OUTAGE_ALREADY_ACTIVE', `Şebeke elemanında süren bir kesinti zaten var: ${cbsId}`, {
+      details: [{ field: 'cbsId', issue: 'OUTAGE_ALREADY_ACTIVE', blockedBy: activeOutageId }],
+    });
+  }
+}
+
+/** Aynı elemanda süren bir iş emri varken ikinci iş emri açılmaya çalışıldığında fırlatılır. */
+export class WorkOrderAlreadyActiveError extends AppError {
+  constructor(cbsId: string, activeWorkOrderId: string) {
+    super('WORK_ORDER_ALREADY_ACTIVE', `Şebeke elemanında süren bir iş emri zaten var: ${cbsId}`, {
+      details: [
+        { field: 'cbsId', issue: 'WORK_ORDER_ALREADY_ACTIVE', blockedBy: activeWorkOrderId },
+      ],
+    });
   }
 }
 

@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { NETWORK_COMPONENT_KEY, NETWORK_IMPACT_PREVIEW_KEY } from '../map/useNetwork.ts';
 import { OUTAGES_KEY } from './useOutages.ts';
 
 const RECONNECT_DELAY_MS = 3_000;
@@ -31,6 +32,10 @@ export function useOutageStream(): boolean {
         clearTimeout(invalidateTimer);
         invalidateTimer = setTimeout(() => {
           void queryClient.invalidateQueries({ queryKey: [OUTAGES_KEY] });
+          // Eleman detayı ve etki önizlemesi kesintiye bağlı anlık alanlar taşıyor
+          // (`deEnergizedBy`, `childOutages`); kesinti değişince onlar da bayatlar.
+          void queryClient.invalidateQueries({ queryKey: [NETWORK_COMPONENT_KEY] });
+          void queryClient.invalidateQueries({ queryKey: [NETWORK_IMPACT_PREVIEW_KEY] });
         }, INVALIDATE_DEBOUNCE_MS);
       };
       source.onerror = () => {

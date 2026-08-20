@@ -1,5 +1,7 @@
-import { FiLink, FiX } from 'react-icons/fi';
+import { useState } from 'react';
+import { FiX, FiXCircle } from 'react-icons/fi';
 import { clsx } from 'clsx';
+import { RecordLink } from '../../shared/components/RecordLink.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
@@ -7,6 +9,8 @@ import { useOutage } from '../outages/useOutages.ts';
 import { useWorkOrder } from '../work-orders/useWorkOrders.ts';
 import { DetailRow, DetailSection, unitAncestorName } from './MapDetailRows.tsx';
 import { useComponent } from './useNetwork.ts';
+import { CancelOutageDialog } from './CancelOutageDialog.tsx';
+import { useAuth } from '../auth/useAuth.tsx';
 import styles from './DetailPanel.module.scss';
 
 const shortDateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
@@ -40,6 +44,8 @@ export function OperationDetailPanel({
 }: OperationDetailPanelProps) {
   const { t } = useTranslation();
   const labels = useLabels();
+  const { hasPermission } = useAuth();
+  const [cancelling, setCancelling] = useState(false);
   const { data: outage, isLoading: isOutageLoading } = useOutage(kind === 'outage' ? id : undefined);
   const { data: workOrder, isLoading: isWorkOrderLoading } = useWorkOrder(kind === 'workOrder' ? id : undefined);
   // Kesinti/iş emri kendi kaydında elemanın tipini/adını taşır ama il-ilçe-mahalle zincirini
@@ -70,7 +76,7 @@ export function OperationDetailPanel({
           <>
             <DetailSection title={t('map.panel.detail.section.general', undefined, 'Genel')}>
               <DetailRow label="ID">
-                <RecordIdButton id={outage.id} onOpen={() => onOpenRecord('outage', outage.id)} />
+                <RecordLink id={outage.id} onClick={() => onOpenRecord('outage', outage.id)} title={t('map.action.openRecord')} />
               </DetailRow>
               <DetailRow label={t('map.panel.detail.field.status')}>
                 <StatusBadge status={outage.status} />
@@ -88,12 +94,32 @@ export function OperationDetailPanel({
               </DetailRow>
               {outage.workOrderId && (
                 <DetailRow label={t('outage.column.workOrderId')}>
-                  <LinkedRecordButton kind="workOrder" id={outage.workOrderId} onSelect={onSelectOperation} />
+                  <RecordLink
+                    id={outage.workOrderId}
+                    onClick={() => onSelectOperation('workOrder', outage.workOrderId!)}
+                    title={t('outage.action.openWorkOrder')}
+                  />
                 </DetailRow>
               )}
             </DetailSection>
 
             <ComponentSection cbsId={outage.cbsId} component={component} onSelectComponent={onSelectComponent} />
+
+            {/* Kullanıcı kesintiyi buradan da görüyor; iptal de buradan yapılabilmeli.
+                Sol paneldeki aksiyonla aynı akış, aynı onay modali. */}
+            {hasPermission('outage:write') && outage.status === 'STARTED' && (
+              <div className={styles.actionsGrid}>
+                <button
+                  type="button"
+                  className={clsx('btn', 'btn--danger', styles.action)}
+                  onClick={() => setCancelling(true)}
+                >
+                  <FiXCircle /> {t('map.action.cancelOutage')}
+                </button>
+              </div>
+            )}
+
+            {cancelling && <CancelOutageDialog outageId={outage.id} onClose={() => setCancelling(false)} />}
           </>
         )}
 
@@ -101,7 +127,11 @@ export function OperationDetailPanel({
           <>
             <DetailSection title={t('map.panel.detail.section.general', undefined, 'Genel')}>
               <DetailRow label="ID">
-                <RecordIdButton id={workOrder.id} onOpen={() => onOpenRecord('workOrder', workOrder.id)} />
+                <RecordLink
+                  id={workOrder.id}
+                  onClick={() => onOpenRecord('workOrder', workOrder.id)}
+                  title={t('map.action.openRecord')}
+                />
               </DetailRow>
               <DetailRow label={t('map.panel.detail.field.status')}>
                 <StatusBadge status={workOrder.status} />
@@ -116,7 +146,11 @@ export function OperationDetailPanel({
               </DetailRow>
               {workOrder.outageId && (
                 <DetailRow label={t('work-order.column.outageId')}>
-                  <LinkedRecordButton kind="outage" id={workOrder.outageId} onSelect={onSelectOperation} />
+                  <RecordLink
+                    id={workOrder.outageId}
+                    onClick={() => onSelectOperation('outage', workOrder.outageId!)}
+                    title={t('work-order.action.openOutage')}
+                  />
                 </DetailRow>
               )}
             </DetailSection>
@@ -173,28 +207,3 @@ function ComponentSection({
 }
 
 /** Kaydın kendi id'si — basılabilir olduğu yeşil renkle belli olur, sayfasını açar. */
-function RecordIdButton({ id, onOpen }: { id: string; onOpen: () => void }) {
-  return (
-    <button type="button" className={clsx(styles.linkedId, 'font-mono')} onClick={onOpen}>
-      {id.slice(0, 8)}
-    </button>
-  );
-}
-
-/** Bağlı kayda (kesinti ↔ iş emri) geçiş — bağlantı ikonuyla ayırt edilir, tam sayfaya atlamaz. */
-function LinkedRecordButton({
-  kind,
-  id,
-  onSelect,
-}: {
-  kind: 'outage' | 'workOrder';
-  id: string;
-  onSelect: (kind: 'outage' | 'workOrder', id: string) => void;
-}) {
-  return (
-    <button type="button" className={clsx(styles.linkedId, 'font-mono')} onClick={() => onSelect(kind, id)}>
-      <FiLink />
-      {id.slice(0, 8)}
-    </button>
-  );
-}

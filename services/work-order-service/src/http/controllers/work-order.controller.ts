@@ -7,12 +7,17 @@ import {
   toExclusiveUpperBound,
   toPageResult,
   UnauthenticatedError,
+  WorkOrderAlreadyActiveError,
   type AuthedRequest,
 } from '@inavitas/shared';
 import type { Response } from 'express';
 import { db } from '../../db.ts';
 import { canTransition } from '../../domain/state-machine.ts';
-import { enqueueWorkOrderCreatedTx, enqueueWorkOrderDoneTx } from '../../kafka/producer.ts';
+import {
+  enqueueWorkOrderCancelledIfNeededTx,
+  enqueueWorkOrderCreatedTx,
+  enqueueWorkOrderDoneTx,
+} from '../../kafka/producer.ts';
 import { notifyWorkOrderChanged } from '../../realtime.ts';
 import * as networkComponentRepository from '../../repository/network-component.repository.ts';
 import * as workOrderRepository from '../../repository/work-order.repository.ts';
@@ -59,14 +64,21 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   const body = CreateWorkOrderBody.parse(req.body);
   const cbsId = body.cbsId;
 
-  // ⭐ Varlık doğrulaması: read-model'de karşılığı olmayan bir kimlik reddedilir.
+  // Varlık doğrulaması: read-model'de karşılığı olmayan bir kimlik reddedilir.
   const component = await networkComponentRepository.findById(cbsId);
   if (!component) throw new ComponentNotFoundError(cbsId);
 
-  // ⭐ Her iş emri, outage-service consumer'ında tipten bağımsız otomatik bir kesinti kaydı
+  // Her iş emri, outage-service consumer'ında tipten bağımsız otomatik bir kesinti kaydı
   // doğurur (bkz. outage-service/kafka/consumers.ts handleWorkOrderCreated); bu yüzden ek izin
   // tüm türlerde aranır, yalnız "kesinti türü" olanlarda değil.
   assertHighImpactAllowed(user, cbsId, component.topologyLevel);
+
+  // Mükerrerlik kapısı: aynı elemanda süren bir iş emri varken ikincisi açılamaz.
+  //
+  // İş emri **enerjisizlik nedeniyle engellenmez** — fiziksel olarak da yanlış olurdu:
+  // enerjisi kesik elemana iş emri açmak zaten onarımın kendisidir.
+  const activeWorkOrder = await workOrderRepository.findActiveByCbsId(cbsId);
+  if (activeWorkOrder) throw new WorkOrderAlreadyActiveError(cbsId, activeWorkOrder.id);
 
   // İş emri kaydı ve outbox bildirimi aynı transaction içinde yazılır.
   const row = await db.transaction(async (tx) => {
@@ -84,7 +96,11 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
       req.correlationId,
     );
 
-    await enqueueWorkOrderCreatedTx(tx, created, req.correlationId!, user.email);
+    await enqueueWorkOrderCreatedTx(tx, created, {
+      origin: 'USER',
+      actor: user.email,
+      correlationId: req.correlationId!,
+    });
     return created;
   });
 
@@ -129,8 +145,11 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
     if (!row) return null;
 
-    if (body.status !== current.status && row.status === 'DONE') {
-      await enqueueWorkOrderDoneTx(tx, row, req.correlationId!, user.email);
+    if (body.status !== current.status) {
+      const opts = { origin: 'USER' as const, actor: user.email, correlationId: req.correlationId! };
+
+      if (row.status === 'DONE') await enqueueWorkOrderDoneTx(tx, row, opts);
+      await enqueueWorkOrderCancelledIfNeededTx(tx, current.status, row, opts);
     }
 
     return row;

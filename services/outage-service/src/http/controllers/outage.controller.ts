@@ -1,8 +1,10 @@
 import {
   assertHighImpactAllowed,
+  ComponentDeEnergizedError,
   ComponentNotFoundError,
   ConflictError,
   NotFoundError,
+  OutageAlreadyActiveError,
   PaginationQuery,
   parseSort,
   toExclusiveUpperBound,
@@ -13,7 +15,11 @@ import {
 import type { Response } from 'express';
 import { db } from '../../db.ts';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
-import { enqueueOutageCreatedTx, enqueueOutageEnergizedIfNeededTx } from '../../kafka/producer.ts';
+import {
+  enqueueOutageCancelledIfNeededTx,
+  enqueueOutageCreatedTx,
+  enqueueOutageEnergizedIfNeededTx,
+} from '../../kafka/producer.ts';
 import { notifyOutageChanged } from '../../realtime.ts';
 import * as networkComponentRepository from '../../repository/network-component.repository.ts';
 import * as outageRepository from '../../repository/outage.repository.ts';
@@ -68,21 +74,44 @@ export async function getById(req: AuthedRequest, res: Response): Promise<void> 
   res.json(toOutageDto(row));
 }
 
+/**
+ * Kesinti açılabilir mi — sunucu tarafı kapı.
+ *
+ * İki bilinen sınır **kabul edilmiştir**:
+ * 1. Etki kümesi `IMPACT_ID_LIMIT` ile kırpılır; kırpılmış bir kümede kapsama sorgusu bazı
+ *    elemanları kaçırabilir. Kaçarsa ikinci kesinti açılır ve kaskad motoru onu zaten üst
+ *    kesintiye **bağlar** — sonuç yanlış değil, sadece daha az sıkı.
+ * 2. Etki asenkrondur (`impactStatus: 'PENDING'`); kesinti açıldıktan ~300 ms sonrasına kadar
+ *    alt elemana ikinci kesinti açılabilir. Yine kaskad ağı yakalar. Emniyet ağı budur, kapı değil.
+ */
+async function assertOutageAllowed(cbsId: string): Promise<void> {
+  const activeOnSelf = await outageRepository.findActiveByCbsId(cbsId);
+  if (activeOnSelf) throw new OutageAlreadyActiveError(cbsId, activeOnSelf.id);
+
+  const containing = await outageRepository.findContainingOutages(cbsId);
+  if (containing.length > 0) throw new ComponentDeEnergizedError(cbsId, containing[0]!.id);
+}
+
 export async function create(req: AuthedRequest, res: Response): Promise<void> {
   if (!req.user) throw new UnauthenticatedError();
 
   const body = CreateOutageBody.parse(req.body);
   const cbsId = body.cbsId;
 
-  // ⭐ Kesintinin varlık doğrulaması burada: read-model'de karşılığı olmayan bir kimlik
+  // Kesintinin varlık doğrulaması burada: read-model'de karşılığı olmayan bir kimlik
   // reddedilir. Eskiden bu alanın tek doğrulaması uzunluktu ve "asdasd" kabul ediliyordu.
   const component = await networkComponentRepository.findById(cbsId);
   if (!component) throw new ComponentNotFoundError(cbsId);
 
-  // ⭐ Yüksek etkili kesinti (fider kesicisi ve üstü) ek izin ister. Harita üzerindeki etki
+  // Yüksek etkili kesinti (fider kesicisi ve üstü) ek izin ister. Harita üzerindeki etki
   // önizlemesi kullanıcıya sayıyı gösterir ama karar burada verilir — önizleme atlanabilir
   // ya da arada eskiyebilir; istemcinin gösterdiği sayıya güvenilmez.
   assertHighImpactAllowed(req.user, cbsId, component.topologyLevel);
+
+  // Enerjisizlik ve mükerrerlik kapıları. Karar sunucudadır; istemci onu yalnız erkenden ve
+  // anlaşılır biçimde gösterir. Sıra önemli: "kendi üzerinde kesinti var" daha spesifik bir
+  // cevaptır, önce o denenir.
+  await assertOutageAllowed(cbsId);
 
   const status: OutageStatus = body.endedAt ? 'ENERGIZED' : (body.status ?? 'STARTED');
   const user = req.user;
@@ -148,7 +177,7 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
-  const updated = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const row = await outageRepository.updateWithVersionTx(
       tx,
       current.id,
@@ -167,28 +196,45 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
     if (!row) return null;
 
+    let detachedChildren: typeof row[] = [];
+
     if (nextStatus !== current.status) {
-      await enqueueOutageEnergizedIfNeededTx(tx, current.status, row, {
-        origin: 'USER',
-        actor: user.email,
-        correlationId: req.correlationId!,
-      });
+      const opts = { origin: 'USER' as const, actor: user.email, correlationId: req.correlationId! };
+
+      await enqueueOutageEnergizedIfNeededTx(tx, current.status, row, opts);
+      await enqueueOutageCancelledIfNeededTx(tx, current.status, row, opts);
+
+      if (nextStatus === 'CANCELLED') {
+        // İptal edilen üstün çocukları kopartılır, yetim abone satırları temizlenir.
+        detachedChildren = await outageRepository.detachChildrenTx(tx, row.id);
+        await outageRepository.clearAffectedCustomersTx(tx, row.id);
+      }
     }
 
-    return row;
+    return { row, detachedChildren };
   });
 
-  if (!updated) {
+  if (!result) {
     throw new ConflictError('Kayıt başka bir istekle güncellenmiş (version uyuşmazlığı)', [
       { field: 'version', issue: 'stale_version' },
     ]);
   }
 
+  const { row: updated, detachedChildren } = result;
+
   if (nextStatus !== current.status) {
     req.log?.info({ outageId: updated.id, from: current.status, to: nextStatus }, 'kesinti durumu değişti');
   }
 
+  if (detachedChildren.length > 0) {
+    req.log?.info(
+      { outageId: updated.id, detachedCount: detachedChildren.length },
+      'iptal edilen kesintinin kaskad çocukları kopartıldı',
+    );
+  }
+
   await notifyOutageChanged(updated, req.log);
+  for (const child of detachedChildren) await notifyOutageChanged(child, req.log);
 
   res.json(toOutageDto(updated));
 }

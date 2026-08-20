@@ -53,13 +53,16 @@ export interface SseHubs {
   outage: SseHub;
   workOrder: SseHub;
   translation: SseHub;
+  /** Enerjilenme değişimleri — mesaj veri taşımaz, yalnız "değişti" der. */
+  energization: SseHub;
 }
 
-/** Kesinti, iş emri ve çeviri canlı akışları için hub'ları oluşturur. */
+/** Kesinti, iş emri, çeviri ve enerjilenme canlı akışları için hub'ları oluşturur. */
 export function createSseHubs(subscriber: Redis): SseHubs {
   return {
     outage: new SseHub('ui:outage', subscriber),
     workOrder: new SseHub('ui:work-order', subscriber),
     translation: new SseHub('ui:translation', subscriber),
+    energization: new SseHub('ui:energization', subscriber),
   };
 }

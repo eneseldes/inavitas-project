@@ -42,7 +42,7 @@ export async function startNetworkConsumer(handler: EventHandler, logger: Logger
   consumerHandle = await startConsumer(
     kafka,
     CONSUMER_GROUPS.NETWORK_SERVICE,
-    [TOPICS.OUTAGE_CREATED],
+    [TOPICS.OUTAGE_CREATED, TOPICS.OUTAGE_ENERGIZED, TOPICS.OUTAGE_CANCELLED],
     handler,
     getProducer(),
     logger,

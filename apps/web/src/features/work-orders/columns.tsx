@@ -1,5 +1,5 @@
 import type { ColumnDef } from '@tanstack/react-table';
-import { FiLink } from 'react-icons/fi';
+import { RecordLink } from '../../shared/components/RecordLink.tsx';
 import type { ColumnMeta } from '../../shared/components/DataGrid.tsx';
 import type { DateFilterValue } from '../../shared/components/ColumnFilter.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
@@ -140,18 +140,12 @@ export function buildWorkOrderColumns(
         const outageId = ctx.getValue<string | null>();
         if (!outageId) return <span className="text-muted">—</span>;
         return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenOutage(outageId);
-            }}
-            className="link"
+          <RecordLink
+            id={outageId}
+            onClick={() => onOpenOutage(outageId)}
             title={t('work-order.action.openOutage')}
-          >
-            <FiLink />
-            {outageId.slice(0, 8)}
-          </button>
+            stopPropagation
+          />
         );
       },
     },

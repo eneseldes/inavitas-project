@@ -116,6 +116,32 @@ export const topologyEdges = networkSchema.table('topology_edges', {
   lengthM: doublePrecision('length_m'),
 });
 
+/**
+ * Aktif kesinti read-model'i (`network.outage_states_ro`).
+ *
+ * `outage.created` / `outage.energized` / `outage.cancelled` olaylarından beslenir; yazımı
+ * olay tüketimiyle **aynı transaction**'da yapılır. Servis açılışında enerjilenmeyi
+ * hesaplayabilmek için aktif kesintileri bilmek zorunludur: cross-DB sorgu ve senkron HTTP
+ * yasak, Kafka'yı baştan replay etmek de saçma — read-model tek doğru cevaptır.
+ *
+ * Bu bir read-model'dir, FK değildir. Cross-DB FK yasağı sürüyor.
+ */
+export const outageStatesRo = networkSchema.table(
+  'outage_states_ro',
+  {
+    outageId: uuid('outage_id').primaryKey(),
+    cbsId: varchar('cbs_id', { length: 64 }).notNull(),
+    status: varchar('status', { length: 32 }).notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_outage_states_ro_cbs').on(table.cbsId),
+    // Aktif küme tek taramayla okunsun: boot'ta ve her yeniden hesapta sorgulanan tek şey bu.
+    index('idx_outage_states_ro_active').on(table.cbsId).where(sql`${table.status} = 'STARTED'`),
+  ],
+);
+
 /** Ring tanımları tablosu (`network.rings`) */
 export const rings = networkSchema.table('rings', {
   ringId: varchar('ring_id', { length: 64 }).primaryKey(),

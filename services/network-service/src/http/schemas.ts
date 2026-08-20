@@ -47,9 +47,30 @@ export const TraceQuery = z.object({
 export type TraceQuery = z.infer<typeof TraceQuery>;
 
 /**
+ * Enerjisizlik sorgusu parametreleri.
+ *
+ * `bbox` neden zorunlu: `setFeatureState` yalnız **yüklü** tile'lara yazılabilir. Ekranda
+ * olmayan bir elemanın durumunu taşımanın faydası yok, maliyeti var.
+ */
+export const EnergizationQuery = z.object({
+  bbox: csv
+    .pipe(z.array(z.string()).length(4))
+    .transform((parts) => parts.map(Number))
+    .refine((values) => values.every(Number.isFinite), { message: 'bbox sayısal olmalı' })
+    .transform(([minLon, minLat, maxLon, maxLat]) => ({
+      minLon: minLon!,
+      minLat: minLat!,
+      maxLon: maxLon!,
+      maxLat: maxLat!,
+    })),
+  zoom: z.coerce.number().min(0).max(22),
+});
+export type EnergizationQuery = z.infer<typeof EnergizationQuery>;
+
+/**
  * Alan (poligon) sorgusu gövdesi.
  *
- * ⚠️ Poligon **gövdede** taşınır, query string'de değil: bir mahalleyi saran poligon
+ * Poligon **gövdede** taşınır, query string'de değil: bir mahalleyi saran poligon
  * kolayca birkaç kilobayt tutar ve URL sınırına takılır.
  */
 const GeoJsonPolygon = z.object({

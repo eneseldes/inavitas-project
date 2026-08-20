@@ -53,6 +53,7 @@ export async function startOutageConsumer(handler: EventHandler, logger: Logger)
       TOPICS.WORK_ORDER_CREATED,
       TOPICS.WORK_ORDER_LINKED,
       TOPICS.WORK_ORDER_DONE,
+      TOPICS.WORK_ORDER_CANCELLED,
       TOPICS.OUTAGE_IMPACT_CALCULATED,
       TOPICS.OUTAGE_ENERGIZED,
     ],

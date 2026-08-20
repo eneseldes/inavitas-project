@@ -1,6 +1,16 @@
-import { useMemo } from 'react';
-import { FiAlertTriangle, FiArrowDownCircle, FiArrowUpCircle, FiExternalLink, FiTool, FiX, FiZap } from 'react-icons/fi';
+import { useMemo, useState } from 'react';
+import {
+  FiAlertTriangle,
+  FiArrowDownCircle,
+  FiArrowUpCircle,
+  FiLink,
+  FiTool,
+  FiX,
+  FiXCircle,
+  FiZap,
+} from 'react-icons/fi';
 import { clsx } from 'clsx';
+import { RecordLink } from '../../shared/components/RecordLink.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
@@ -10,6 +20,8 @@ import type { DownstreamImpact, UpstreamChain } from '../../types/network.ts';
 import type { TraceDirection } from './api.ts';
 import { DetailRow, DetailSection, unitAncestorName } from './MapDetailRows.tsx';
 import { useComponent } from './useNetwork.ts';
+import { useOperationGuards } from './useOperationGuards.ts';
+import { CancelOutageDialog } from './CancelOutageDialog.tsx';
 import styles from './DetailPanel.module.scss';
 
 interface DetailPanelProps {
@@ -54,6 +66,8 @@ export function DetailPanel({
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const { data: component, isLoading } = useComponent(selectedId);
+  const guards = useOperationGuards(selectedId);
+  const [cancelTarget, setCancelTarget] = useState<string | undefined>(undefined);
 
   // Elemana bağlı kesinti/iş emri kayıtları — "haritada tıkla → sol panel → id → detay
   // sayfası" yolunun harita ucu. Sorgu yalnız bir eleman seçiliyken atılır.
@@ -112,12 +126,22 @@ export function DetailPanel({
                   ? `${formatAttribute(component.attributes?.capacity_kva)} kVA`
                   : undefined}
               </DetailRow>
+              {/* Durum anlık enerjilenmedir — kolondan değil, aktif kesintilerden türetilir. */}
               <DetailRow label={t('map.panel.detail.field.status')}>
-                {component.status ? t(`network.enum.status.${component.status}`) : undefined}
+                {t(`network.enum.energization.${component.isEnergized ? 'ENERGIZED' : 'DE_ENERGIZED'}`)}
               </DetailRow>
               <DetailRow label={t('map.panel.detail.field.customerCount')}>
                 {formatAttribute(component.attributes?.customer_count)}
               </DetailRow>
+              {component.deEnergizedBy && (
+                <DetailRow label={t('map.panel.detail.field.deEnergizedBy')}>
+                  <RecordLink
+                    id={component.deEnergizedBy}
+                    onClick={() => onSelectOperation('outage', component.deEnergizedBy!)}
+                    title={t('map.action.openRecord')}
+                  />
+                </DetailRow>
+              )}
             </DetailSection>
 
             <DetailSection title={t('map.panel.detail.section.location', undefined, 'Konum')}>
@@ -155,20 +179,56 @@ export function DetailPanel({
             {traceDirection && <TraceSummary trace={trace} isLoading={isTraceLoading} />}
 
             {/* --- Kayıt aksiyonları: yetkisiz kullanıcıda hiç görünmez. Kesinti düğmesi
-                satırın sağında kalsın diye markup'ta İş Emri'nden SONRA gelir. --- */}
+                satırın sağında kalsın diye markup'ta İş Emri'nden SONRA gelir.
+
+                Düğme matrisi:
+                - kendi üzerinde aktif kesinti varsa "Kesinti Aç" yerine "Kesintiyi İptal Et"
+                - üstteki kesinti yüzünden enerjisizse "Kesinti Aç" pasif + sebep + engelleyen
+                  kesintiye bağlantı
+                - aktif iş emri varsa "İş Emri Aç" pasif --- */}
             {(hasPermission('outage:write') || hasPermission('workorder:write')) && (
               <div className={styles.actionsGrid}>
                 {hasPermission('workorder:write') && (
-                  <button type="button" className={clsx('btn', 'btn--ghost', styles.action)} onClick={onCreateWorkOrder}>
+                  <button
+                    type="button"
+                    className={clsx('btn', 'btn--ghost', styles.action)}
+                    disabled={guards.workOrderBlocked}
+                    onClick={onCreateWorkOrder}
+                  >
                     <FiTool /> {t('map.action.createWorkOrder')}
                   </button>
                 )}
-                {hasPermission('outage:write') && (
-                  <button type="button" className={clsx('btn', 'btn--primary', styles.action)} onClick={onCreateOutage}>
+                {hasPermission('outage:write') && guards.activeOutageOnSelf && (
+                  <button
+                    type="button"
+                    className={clsx('btn', 'btn--danger', styles.action)}
+                    onClick={() => setCancelTarget(guards.activeOutageOnSelf)}
+                  >
+                    <FiXCircle /> {t('map.action.cancelOutage')}
+                  </button>
+                )}
+                {hasPermission('outage:write') && !guards.activeOutageOnSelf && (
+                  <button
+                    type="button"
+                    className={clsx('btn', 'btn--primary', styles.action)}
+                    disabled={guards.outageBlocked}
+                    onClick={onCreateOutage}
+                  >
                     <FiZap /> {t('map.action.createOutage')}
                   </button>
                 )}
               </div>
+            )}
+
+            {/* Engelin sebebi ve "hangi kesinti yüzünden" bağlantısı — kullanıcı pasif bir
+                düğmeye bakıp neden olduğunu tahmin etmek zorunda kalmamalı. */}
+            {guards.workOrderBlocked && <p className={styles.blockReason}>{t('map.block.workOrderActive')}</p>}
+            {guards.outageBlocked && guards.outageBlockReason === 'DE_ENERGIZED' && (
+              <p className={styles.blockReason}>{t('map.block.deEnergized')}</p>
+            )}
+
+            {cancelTarget && (
+              <CancelOutageDialog outageId={cancelTarget} onClose={() => setCancelTarget(undefined)} />
             )}
 
             {(outages?.items.length ?? 0) > 0 && (
@@ -181,8 +241,8 @@ export function DetailPanel({
                     onClick={() => onSelectOperation('outage', outage.id)}
                   >
                     <span className={clsx(styles.linkedId, 'font-mono')}>
+                      <FiLink />
                       {outage.id.slice(0, 8)}
-                      <FiExternalLink />
                     </span>
                     <StatusBadge status={outage.status} />
                   </button>
@@ -200,8 +260,8 @@ export function DetailPanel({
                     onClick={() => onSelectOperation('workOrder', workOrder.id)}
                   >
                     <span className={clsx(styles.linkedId, 'font-mono')}>
+                      <FiLink />
                       {workOrder.id.slice(0, 8)}
-                      <FiExternalLink />
                     </span>
                     <StatusBadge status={workOrder.status} />
                   </button>

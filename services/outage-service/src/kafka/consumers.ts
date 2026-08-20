@@ -6,6 +6,7 @@ import {
   TOPICS,
   type OutageEnergizedEvent,
   type OutageImpactCalculatedEvent,
+  type WorkOrderCancelledEvent,
   type WorkOrderCreatedEvent,
   type WorkOrderDoneEvent,
   type WorkOrderLinkedEvent,
@@ -24,7 +25,12 @@ import * as outageRepository from '../repository/outage.repository.ts';
 import { applyImpactTx, createTx, linkWorkOrderTx, updateWithVersionTx } from '../repository/outage.repository.ts';
 import { redis } from '../redis.ts';
 import { notifyOutageChanged } from '../realtime.ts';
-import { enqueueOutageCreatedTx, enqueueOutageEnergizedIfNeededTx, enqueueOutageLinkedTx } from './producer.ts';
+import {
+  enqueueOutageCancelledIfNeededTx,
+  enqueueOutageCreatedTx,
+  enqueueOutageEnergizedIfNeededTx,
+  enqueueOutageLinkedTx,
+} from './producer.ts';
 
 /**
  * 'work-order.created' event'i işleyicisi: Kullanıcı kaynaklı bir iş emri oluştuğunda otomatik sistem kesintisi oluşturur.
@@ -45,6 +51,17 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
   if (!component) {
     log.error({ cbsId: envelope.payload.cbsId }, 'iş emrinin CBS elemanı read-model\'de yok, kesinti açılmadı');
     throw new ComponentNotFoundError(envelope.payload.cbsId);
+  }
+
+  // Eleman hâlihazırda aktif bir kesintinin etki kümesindeyse **ikinci bir sistem kesintisi
+  // açılmaz**; iş emri o kesintiye bağlanır.
+  //
+  // Neden: aksi halde `POST /outages`'in enerjisizlik kapısı kendi sistemimiz tarafından
+  // delinirdi — kullanıcı iş emri açar, bu consumer kapıdan geçmeden ikinci kesinti doğururdu.
+  const existing = await findExistingOutageFor(envelope.payload.cbsId);
+  if (existing) {
+    await linkWorkOrderToExistingOutage(existing, envelope, log);
+    return;
   }
 
   const created = await db.transaction(async (tx) => {
@@ -100,6 +117,54 @@ export async function handleWorkOrderCreated(envelope: WorkOrderCreatedEvent, lo
   );
 
   await notifyOutageChanged(created, log);
+}
+
+/**
+ * İş emrinin elemanını karartan mevcut kesintiyi arar: önce elemanın kendi üzerindeki aktif
+ * kesinti, sonra onu etki kümesinde taşıyan en yakın üst kesinti.
+ */
+async function findExistingOutageFor(cbsId: string) {
+  const onSelf = await outageRepository.findActiveByCbsId(cbsId);
+  if (onSelf) return onSelf;
+
+  const [containing] = await outageRepository.findContainingOutages(cbsId);
+  return containing ?? null;
+}
+
+/** İş emrini yeni kesinti açmadan mevcut kesintiye bağlar. */
+async function linkWorkOrderToExistingOutage(
+  existing: outageRepository.OutageRow,
+  envelope: WorkOrderCreatedEvent,
+  log: Logger,
+): Promise<void> {
+  const linked = await db.transaction(async (tx) => {
+    const processed = await markProcessed(tx, envelope.eventId, TOPICS.WORK_ORDER_CREATED);
+    if (!processed) return null;
+
+    const row = await linkWorkOrderTx(tx, existing.id, envelope.payload.workOrderId);
+    if (!row) return null;
+
+    await enqueueOutageLinkedTx(tx, row.id, row.cbsId, envelope.payload.workOrderId, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    return row;
+  });
+
+  if (!linked) {
+    log.debug({ eventId: envelope.eventId }, 'event zaten işlenmiş veya kesinti bağlanamadı, atlanıyor');
+    return;
+  }
+
+  log.info(
+    { outageId: linked.id, workOrderId: envelope.payload.workOrderId, cbsId: linked.cbsId },
+    'iş emri mevcut kesintiye bağlandı (yeni sistem kesintisi açılmadı)',
+  );
+
+  await notifyOutageChanged(linked, log);
 }
 
 /**
@@ -282,10 +347,89 @@ export async function handleOutageEnergized(envelope: OutageEnergizedEvent, log:
   }
 }
 
+/**
+ * 'work-order.cancelled' işleyicisi: iş emri iptal edilince bağlı kesinti de iptal edilir
+ * (iptal simetrisi).
+ *
+ * `shouldTriggerCounterpart` kontrolü **zorunludur**. `work-order-service`'in
+ * kendi iptalinden doğan olay `origin: 'SYSTEM'` taşır; kontrol olmasa iki servis birbirini
+ * sonsuza kadar iptal ederdi. Zincir burada durur.
+ */
+export async function handleWorkOrderCancelled(envelope: WorkOrderCancelledEvent, log: Logger): Promise<void> {
+  if (!shouldTriggerCounterpart(envelope)) {
+    log.debug({ eventId: envelope.eventId }, 'sistem kaynaklı/derinlik aşıldı, karşı iptal tetiklenmiyor');
+    return;
+  }
+  if (!envelope.payload.outageId) {
+    log.debug({ eventId: envelope.eventId }, 'iş emri bir kesintiye bağlı değil, atlanıyor');
+    return;
+  }
+
+  const result = await db.transaction(async (tx) => {
+    const processed = await markProcessed(tx, envelope.eventId, TOPICS.WORK_ORDER_CANCELLED);
+    if (!processed) return null;
+
+    const [current] = await tx.select().from(outages).where(eq(outages.id, envelope.payload.outageId!));
+    if (!current) {
+      log.warn({ outageId: envelope.payload.outageId }, 'bağlı kesinti bulunamadı');
+      return null;
+    }
+
+    if (!canTransition(current.status, 'CANCELLED')) {
+      return { previousStatus: current.status, row: current, detachedChildren: [] as typeof outages.$inferSelect[] };
+    }
+
+    const updated = await updateWithVersionTx(
+      tx,
+      current.id,
+      current.version,
+      { status: 'CANCELLED' },
+      { fromStatus: current.status, actor: SYSTEM_ACTOR, origin: 'SYSTEM', correlationId: envelope.correlationId },
+    );
+    if (!updated) return null;
+
+    // Karşılık olayı SYSTEM olarak yayınlanır; work-order-service onu tüketirken
+    // `shouldTriggerCounterpart` false döner ve döngü kapanır.
+    await enqueueOutageCancelledIfNeededTx(tx, current.status, updated, {
+      origin: 'SYSTEM',
+      actor: SYSTEM_ACTOR,
+      correlationId: envelope.correlationId,
+      causedBy: envelope,
+    });
+
+    const detachedChildren = await outageRepository.detachChildrenTx(tx, updated.id);
+    await outageRepository.clearAffectedCustomersTx(tx, updated.id);
+
+    return { previousStatus: current.status, row: updated, detachedChildren };
+  });
+
+  if (!result) {
+    log.debug({ eventId: envelope.eventId }, 'zaten işlenmiş veya version çakışması, atlanıyor');
+    return;
+  }
+
+  if (result.previousStatus === result.row.status) {
+    log.info(
+      { outageId: result.row.id, status: result.row.status },
+      'kesinti iptal edilebilir durumda değil, atlandı',
+    );
+    return;
+  }
+
+  log.info(
+    { outageId: result.row.id, workOrderId: envelope.payload.workOrderId, detachedCount: result.detachedChildren.length },
+    'iş emri iptal edildi, bağlı kesinti otomatik CANCELLED yapıldı',
+  );
+
+  await notifyOutageChanged(result.row, log);
+  for (const child of result.detachedChildren) await notifyOutageChanged(child, log);
+}
+
 const VALIDATORS = {
   [TOPICS.WORK_ORDER_CREATED]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_CREATED, raw),
   [TOPICS.WORK_ORDER_LINKED]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_LINKED, raw),
   [TOPICS.WORK_ORDER_DONE]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_DONE, raw),
+  [TOPICS.WORK_ORDER_CANCELLED]: (raw: unknown) => parseEvent(TOPICS.WORK_ORDER_CANCELLED, raw),
   [TOPICS.OUTAGE_IMPACT_CALCULATED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_IMPACT_CALCULATED, raw),
   [TOPICS.OUTAGE_ENERGIZED]: (raw: unknown) => parseEvent(TOPICS.OUTAGE_ENERGIZED, raw),
 } as const;
@@ -326,6 +470,8 @@ export function createOutageEventHandler(logger: Logger): EventHandler {
         return handleWorkOrderLinked(envelope as WorkOrderLinkedEvent, log);
       case TOPICS.WORK_ORDER_DONE:
         return handleWorkOrderDone(envelope as WorkOrderDoneEvent, log);
+      case TOPICS.WORK_ORDER_CANCELLED:
+        return handleWorkOrderCancelled(envelope as WorkOrderCancelledEvent, log);
       case TOPICS.OUTAGE_IMPACT_CALCULATED:
         return handleOutageImpactCalculated(envelope as OutageImpactCalculatedEvent, log);
       case TOPICS.OUTAGE_ENERGIZED:

@@ -5,6 +5,8 @@ export const TOPICS = {
   OUTAGE_CREATED: 'outage.created',
   OUTAGE_ENERGIZED: 'outage.energized',
   OUTAGE_LINKED: 'outage.linked',
+  /** Kesinti iptal edildi — bağlı iş emri de iptal edilir, şebeke yeniden enerjilendirilir. */
+  OUTAGE_CANCELLED: 'outage.cancelled',
   /** Etki hesaplandı — network-service grafı gezdi, etkilenen eleman ve abone kümesini yayınlıyor. */
   OUTAGE_IMPACT_CALCULATED: 'outage.impact.calculated',
   /** İki kesinti arasında kapsama/yükselme ilişkisi kuruldu. */
@@ -12,6 +14,8 @@ export const TOPICS = {
   WORK_ORDER_CREATED: 'work-order.created',
   WORK_ORDER_DONE: 'work-order.done',
   WORK_ORDER_LINKED: 'work-order.linked',
+  /** İş emri iptal edildi — bağlı kesinti de iptal edilir (iptal simetrisi). */
+  WORK_ORDER_CANCELLED: 'work-order.cancelled',
   TRANSLATION_PUBLISHED: 'translation.published',
 } as const;
 

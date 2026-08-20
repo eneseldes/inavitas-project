@@ -36,3 +36,33 @@
   color: v.$color-danger-soft-ink;
   margin: 0 0 v.$space-3;
 }
+
+// Kaskad onay modalındaki alt kesinti listesi. Liste sunucuda kırpılır; kırpılan sayı
+// listenin altında ayrıca yazılır.
+.cascadeList {
+  list-style: none;
+  margin: 0 0 v.$space-3;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-md;
+}
+
+.cascadeItem {
+  display: flex;
+  align-items: baseline;
+  gap: v.$space-2;
+  padding: v.$space-2 v.$space-3;
+  font-size: v.$control-font-size;
+
+  & + & {
+    border-top: 1px solid v.$color-hairline;
+  }
+}
+
+.cascadeCount {
+  margin-left: auto;
+  color: v.$color-ink-soft;
+  white-space: nowrap;
+}

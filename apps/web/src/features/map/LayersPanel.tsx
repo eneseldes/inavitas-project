@@ -69,6 +69,8 @@ interface LayersPanelProps {
   onToggleLegendGroup: (ids: readonly LegendId[]) => void;
   showAdminBoundaries: boolean;
   onShowAdminBoundariesChange: (value: boolean) => void;
+  showDeEnergized: boolean;
+  onShowDeEnergizedChange: (value: boolean) => void;
   showOutages: boolean;
   onShowOutagesChange: (value: boolean) => void;
   showWorkOrders: boolean;
@@ -104,6 +106,8 @@ export function LayersPanel({
   onToggleLegendGroup,
   showAdminBoundaries,
   onShowAdminBoundariesChange,
+  showDeEnergized,
+  onShowDeEnergizedChange,
   showOutages,
   onShowOutagesChange,
   showWorkOrders,
@@ -194,9 +198,27 @@ export function LayersPanel({
 
       <HeatmapGroup activeHeatmap={activeHeatmap} onActiveHeatmapChange={onActiveHeatmapChange} />
 
-      {/* Bugün tek eleman: idari sınırlar. Kendi başına bir grup gövdesine ihtiyacı yok —
-          eskiden "Bağımsız Katmanlar" başlığı altında tek satır olarak durup gereksiz bir
-          isim katmanı ekliyordu. */}
+      {/* Kendi grup gövdesi olmayan tekil katmanlar — her biri tek satır. Enerjisiz bölgeler
+          kapatılabilir olmalı: kalabalık bir kesinti gününde harita aksi halde okunmaz olur. */}
+      <section className={styles.group}>
+        <div className={styles.groupHeader}>
+          <label className={clsx(styles.checkLabel, styles.simpleRow)}>
+            <span className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={showDeEnergized}
+                onChange={() => onShowDeEnergizedChange(!showDeEnergized)}
+              />
+              <span className={styles.checkboxBox}>
+                <FiCheck />
+              </span>
+            </span>
+            <span className={clsx(styles.swatch, styles.swatchDeEnergized)} aria-hidden />
+            {t('map.layer.deEnergized')}
+          </label>
+        </div>
+      </section>
+
       <section className={styles.group}>
         <div className={styles.groupHeader}>
           <label className={clsx(styles.checkLabel, styles.simpleRow)}>

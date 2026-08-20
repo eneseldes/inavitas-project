@@ -1,6 +1,5 @@
 import {
   Map as MapLibreMap,
-  Marker,
   type GeoJSONSource,
   type MapLayerMouseEvent,
   type StyleSpecification,
@@ -23,6 +22,7 @@ import {
   buildNetworkSource,
   CLICKABLE_LAYER_IDS,
   componentFilters,
+  emphasisVisibility,
   legendVisibility,
   NETWORK_SOURCE_ID,
   SELECTABLE_SOURCE_LAYERS,
@@ -45,6 +45,14 @@ import {
   WORK_ORDER_SOURCE_ID,
 } from './operationLayers.ts';
 import { PolygonDrawController } from './polygonDraw.ts';
+import {
+  buildUnitLabelLayers,
+  registerUnitLabelImages,
+  toUnitLabelCollection,
+  UNIT_LABEL_LAYER_IDS,
+  UNIT_LABEL_SOURCE_ID,
+  type UnitLabelSet,
+} from './unitLabels.ts';
 import styles from './MapView.module.scss';
 
 /** Zoom düğmelerinin çağırdığı asgari yüzey — kontrol MapPage'te ayrı bir bileşen olarak çizilir. */
@@ -73,6 +81,18 @@ interface MapViewProps {
    * buraya oturur; iz kapanınca kullanıcının seçimden önceki konumuna geri döner.
    */
   traceBbox: Bbox | null | undefined;
+  /**
+   * Görünüm penceresindeki enerjisiz eleman kimlikleri. İzle aynı mekanizma: ayrı katman
+   * üretilmez, bu kimliklerin `feature-state`'i boyanır. Enerji durumu tile'a **gömülmez** —
+   * gömülseydi her manevrada tüm tile önbelleği boşalırdı.
+   */
+  deEnergizedIds: string[] | undefined;
+  /** Kesintinin kökü olan kesiciler — "açık kontak" olarak çizilir (içi boş + kırmızı kontur). */
+  openSwitchIds: string[] | undefined;
+  /** Efsanedeki "Enerjisiz Bölgeler" satırı kapalıysa durum hiç yazılmaz. */
+  showDeEnergized: boolean;
+  /** Kamera durduğunda görünüm penceresi yukarı bildirilir — enerjisizlik sorgusu bbox kapsamlı. */
+  onViewportChange?: (bbox: Bbox, zoom: number) => void;
   /** İşletim katmanları — `/outages/map` ve `/work-orders/map` özetleri. */
   outages: OutageMapItem[] | undefined;
   workOrders: WorkOrderMapItem[] | undefined;
@@ -140,6 +160,10 @@ export function MapView({
   tracedIds,
   traceDirection,
   traceBbox,
+  deEnergizedIds,
+  openSwitchIds,
+  showDeEnergized,
+  onViewportChange,
   isAreaDrawing,
   areaPolygon,
   onAreaDrawn,
@@ -159,11 +183,15 @@ export function MapView({
   const [layersVersion, setLayersVersion] = useState(0);
 
   const { data: unitLabels } = useUnitLabels();
-  const labelMarkersRef = useRef<Marker[]>([]);
+  const unitLabelsRef = useRef(unitLabels);
+  unitLabelsRef.current = unitLabels;
   // Önceki seçimin `feature-state`'ini temizleyebilmek için tutulur.
   const selectedFeatureRef = useRef<string | undefined>(undefined);
   // Aynısının iz karşılığı — iz kapanınca boyanmış her kimlik tek tek geri alınır.
   const tracedFeatureIdsRef = useRef<string[]>([]);
+  // Enerjisizlik karşılığı; kesinti bitince ya da pencere değişince tek tek temizlenir.
+  const energizedFeatureIdsRef = useRef<string[]>([]);
+  const openSwitchFeatureIdsRef = useRef<string[]>([]);
   // İz açılmadan önceki kamera; iz kapanınca buraya dönülür.
   const savedCameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const drawRef = useRef<PolygonDrawController | null>(null);
@@ -187,6 +215,8 @@ export function MapView({
   onAreaDrawingChangeRef.current = onAreaDrawingChange;
   const onMapReadyRef = useRef(onMapReady);
   onMapReadyRef.current = onMapReady;
+  const onViewportChangeRef = useRef(onViewportChange);
+  onViewportChangeRef.current = onViewportChange;
   // Kesinti/iş emri verisi katmanlar kurulmadan da gelebilir; son hâli burada tutulur ki
   // tema değişiminde katmanlar yeniden kurulurken veri kaybolmasın.
   const outagesRef = useRef(outages);
@@ -245,6 +275,15 @@ export function MapView({
         if (!window.location.pathname.startsWith('/map')) return;
         const center = map!.getCenter();
         onViewChangeRef.current({ lng: center.lng, lat: center.lat, zoom: map!.getZoom() });
+
+        // Enerjisizlik sorgusu görünüm penceresi kapsamlıdır (`setFeatureState` yalnız yüklü
+        // tile'lara yazılabilir), o yüzden pencere her durduğunda yukarı bildirilir. Yukarıdaki
+        // "haritadan çıkamama" koruması bu bildirimi de kapsar — bilerek aynı bloktadır.
+        const b = map!.getBounds();
+        onViewportChangeRef.current?.(
+          [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()],
+          map!.getZoom(),
+        );
       });
 
       // Küme rozetleri her sayı için ayrı bir görseldir; sayı sınırsız olduğundan hepsi
@@ -283,7 +322,7 @@ export function MapView({
       // İşletim katmanları ayrı bir tıklama kuralı izler: nokta bir şebeke elemanını
       // değil, bir kesinti/iş emri kaydını temsil eder.
       //
-      // ⚠️ İş emri ÖNCE, kesinti SONRA kaydedilir: bir kesinti açıldığında aynı konumda
+      // İş emri ÖNCE, kesinti SONRA kaydedilir: bir kesinti açıldığında aynı konumda
       // otomatik bir iş emri de oluşuyor, ikisi tam aynı noktada üst üste biniyor. MapLibre
       // her katmanın delege tıklama dinleyicisini BAĞIMSIZ çalıştırır — aynı tıklama ikisini
       // de tetikler ve SON çalışan seçimi ezer. Kesinti zaten üstte ÇİZİLİYOR (aşağıdaki
@@ -324,6 +363,13 @@ export function MapView({
 
       map.on('load', () => {
         loadedRef.current = true;
+        // İlk pencere `moveend` beklemeden bildirilir — kullanıcı haritayı hiç oynatmazsa
+        // enerjisizlik sorgusu hiç açılmazdı.
+        const initial = map!.getBounds();
+        onViewportChangeRef.current?.(
+          [initial.getWest(), initial.getSouth(), initial.getEast(), initial.getNorth()],
+          map!.getZoom(),
+        );
         drawRef.current = new PolygonDrawController(map!, {
           onComplete: (polygon) => onAreaDrawnRef.current(polygon),
           onDrawingChange: (drawing) => onAreaDrawingChangeRef.current(drawing),
@@ -333,6 +379,7 @@ export function MapView({
           workOrders: workOrdersRef.current,
           selectedOperationId: selectedOperationIdRef.current,
           draw: drawRef.current,
+          unitLabels: unitLabelsRef.current,
         }).then(() => setLayersVersion((version) => version + 1));
       });
     });
@@ -361,8 +408,11 @@ export function MapView({
       workOrders: workOrdersRef.current,
       selectedOperationId: selectedOperationIdRef.current,
       draw: drawRef.current,
+      unitLabels: unitLabelsRef.current,
     }).then(() => setLayersVersion((version) => version + 1));
-  }, [theme]);
+    // Ad verisi sorgudan sonra geldiği için bağımlılıkta: ilk kurulumda henüz yoksa
+    // katmanları da eklenmemiş olur, geldiğinde bir kez daha kurulur.
+  }, [theme, unitLabels]);
 
   // Kesinti/iş emri verisi değişince katman kurulmaz, yalnız kaynağın verisi güncellenir —
   // SSE her olayda katmanları yeniden kursaydı harita her olayda bir an boşalırdı.
@@ -497,6 +547,58 @@ export function MapView({
     tracedFeatureIdsRef.current = tracedIds;
   }, [tracedIds, traceDirection, layersVersion]);
 
+  // Enerjisizlik — izle birebir aynı desen. `layersVersion` bağımlılıkta: tema değişiminde
+  // katmanlar yeniden kurulur ve durumlar yeniden yazılmazsa enerjisizlik sessizce kaybolur.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || layersVersion === 0) return;
+
+    // Tek tek temizlenir; kaynağın tamamını sıfırlamak seçimi ve izi de silerdi.
+    for (const id of energizedFeatureIdsRef.current) {
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, 'energized');
+      }
+    }
+    for (const id of openSwitchFeatureIdsRef.current) {
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, 'switchOpen');
+      }
+    }
+    energizedFeatureIdsRef.current = [];
+    openSwitchFeatureIdsRef.current = [];
+
+    if (!showDeEnergized) return;
+
+    for (const id of deEnergizedIds ?? []) {
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, { energized: false });
+      }
+    }
+    for (const id of openSwitchIds ?? []) {
+      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
+        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, { switchOpen: true });
+      }
+    }
+
+    energizedFeatureIdsRef.current = deEnergizedIds ?? [];
+    openSwitchFeatureIdsRef.current = openSwitchIds ?? [];
+  }, [deEnergizedIds, openSwitchIds, showDeEnergized, layersVersion]);
+
+  // Kesikli enerjisizlik katmanları yalnız efsane satırı açıkken VE enerjisiz küme boş
+  // değilken açılır (bkz. `emphasisVisibility` — performans notu orada).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || layersVersion === 0) return;
+
+    const hasEmphasis = showDeEnergized && (deEnergizedIds?.length ?? 0) > 0;
+
+    for (const { layerId, visible } of emphasisVisibility(legend, hasEmphasis)) {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+      }
+    }
+  }, [deEnergizedIds, showDeEnergized, legend, layersVersion]);
+
   // Harita odağı: iz açılınca kamera izin kapsayan dikdörtgenine oturur, iz kapanınca
   // kullanıcının seçimden ÖNCEKİ konumuna geri döner. Ayrı bir "temizle" butonuna
   // bağlanmaz — unutulursa harita yanlış konumda takılı kalmış gibi hissedilir.
@@ -526,48 +628,18 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traceBbox?.join(','), layersVersion, selectedId]);
 
-  // İl/ilçe adları — kendi glyph fontumuzu barındırmadığımız için MapLibre `symbol`
-  // katmanı yerine HTML işaretçisi kullanılır (dış font sunucusuna bağımlılık yok).
-  // İl adı z<8'de, ilçe adları z8–13'te; üstünde hepsi kaybolur.
+  // İl/ilçe adları — kaynak ve görseller `rebuildLayers` içinde kurulur; burada yalnız
+  // idari sınır anahtarına göre görünürlük sürülür (dolgularla aynı anahtar).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || layersVersion === 0 || !unitLabels) return;
+    if (!map || layersVersion === 0) return;
 
-    for (const marker of labelMarkersRef.current) marker.remove();
-    labelMarkersRef.current = [];
-
-    if (!showAdminBoundaries) return;
-
-    const add = (items: typeof unitLabels.provinces, className: string) => {
-      for (const unit of items) {
-        const el = document.createElement('div');
-        el.className = className;
-        el.textContent = unit.name;
-        const marker = new Marker({ element: el }).setLngLat([unit.centerLon!, unit.centerLat!]).addTo(map);
-        labelMarkersRef.current.push(marker);
+    for (const layerId of UNIT_LABEL_LAYER_IDS) {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', showAdminBoundaries ? 'visible' : 'none');
       }
-    };
-    add(unitLabels.provinces, styles.provinceLabel!);
-    add(unitLabels.districts, styles.districtLabel!);
-
-    const applyZoom = () => {
-      const z = map.getZoom();
-      for (const marker of labelMarkersRef.current) {
-        const el = marker.getElement();
-        // `classList` ile bakılır: Marker kendi sınıflarını da eklediğinden `className`
-        // birebir karşılaştırması hiçbir zaman tutmaz.
-        const isProvince = el.classList.contains(styles.provinceLabel!);
-        el.style.display = (isProvince ? z < 8 : z >= 8 && z < 13) ? '' : 'none';
-      }
-    };
-    applyZoom();
-    map.on('zoom', applyZoom);
-    return () => {
-      map.off('zoom', applyZoom);
-      for (const marker of labelMarkersRef.current) marker.remove();
-      labelMarkersRef.current = [];
-    };
-  }, [unitLabels, showAdminBoundaries, layersVersion]);
+    }
+  }, [showAdminBoundaries, layersVersion]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -583,11 +655,18 @@ interface RebuildInput {
   workOrders: WorkOrderMapItem[] | undefined;
   selectedOperationId: string | undefined;
   draw: PolygonDrawController | null;
+  unitLabels: UnitLabelSet | undefined;
 }
 
 /** Mevcut basemap + şebeke + işletim katmanlarını kaldırıp güncel tema token'larıyla yeniden kurar. */
 async function rebuildLayers(map: MapLibreMap, theme: 'light' | 'dark', input: RebuildInput): Promise<void> {
-  const ownedSources = [NETWORK_SOURCE_ID, OUTAGE_SOURCE_ID, WORK_ORDER_SOURCE_ID, OUTAGE_HEAT_SOURCE_ID];
+  const ownedSources = [
+    NETWORK_SOURCE_ID,
+    UNIT_LABEL_SOURCE_ID,
+    OUTAGE_SOURCE_ID,
+    WORK_ORDER_SOURCE_ID,
+    OUTAGE_HEAT_SOURCE_ID,
+  ];
   const style = map.getStyle();
   if (style) {
     for (const layer of style.layers) {
@@ -599,12 +678,23 @@ async function rebuildLayers(map: MapLibreMap, theme: 'light' | 'dark', input: R
   }
   removeBasemap(map);
 
-  // Katman sırası: altlık harita → il/ilçe renkleri → hatlar → bina izi → düğümler →
-  // çizim poligonu → ısı haritası → kesinti/iş emri işaretçileri (en üstte).
+  // Katman sırası: altlık harita → il/ilçe renkleri → il/ilçe adları → hatlar → bina izi →
+  // düğümler → çizim poligonu → ısı haritası → kesinti/iş emri işaretçileri (en üstte).
   map.addSource(NETWORK_SOURCE_ID, buildNetworkSource());
   const layers = buildNetworkLayers(theme);
   for (const layer of layers) map.addLayer(layer);
   const firstLayerId = layers[0]!.id;
+
+  // Adlar il/ilçe dolgularının hemen üstüne, hatların altına girer: eskiden HTML işaretçisi
+  // oldukları için her şeyin üstünde duruyor ve elemanların üstünü kapatıyorlardı.
+  if (input.unitLabels) {
+    const beforeLineLayerId = layers.find(
+      (layer) => layer.id !== UNITS_PROVINCE_FILL_LAYER_ID && layer.id !== UNITS_DISTRICT_FILL_LAYER_ID,
+    )?.id;
+    registerUnitLabelImages(map, input.unitLabels);
+    map.addSource(UNIT_LABEL_SOURCE_ID, { type: 'geojson', data: toUnitLabelCollection(input.unitLabels) });
+    for (const layer of buildUnitLabelLayers()) map.addLayer(layer, beforeLineLayerId);
+  }
 
   // Çizim katmanları işaretçilerin altında kalır: yarı saydam dolgu, üstüne binerse
   // rozetleri soluklaştırırdı.

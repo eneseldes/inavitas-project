@@ -6,6 +6,7 @@ import { loadGraph } from './graph/loader.ts';
 import { connectKafka, disconnectKafka, startNetworkConsumer } from './kafka.ts';
 import { createNetworkEventHandler } from './kafka/consumers.ts';
 import { startOutboxPoller, type OutboxPollerHandle } from './kafka/outbox-poller.ts';
+import { initBaseline, refresh } from './modules/energization/service.ts';
 import { disconnectRedis } from './redis.ts';
 
 const logger = await createLogger({
@@ -21,12 +22,20 @@ const server = app.listen(config.NETWORK_SERVICE_PORT, () => {
 
 await connectKafka();
 
+// Boot sırası bağlayıcıdır:
+// loadGraph → computeBaseline → outage_states_ro oku → recompute → consumer'ları başlat
 // Graf, tüketiciden ÖNCE yüklenir: `outage.created` işleyicisi ilk mesajda grafı hazır
-// bulmalı, aksi halde etki hesabı "graf henüz yüklenmedi" hatasıyla DLQ'ya düşer.
+// bulmalı, aksi halde etki hesabı "graf henüz yüklenmedi" hatasıyla DLQ'ya düşer. Aynı şey
+// enerjilenme için de geçerli — ilk `outage.cancelled` mesajı taban çizgisini hazır bulmalı.
 await loadGraph(logger);
 
+initBaseline(logger);
+
+// Enerjilenme kalıcı yazılmadığı için restart'ta durum read-model replay'inden kurulur.
+await refresh(logger);
+
 await startNetworkConsumer(createNetworkEventHandler(logger), logger);
-logger.info('Kafka consumer ayakta (outage.created)');
+logger.info('Kafka consumer ayakta (outage.created, outage.energized, outage.cancelled)');
 
 const outboxPoller: OutboxPollerHandle = startOutboxPoller(logger);
 

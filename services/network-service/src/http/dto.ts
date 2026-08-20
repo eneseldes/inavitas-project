@@ -1,3 +1,4 @@
+import * as energizationService from '../modules/energization/service.ts';
 import type { DownstreamImpact, ImpactPreview } from '../modules/impact/service.ts';
 import type { Bbox, ComponentAreaRow, ComponentRow } from '../repository/components.repository.ts';
 import type { CustomerPiiRow, CustomerRow } from '../repository/customers.repository.ts';
@@ -19,7 +20,14 @@ export function toUnitDto(row: UnitRow) {
   };
 }
 
-/** Şebeke elemanı veritabanı kaydını API DTO nesnesine dönüştürür. */
+/**
+ * Şebeke elemanı veritabanı kaydını API DTO nesnesine dönüştürür.
+ *
+ * `isEnergized` **kolondan okunmaz**. `components.is_energized` seed'in başlangıç
+ * koşuludur ve runtime'da güncellenmez; gerçek durum enerjilenme motorundadır. Dönüşüm bu tek
+ * noktada yapılır — her uca ayrı ayrı bırakılsaydı biri unutulur ve API "enerjili" derken
+ * harita "enerjisiz" çizerdi. Bellek-içi bir aramadır, I/O değildir.
+ */
 export function toComponentDto(row: ComponentRow) {
   return {
     id: row.id,
@@ -43,7 +51,8 @@ export function toComponentDto(row: ComponentRow) {
     normallyOpen: row.normallyOpen,
     isClosed: row.isClosed,
     status: row.status,
-    isEnergized: row.isEnergized,
+    isEnergized: energizationService.isEnergized(row.id),
+    deEnergizedBy: energizationService.deEnergizedBy(row.id),
     name: row.name,
     attributes: row.attributes,
   };
@@ -101,6 +110,10 @@ export function toImpactPreviewDto(preview: ImpactPreview) {
     affectedCustomerCount: preview.affectedCustomerCount,
     overflowed: preview.overflowed,
     radialityViolated: preview.radialityViolated,
+    isEnergized: preview.isEnergized,
+    deEnergizedBy: preview.deEnergizedBy,
+    childOutages: preview.childOutages,
+    childOutageCount: preview.childOutageCount,
   };
 }
 

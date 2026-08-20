@@ -8,9 +8,17 @@
 import type { Logger } from '@inavitas/shared';
 import { sql } from 'drizzle-orm';
 import { db } from '../db.ts';
-import { buildCsr, computeSpanningParents, type CsrGraph, type GraphEdgeInput, type GraphNodeInput } from './csr.ts';
+import {
+  buildCsr,
+  computeSpanningParents,
+  CUSTOMER_TOPOLOGY_LEVEL,
+  type CsrGraph,
+  type GraphEdgeInput,
+  type GraphNodeInput,
+} from './csr.ts';
 
 let graph: CsrGraph | undefined;
+let feederBreakersByTm: Map<string, string[]> = new Map();
 
 /** Yüklenmiş grafı döner; henüz yüklenmediyse hata fırlatır. */
 export function getGraph(): CsrGraph {
@@ -23,11 +31,25 @@ export function isGraphLoaded(): boolean {
   return graph !== undefined;
 }
 
+/**
+ * TM kimliği → o TM'ye ait `TM_FEEDER` rolündeki kesicilerin kimlikleri.
+ *
+ * TM'nin kendisi `switchable=false`'tur; "TM'ye kesinti açmak" fiziksel olarak altındaki her
+ * fider kesicisinin açılması demektir. Harita artık tek tek fider seçtirmediği için bu
+ * genişletmeyi sunucu yapar. Tüm şebekede ~288 fider kesicisi vardır — harita önemsiz boyuttadır.
+ */
+export function getFeederBreakersOfTm(tmId: string): string[] {
+  return feederBreakersByTm.get(tmId) ?? [];
+}
+
 interface ComponentNodeRow {
   id: string;
   type: string;
   switchable: boolean;
   is_energized: boolean;
+  topology_level: number;
+  breaker_role: string | null;
+  tm_id: string | null;
 }
 
 interface CustomerNodeRow {
@@ -51,7 +73,9 @@ export async function loadGraph(logger: Logger): Promise<void> {
   const startedAt = Date.now();
 
   const [componentRows, customerRows, edgeRows] = await Promise.all([
-    db.execute(sql`SELECT id, type, switchable, is_energized FROM network.components`),
+    db.execute(
+      sql`SELECT id, type, switchable, is_energized, topology_level, breaker_role, tm_id FROM network.components`,
+    ),
     db.execute(sql`SELECT id FROM customer.customers`),
     db.execute(
       sql`SELECT from_id, to_id, is_closed, normally_open, participates_in_outage_graph FROM network.topology_edges`,
@@ -60,10 +84,18 @@ export async function loadGraph(logger: Logger): Promise<void> {
 
   const nodes: GraphNodeInput[] = [];
   const sourceIds: string[] = [];
+  const feederMap = new Map<string, string[]>();
 
   for (const row of componentRows.rows as unknown as ComponentNodeRow[]) {
     const isSource = row.type === 'TM';
     if (isSource) sourceIds.push(row.id);
+
+    // K10: TM'ye açılan kesinti bu haritadan N fider köküne genişletilir.
+    if (row.breaker_role === 'TM_FEEDER' && row.tm_id) {
+      const existing = feederMap.get(row.tm_id);
+      if (existing) existing.push(row.id);
+      else feederMap.set(row.tm_id, [row.id]);
+    }
 
     nodes.push({
       id: row.id,
@@ -71,11 +103,19 @@ export async function loadGraph(logger: Logger): Promise<void> {
       isCustomer: false,
       switchable: row.switchable,
       energized: row.is_energized,
+      topologyLevel: row.topology_level,
     });
   }
 
   for (const row of customerRows.rows as unknown as CustomerNodeRow[]) {
-    nodes.push({ id: row.id, isSource: false, isCustomer: true, switchable: false, energized: true });
+    nodes.push({
+      id: row.id,
+      isSource: false,
+      isCustomer: true,
+      switchable: false,
+      energized: true,
+      topologyLevel: CUSTOMER_TOPOLOGY_LEVEL,
+    });
   }
 
   const edges: GraphEdgeInput[] = (edgeRows.rows as unknown as EdgeRow[]).map((row) => ({
@@ -97,6 +137,7 @@ export async function loadGraph(logger: Logger): Promise<void> {
   const reachedCount = computeSpanningParents(built, sourceIndices);
 
   graph = built;
+  feederBreakersByTm = feederMap;
 
   const durationMs = Date.now() - startedAt;
   const memMb = Math.round(process.memoryUsage().heapUsed / (1024 * 1024));
@@ -107,6 +148,7 @@ export async function loadGraph(logger: Logger): Promise<void> {
       nodeCount: built.nodeIds.length,
       edgeCount: edges.length,
       sourceCount: sourceIndices.length,
+      feederBreakerTmCount: feederMap.size,
       unreachedCount,
       durationMs,
       memMb,

@@ -58,7 +58,14 @@ export interface NetworkComponent {
   normallyOpen: boolean;
   isClosed: boolean;
   status: string | null;
+  /**
+   * Elemanın **şu anki** enerjilenme durumu. Sunucuda kolondan değil, aktif kesintilerden
+   * türetilen bellek-içi hesaptan gelir — `network.components.is_energized` yalnız seed'in
+   * başlangıç koşuludur ve runtime'da güncellenmez.
+   */
   isEnergized: boolean;
+  /** Elemanı karartan kesintinin kimliği; enerjiliyse `null`. */
+  deEnergizedBy: string | null;
   name: string | null;
   attributes: Record<string, unknown> | null;
 }
@@ -93,6 +100,16 @@ export interface UpstreamChain {
   bbox: Bbox | null;
 }
 
+/** Kaskad onay modalında listelenen alt kesinti özeti. */
+export interface ChildOutage {
+  outageId: string;
+  cbsId: string;
+  componentName: string | null;
+  componentType: string;
+  status: string;
+  affectedCustomerCount: number;
+}
+
 export interface ImpactPreview {
   componentId: string;
   topologyLevel: number;
@@ -101,4 +118,24 @@ export interface ImpactPreview {
   affectedCustomerCount: number;
   overflowed: boolean;
   radialityViolated: boolean;
+  isEnergized: boolean;
+  deEnergizedBy: string | null;
+  /** Beslediği hatta süren kesintiler — liste `CHILD_OUTAGE_PREVIEW_LIMIT` ile kırpılır. */
+  childOutages: ChildOutage[];
+  /** Kırpılmamış toplam alt kesinti sayısı. */
+  childOutageCount: number;
+}
+
+/** Görünüm penceresindeki enerjisiz eleman kimlikleri. */
+export interface EnergizationSnapshot {
+  /** Sunucudaki hesap sürümü — her yeniden hesapta artar. */
+  version: number;
+  deEnergizedIds: string[];
+  /**
+   * "Açık konuma geçmiş" kesiciler — haritada içi boş, kırmızı konturlu çizilir.
+   * İstemci bunları türetemez: bir TM kesintisi sunucuda N fider kesicisine genişler.
+   */
+  openSwitchIds: string[];
+  /** Sorgu sunucudaki satır sınırına dayandı; küme eksik olabilir. */
+  truncated: boolean;
 }

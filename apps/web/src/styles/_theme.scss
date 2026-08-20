@@ -54,7 +54,13 @@
 
   // Hatlar — gerilim sınıfına göre. `-case` beyaz kılıf, hattı altlıktan ayırır.
   --c-map-line-case: #ffffff;
-  --c-map-line-hv: #922b21;
+  // HV iç rengi siyaha çekildi: eski bordo (#922b21) enerjisizlik kırmızısıyla karışıyordu.
+  --c-map-line-hv: #14181c;
+  // HV halkası MV ile aynı token'ı PAYLAŞAMAZ: `--c-map-line-case` koyu temada
+  // neredeyse siyahtır (#0b0d10). İç rengi siyah yapıp halkayı da siyah bırakırsak
+  // 154/400 kV hattı koyu temada tamamen kaybolur. Halka koyu temada açık olmalı —
+  // "siyah çekirdek + açık kontur" iki temada da okunur.
+  --c-map-line-hv-case: #ffffff;
   --c-map-line-mv: #1a5fb4;
   --c-map-line-tie: #e67e22;
   --c-map-line-mv-branch: #3b8fd4;
@@ -80,8 +86,14 @@
   // İz vurgusu — yön renkten okunur: besleme zinciri yukarı doğru "kaynağa",
   // etkilenenler aşağı doğru "karanlığa" gider. Seçim renginden (macenta) ayrı tutulur,
   // yoksa seçili eleman izin bir parçası mı diye ayırt edilemez.
-  --c-map-trace-up: #f1c40f;
-  --c-map-trace-down: #ff4d3d;
+  // Downstream yeşil: kırmızı enerjisizlikle, cyan da MV hat tonlarıyla karışıyordu.
+  --c-map-trace-up: #e8ab00;
+  --c-map-trace-down: #00b34a;
+
+  // Enerjisizlik — kalıcı işletim durumu. İz renkleri (cyan/amber) geçici bir sorgudur ve
+  // bunu ezer; iz kapandığı an kırmızı geri görünür.
+  --c-map-deenergized: #e01b24;
+  --c-map-deenergized-dark: #7a0c12;
 
   // İşletim katmanları — kesinti ve iş emri noktaları durum rengiyle çizilir.
   // Renkler durum rozetleriyle (StatusBadge) aynı aileden seçilir ki tablo ile harita
@@ -185,7 +197,9 @@
   --c-map-bg: #15181c;
 
   --c-map-line-case: #0b0d10;
-  --c-map-line-hv: #e06055;
+  // Koyu temada da siyah çekirdek; ayırt ediciliği açık halka sağlıyor (bkz. açık tema notu).
+  --c-map-line-hv: #05070a;
+  --c-map-line-hv-case: #9aa7b4;
   --c-map-line-mv: #5b9bf0;
   --c-map-line-tie: #f0a35c;
   --c-map-line-mv-branch: #7bc0ef;
@@ -208,7 +222,10 @@
   --c-map-customer: #a5b4fc;
   --c-map-selected: #f0abfc;
   --c-map-trace-up: #ffd95c;
-  --c-map-trace-down: #ff7d6e;
+  --c-map-trace-down: #3ee07f;
+
+  --c-map-deenergized: #ff5147;
+  --c-map-deenergized-dark: #ffbdb8;
 
   --c-map-outage-started: #ff7060;
   --c-map-outage-energized: #5fd88f;

@@ -46,6 +46,21 @@ export const OutageLinkedPayload = z.object({
 });
 export type OutageLinkedPayload = z.infer<typeof OutageLinkedPayload>;
 
+/**
+ * Kesinti iptal edildiğinde yayınlanır.
+ *
+ * Kesinti nasıl iptal edilirse edilsin bu olay **her hâlükârda** yayınlanır:
+ * `network-service`'in şebekeyi yeniden enerjilendirmesi yalnız buna bağlıdır. Sonsuz döngü
+ * koruması olayı yayınlamamakla değil, tüketirken `shouldTriggerCounterpart` ile yapılır.
+ */
+export const OutageCancelledPayload = z.object({
+  outageId: z.uuid(),
+  cbsId: CbsId,
+  cancelledAt: z.iso.datetime(),
+  workOrderId: z.uuid().nullable(),
+});
+export type OutageCancelledPayload = z.infer<typeof OutageCancelledPayload>;
+
 /** Kesintiler arası kaskad ilişki türleri. */
 export const OutageRelationType = z.enum([
   'CONTAINS', // Üstteki kesinti alttakini kapsar — müşteri-dakika yalnız üstte sayılır
@@ -72,6 +87,9 @@ export type OutageEnergizedEvent = z.infer<typeof OutageEnergizedEvent>;
 
 export const OutageLinkedEvent = envelopeOf(TOPICS.OUTAGE_LINKED, OutageLinkedPayload);
 export type OutageLinkedEvent = z.infer<typeof OutageLinkedEvent>;
+
+export const OutageCancelledEvent = envelopeOf(TOPICS.OUTAGE_CANCELLED, OutageCancelledPayload);
+export type OutageCancelledEvent = z.infer<typeof OutageCancelledEvent>;
 
 export const OutageCascadedEvent = envelopeOf(TOPICS.OUTAGE_CASCADED, OutageCascadedPayload);
 export type OutageCascadedEvent = z.infer<typeof OutageCascadedEvent>;

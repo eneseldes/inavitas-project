@@ -206,6 +206,54 @@ export async function findBoundingBox(ids: string[]): Promise<Bbox | null> {
 }
 
 /**
+ * Enerjisizlik sorgusunun sunucu tarafı üst sınırı. `setFeatureState` yalnız **yüklü**
+ * tile'lara yazılabildiği için sorgu zaten viewport kapsamlıdır; bu sınır hatalı bir
+ * "tüm Ankara" bbox'ının yanıtı şişirmesini engeller.
+ */
+export const ENERGIZATION_ROW_LIMIT = 20_000;
+
+export interface ViewportFilter {
+  /** `TYPE_MIN_ZOOM`'dan gelen görünür eleman tipleri. */
+  types: string[];
+  /** Kofra kesicisi (`SERVICE_ENTRY`) bu zoom'da görünüyor mu. */
+  includeServiceEntry: boolean;
+  /** Bina izi açık mı — TM/DM/trafo kesicileri de bu zoom'da çizilir ve durum taşıyabilir. */
+  includeBuildings: boolean;
+}
+
+/**
+ * Görünüm penceresindeki (bbox + zoom) eleman kimliklerini döner.
+ *
+ * Zoom eleme kuralı tile üretimiyle **aynı kaynaktan** (`resolveZoomLod`) gelir: ekranda
+ * çizilmeyen bir elemanın durumunu taşımanın faydası yok, maliyeti var. Kesici tiplerinin
+ * eşleşmesi de tile sorgusunun aynısıdır — kofra `type` ile değil `breaker_role` ile ayrılır.
+ */
+export async function findIdsInViewport(
+  bbox: Bbox,
+  filter: ViewportFilter,
+  limit: number = ENERGIZATION_ROW_LIMIT,
+): Promise<{ ids: string[]; truncated: boolean }> {
+  const typeMatches = filter.types.length > 0 ? inArray(components.type, filter.types) : sql`false`;
+  const breakerMatches = filter.includeBuildings
+    ? sql`${components.type} = 'CIRCUIT_BREAKER'`
+    : sql`(${filter.includeServiceEntry} AND ${components.breakerRole} = 'SERVICE_ENTRY')`;
+
+  const rows = await db
+    .select({ id: components.id })
+    .from(components)
+    .where(
+      and(
+        sql`(${typeMatches} OR ${breakerMatches})`,
+        sql`${components.geom} && ST_MakeEnvelope(${bbox.minLon}, ${bbox.minLat}, ${bbox.maxLon}, ${bbox.maxLat}, 4326)`,
+      ),
+    )
+    .limit(limit + 1);
+
+  const truncated = rows.length > limit;
+  return { ids: rows.slice(0, limit).map((row) => row.id), truncated };
+}
+
+/**
  * Elemanın idari yolundaki tüm ataları (il → ilçe → mahalle) tek GiST sorgusuyla getirir.
  * `network.units` içinde her seviye ayrı bir satır olduğundan `path @> unitPath` ile bulunur.
  */

@@ -320,11 +320,28 @@ export async function listAffectedCustomers(
 }
 
 /**
+ * Elemanın **kendi üzerinde** süren kesintiyi döner (kapı sorgusu).
+ *
+ * `idx_outages_active` kısmi indeksi (`cbs_id, started_at DESC WHERE status='STARTED'`) zaten
+ * kurulu — yeni indeks gerekmez.
+ */
+export async function findActiveByCbsId(cbsId: string): Promise<OutageRow | null> {
+  const [row] = await db
+    .select()
+    .from(outages)
+    .where(and(eq(outages.cbsId, cbsId), eq(outages.status, 'STARTED')))
+    .orderBy(desc(outages.startedAt))
+    .limit(1);
+
+  return row ?? null;
+}
+
+/**
  * Verilen elemanı etki kümesinde taşıyan **aktif** kesintileri döner — kapsayan kesinti
  * adayları. Etki kümesi en dar olan (en az eleman etkileyen) en yakın üsttür, o yüzden
  * artan sırada dönülür.
  */
-export async function findContainingOutages(cbsId: string, excludeOutageId: string): Promise<OutageRow[]> {
+export async function findContainingOutages(cbsId: string, excludeOutageId?: string | null): Promise<OutageRow[]> {
   return db
     .select({ outage: outages })
     .from(outages)
@@ -332,7 +349,8 @@ export async function findContainingOutages(cbsId: string, excludeOutageId: stri
     .where(
       and(
         eq(outages.status, 'STARTED'),
-        sql`${outages.id} <> ${excludeOutageId}::uuid`,
+        // Oluşturma kapısında henüz bir kesinti yok — hariç tutulacak kimlik de yok.
+        ...(excludeOutageId ? [sql`${outages.id} <> ${excludeOutageId}::uuid`] : []),
         sql`${outageImpact.affectedElementIds} @> ${JSON.stringify([cbsId])}::jsonb`,
       ),
     )
@@ -398,6 +416,41 @@ export async function linkCascadeTx(
     .onConflictDoNothing({ target: [outageRelations.parentOutageId, outageRelations.childOutageId] });
 
   return true;
+}
+
+/**
+ * İptal edilen bir üst kesintinin **çocuklarını kopartır**: `parent_outage_id` boşaltılır ve
+ * `outage_relations` satırları silinir.
+ *
+ * Aksi halde alt kesintiler iptal edilmiş bir üste bağlı kalır ve müşteri-dakikaları
+ * **hiç sayılmaz** — kapsanan kesintide 0 sayılıyor (`computeCustomerMinutes`), üst ise iptal
+ * edildiği için hiç sayılmıyor.
+ *
+ * Kopan çocukların kimlikleri döner; çağıran her biri için `notifyOutageChanged` yayınlar.
+ */
+export async function detachChildrenTx(tx: Tx, parentOutageId: string): Promise<OutageRow[]> {
+  const detached = await tx
+    .update(outages)
+    .set({ parentOutageId: null, version: sql`${outages.version} + 1`, updatedAt: new Date() })
+    .where(eq(outages.parentOutageId, parentOutageId))
+    .returning();
+
+  if (detached.length > 0) {
+    await tx.delete(outageRelations).where(eq(outageRelations.parentOutageId, parentOutageId));
+  }
+
+  return detached;
+}
+
+/**
+ * İptal edilen kesintinin etkilenen abone satırlarını temizler.
+ *
+ * Kesinti iptal/arşivlenirse bu satırlar da temizlenir, yetim veri bırakılmaz.
+ * Etki revizyon kayıtları (`outage_impact`) **korunur** — denetim izidir, kesintinin ne kadar
+ * etki yarattığı iptal edilse bile tarihsel bir gerçektir.
+ */
+export async function clearAffectedCustomersTx(tx: Tx, outageId: string): Promise<void> {
+  await tx.delete(outageAffectedCustomers).where(eq(outageAffectedCustomers.outageId, outageId));
 }
 
 /** Bir üst kesintiye bağlı, hâlâ süren alt kesintileri döner (otomatik çözülme için). */

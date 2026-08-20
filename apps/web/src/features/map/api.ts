@@ -2,8 +2,10 @@ import type { Polygon } from 'geojson';
 import { apiFetch } from '../../shared/api/client.ts';
 import type { PageResult } from '../../types/api.ts';
 import type {
+  Bbox,
   ComponentCategory,
   DownstreamImpact,
+  EnergizationSnapshot,
   ImpactPreview,
   NetworkComponentAreaItem,
   NetworkComponentDetail,
@@ -85,6 +87,16 @@ export function fetchImpactPreview(id: string): Promise<ImpactPreview> {
   return apiFetch(`/api/network/components/${id}/impact-preview`);
 }
 
+/**
+ * Görünüm penceresindeki enerjisiz elemanlar.
+ *
+ * Sorgu **bbox kapsamlıdır**: `setFeatureState` yalnız yüklü tile'lara yazılabilir, ekranda
+ * olmayan bir elemanın durumunu taşımanın faydası yok, maliyeti var.
+ */
+export function fetchEnergization(bbox: Bbox, zoom: number): Promise<EnergizationSnapshot> {
+  return apiFetch(`/api/network/energization?bbox=${bbox.join(',')}&zoom=${zoom}`);
+}
+
 /** Alan sorgusunun gövdesi — poligon + `/components` ile aynı sözlükten gelen filtreler. */
 export interface AreaQueryBody {
   polygon: Polygon;
@@ -102,7 +114,7 @@ export interface AreaQueryResult extends PageResult<NetworkComponentAreaItem> {
 /**
  * Haritada çizilen alanın içindeki şebeke elemanları.
  *
- * ⚠️ **POST**, çünkü poligon gövdede taşınır: bir mahalleyi saran poligon kolayca birkaç
+ * **POST**, çünkü poligon gövdede taşınır: bir mahalleyi saran poligon kolayca birkaç
  * kilobayt tutar ve query string sınırına takılır.
  */
 export function queryWithin(body: AreaQueryBody): Promise<AreaQueryResult> {

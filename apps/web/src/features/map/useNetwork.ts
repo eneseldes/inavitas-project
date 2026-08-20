@@ -1,6 +1,8 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import type { Bbox } from '../../types/network.ts';
 import {
   fetchComponent,
+  fetchEnergization,
   fetchImpactPreview,
   fetchTrace,
   fetchUnitLabels,
@@ -14,6 +16,7 @@ export const NETWORK_UNIT_LABELS_KEY = 'network-unit-labels';
 export const NETWORK_TRACE_KEY = 'network-trace';
 export const NETWORK_IMPACT_PREVIEW_KEY = 'network-impact-preview';
 export const NETWORK_AREA_QUERY_KEY = 'network-area-query';
+export const NETWORK_ENERGIZATION_KEY = 'network-energization';
 
 /** İl ve ilçe adları — harita üzerine yazılan etiketleri besler, oturum boyunca değişmez. */
 export function useUnitLabels() {
@@ -50,13 +53,38 @@ export function useTrace(id: string | undefined, direction: TraceDirection | und
   });
 }
 
-/** Kesinti/iş emri onay adımının etki özeti — tamamen bellek-içi hesaplandığı için hızlıdır. */
+/**
+ * Kesinti/iş emri onay adımının etki özeti — tamamen bellek-içi hesaplandığı için hızlıdır.
+ *
+ * **`staleTime: Infinity` olamaz.** Yanıt artık `isEnergized`, `deEnergizedBy` ve
+ * `childOutages` taşıyor; üçü de anlık durumdur. Model salt-okunur ama **işletim durumu
+ * değil** — kesinti/enerjilenme SSE'si geldiğinde bu sorgu tazelenmelidir.
+ * (`useTrace` `Infinity` kalabilir: topoloji hâlâ değişmiyor.)
+ */
 export function useImpactPreview(id: string | undefined) {
   return useQuery({
     queryKey: [NETWORK_IMPACT_PREVIEW_KEY, id],
     queryFn: () => fetchImpactPreview(id!),
     enabled: id !== undefined,
-    staleTime: Infinity,
+  });
+}
+
+/**
+ * Görünüm penceresindeki enerjisiz eleman kimlikleri.
+ *
+ * `bbox` anahtara **yuvarlanmış** girer: her piksel hareketinde yeni bir sorgu açmak yerine
+ * ~100 m'lik bir ızgaraya oturur. `keepPreviousData` pan sırasında kırmızıların bir kare
+ * kaybolup geri gelmesini önler.
+ */
+export function useEnergization(bbox: Bbox | undefined, zoom: number, enabled = true) {
+  const rounded = bbox ? (bbox.map((v) => Math.round(v * 1000) / 1000) as Bbox) : undefined;
+  const roundedZoom = Math.floor(zoom);
+
+  return useQuery({
+    queryKey: [NETWORK_ENERGIZATION_KEY, rounded, roundedZoom],
+    queryFn: () => fetchEnergization(rounded!, roundedZoom),
+    enabled: enabled && rounded !== undefined,
+    placeholderData: keepPreviousData,
   });
 }
 

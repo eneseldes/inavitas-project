@@ -14,7 +14,9 @@ import { MapZoomControl } from './MapZoomControl.tsx';
 import { OperationDetailPanel } from './OperationDetailPanel.tsx';
 import { useAreaResults, useAreaSelectionState } from './useAreaSelection.ts';
 import { useMapState } from './useMapState.ts';
-import { useComponent, useTrace } from './useNetwork.ts';
+import { useComponent, useEnergization, useTrace } from './useNetwork.ts';
+import { useEnergizationStream } from './useEnergizationStream.ts';
+import type { Bbox } from '../../types/network.ts';
 import type { TraceDirection } from './api.ts';
 import { useOutageMapItems } from '../outages/useOutages.ts';
 import { useOutageStream } from '../outages/useOutageStream.ts';
@@ -39,6 +41,8 @@ export function MapPage() {
     voltageLevels,
     showAdminBoundaries,
     setShowAdminBoundaries,
+    showDeEnergized,
+    setShowDeEnergized,
     showOutages,
     setShowOutages,
     showWorkOrders,
@@ -66,17 +70,29 @@ export function MapPage() {
   const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom: number } | undefined>(undefined);
   const [isAreaDrawing, setIsAreaDrawing] = useState(false);
   const [selectedOperationId, setSelectedOperationId] = useState<string | undefined>(undefined);
-  /** Haritada tıklanan kesinti/iş emri işaretçisinin özet paneli — bkz. `selectOperation`. */
+  /** Haritada tıklanan kesinti/iş emri işaretçisinin özet paneli — bkz. `focusOperation`. */
   const [operationDetail, setOperationDetail] = useState<{ kind: 'outage' | 'workOrder'; id: string } | undefined>(
     undefined,
   );
 
   const { data: trace, isLoading: isTraceLoading } = useTrace(selectedId, traceDirection);
 
+  /**
+   * Enerjisizlik görünüm penceresi kapsamlıdır: `setFeatureState` yalnız yüklü tile'lara
+   * yazılabilir, ekranda olmayan elemanın durumunu taşımanın faydası yok. Pencere
+   * `MapView`'den `moveend`'de gelir.
+   */
+  const [viewport, setViewport] = useState<{ bbox: Bbox; zoom: number } | undefined>(undefined);
+  const { data: energization } = useEnergization(viewport?.bbox, viewport?.zoom ?? 0, showDeEnergized);
+  const handleViewportChange = useCallback((bbox: Bbox, zoom: number) => setViewport({ bbox, zoom }), []);
+
   // Canlılık: kesinti ve iş emri akışlarına abone olunur; gelen her olay ilgili sorguları
   // invalidate ettiği için harita katmanı sayfa yenilenmeden tazelenir.
   useOutageStream();
   useWorkOrderStream();
+  // Enerjilenme akışı: mesaj veri taşımaz, yalnız "değişti" der; istemci kendi görünüm
+  // penceresi için yeniden sorgular.
+  useEnergizationStream();
 
   // Alan seçiminin durumu sorgulardan ÖNCE kurulur: hangi kayıt sorgularının açılacağını
   // bu durum belirler, sonuçları da bir alt satırdaki `useAreaResults` süzer.
@@ -170,24 +186,25 @@ export function MapPage() {
   );
 
   /**
-   * Alan sonuçları listesinden bir kesinti/iş emri satırına tıklamak — özet paneli AÇAR
-   * (`selectOperation`) VE kamerayı üstüne getirir. Eskiden yalnız kamerayı getirip paneli
-   * açmıyordu; eleman satırları paneli açıyordu ama kamerayı getirmiyordu — ikisi tutarsızdı.
+   * Bir kesinti/iş emri kaydına geçiş — özet paneli AÇAR **ve** kamerayı üstüne getirir.
+   * Alan sonuç listesi, bağlı kayıt listeleri ve "karartan kesinti" satırı hep bunu kullanır;
+   * kayda gitmenin tek bir davranışı vardır.
+   *
+   * Koordinat harita katmanı verisinden okunur (alan sonucu zaten onun süzülmüş hâlidir).
+   * Kayıt katmanı kapalı ya da filtreyle elenmişse panel yine açılır, kamera yerinde kalır.
    */
-  const selectAreaOperation = useCallback(
+  const focusOperation = useCallback(
     (kind: 'outage' | 'workOrder', id: string) => {
       selectOperation(kind, id);
       const item =
-        kind === 'outage'
-          ? areaResults.outagesInArea.find((row) => row.id === id)
-          : areaResults.workOrdersInArea.find((row) => row.id === id);
+        kind === 'outage' ? outageItems?.find((row) => row.id === id) : workOrderItems?.find((row) => row.id === id);
       if (item) setFlyTo({ lng: item.lon, lat: item.lat, zoom: Math.max(view.zoom, RECORD_ZOOM) });
     },
-    [selectOperation, areaResults.outagesInArea, areaResults.workOrdersInArea, view.zoom],
+    [selectOperation, outageItems, workOrderItems, view.zoom],
   );
 
-  /** Alan sonuçları listesinden bir eleman satırına tıklamak — bkz. `selectAreaOperation`. */
-  const selectAreaComponent = useCallback(
+  /** Aynısının eleman karşılığı — alan sonuç listesindeki eleman satırları kullanır. */
+  const focusComponentRow = useCallback(
     (id: string) => {
       selectComponent(id);
       const item = areaResults.components?.items.find((row) => row.id === id);
@@ -242,13 +259,17 @@ export function MapPage() {
           tracedIds={tracedIds}
           traceDirection={traceDirection}
           traceBbox={trace?.bbox}
+          deEnergizedIds={energization?.deEnergizedIds}
+          openSwitchIds={energization?.openSwitchIds}
+          showDeEnergized={showDeEnergized}
+          onViewportChange={handleViewportChange}
           outages={outageItems}
           workOrders={workOrderItems}
           showOutages={showOutages}
           showWorkOrders={showWorkOrders}
           showOutageHeatmap={showOutageHeatmap}
           selectedOperationId={selectedOperationId}
-          onSelectOperation={selectOperation}
+          onSelectOperation={focusOperation}
           isAreaDrawing={isAreaDrawing}
           areaPolygon={area.polygon}
           onAreaDrawn={handleAreaDrawn}
@@ -275,9 +296,9 @@ export function MapPage() {
             includeOutages={showOutages}
             includeWorkOrders={showWorkOrders}
             selectedComponentId={selectedId}
-            onSelectComponent={selectAreaComponent}
+            onSelectComponent={focusComponentRow}
             selectedOperationId={selectedOperationId}
-            onSelectOperation={selectAreaOperation}
+            onSelectOperation={focusOperation}
           />
         )}
 
@@ -290,7 +311,7 @@ export function MapPage() {
           isTraceLoading={isTraceLoading}
           onCreateOutage={() => setAction('outage')}
           onCreateWorkOrder={() => setAction('workOrder')}
-          onSelectOperation={selectOperation}
+          onSelectOperation={focusOperation}
         />
 
         {operationDetail && (
@@ -302,7 +323,7 @@ export function MapPage() {
               setSelectedOperationId(undefined);
             }}
             onOpenRecord={openRecord}
-            onSelectOperation={selectOperation}
+            onSelectOperation={focusOperation}
             onSelectComponent={selectComponent}
           />
         )}
@@ -318,6 +339,8 @@ export function MapPage() {
             onToggleLegendGroup={toggleLegendGroup}
             showAdminBoundaries={showAdminBoundaries}
             onShowAdminBoundariesChange={setShowAdminBoundaries}
+            showDeEnergized={showDeEnergized}
+            onShowDeEnergizedChange={setShowDeEnergized}
             showOutages={showOutages}
             onShowOutagesChange={setShowOutages}
             showWorkOrders={showWorkOrders}

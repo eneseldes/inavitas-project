@@ -35,6 +35,10 @@ const SEED_NAMESPACES = [
   { name: 'user-management', description: 'Kullanıcı ve rol yönetimi ekranları' },
   { name: 'network', description: 'Şebeke elemanı enum etiketleri' },
   { name: 'map', description: 'Harita ekranı' },
+  // Sunucudan dönen hata kodlarının kullanıcıya gösterilen karşılıkları. Anahtar adı
+  // `ERROR_CODES` ile birebir aynıdır (bkz. packages/shared/src/errors.ts) — istemci
+  // `ApiError.code`'a bakıp doğrudan bu anahtarı seçer.
+  { name: 'error', description: 'Sunucu hata kodlarının kullanıcı mesajları' },
 ] as const;
 
 /** [namespace, keyName, tr, en] */
@@ -417,6 +421,32 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['network', 'enum.status.CLOSED', 'Kapalı', 'Closed'],
   ['network', 'enum.status.OPEN', 'Açık', 'Open'],
 
+  // Anlık enerjilenme durumu — `network.components.status` kolonundan FARKLIDIR: bu, aktif
+  // kesintilerden türetilen runtime değeridir.
+  ['network', 'enum.energization.ENERGIZED', 'Enerjili', 'Energized'],
+  ['network', 'enum.energization.DE_ENERGIZED', 'Enerjisiz', 'De-energized'],
+
+  // --- Sunucu hata kodları (409 kapıları) ---
+  // Anahtar adı `ERROR_CODES` ile birebir aynıdır; istemci `ApiError.code`'a bakıp seçer.
+  [
+    'error',
+    'COMPONENT_DE_ENERGIZED',
+    'Bu şebeke elemanının elektriği hâlihazırda kesik. Önce mevcut kesintiyi sonlandırın.',
+    'This network element is already de-energized. End the existing outage first.',
+  ],
+  [
+    'error',
+    'OUTAGE_ALREADY_ACTIVE',
+    'Bu şebeke elemanında süren bir kesinti zaten var.',
+    'This network element already has an ongoing outage.',
+  ],
+  [
+    'error',
+    'WORK_ORDER_ALREADY_ACTIVE',
+    'Bu şebeke elemanına ait süren bir iş emri zaten var.',
+    'This network element already has an ongoing work order.',
+  ],
+
   // --- Harita ekranı ---
   ['map', 'page.title', 'Harita', 'Map'],
   ['map', 'panel.detail.title', 'Seçili Eleman', 'Selected Element'],
@@ -511,6 +541,59 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'action.zoomIn', 'Yakınlaştır', 'Zoom in'],
   ['map', 'action.zoomOut', 'Uzaklaştır', 'Zoom out'],
   ['map', 'action.openRecord', 'Kaydı aç', 'Open record'],
+
+  // --- Kesinti iptali (haritadan) ---
+  ['map', 'action.cancelOutage', 'Kesintiyi İptal Et', 'Cancel Outage'],
+  ['map', 'action.cancelOutageConfirmTitle', 'Kesintiyi iptal et', 'Cancel the outage'],
+  [
+    'map',
+    'action.cancelOutageConfirmBody',
+    'Kesinti iptal edilecek ve hesaplanan etkisi geri alınacak. Bu işlem geri alınamaz.',
+    'The outage will be cancelled and its calculated impact reverted. This cannot be undone.',
+  ],
+  [
+    'map',
+    'action.cancelOutageWorkOrderNote',
+    'Bu kesintiye bağlı iş emri de iptal edilecek.',
+    'The work order linked to this outage will also be cancelled.',
+  ],
+
+  // --- Kapı (engel) sebepleri: sunucudaki 409'ların arayüzdeki erken karşılığı ---
+  [
+    'map',
+    'block.deEnergized',
+    'Bu elemanın elektriği üstteki bir kesinti yüzünden hâlihazırda kesik.',
+    'This element is already de-energized by an upstream outage.',
+  ],
+  [
+    'map',
+    'block.outageActive',
+    'Bu şebeke elemanında süren bir kesinti zaten var.',
+    'This network element already has an ongoing outage.',
+  ],
+  [
+    'map',
+    'block.workOrderActive',
+    'Bu şebeke elemanında süren bir iş emri zaten var.',
+    'This network element already has an ongoing work order.',
+  ],
+
+  // --- Kaskad onayı: bir bilgilendirmedir, izin sorusu değil ---
+  ['map', 'cascade.title', 'Alt Kesintiler Bulundu', 'Downstream Outages Found'],
+  [
+    'map',
+    'cascade.body',
+    'Bu elemanın beslediği hatta hâlihazırda {count} kesinti sürüyor. Yeni kesinti açılırsa bu kesintiler kapsanan kesinti olarak buna bağlanacak ve müşteri-dakikaları yalnız üst kesintide sayılacak.',
+    '{count} outages are already ongoing downstream of this element. If you open a new outage, they will be linked to it as contained outages and customer-minutes will be counted only on the parent.',
+  ],
+  ['map', 'cascade.confirm', 'Onayla ve Devam', 'Confirm and Continue'],
+  ['map', 'cascade.customerCount', '{count} abone', '{count} customers'],
+  ['map', 'cascade.more', 've {count} kesinti daha', 'and {count} more outages'],
+
+  // --- Enerjisizlik katmanı ---
+  ['map', 'layer.deEnergized', 'Enerjisiz Bölgeler', 'De-energized Areas'],
+  ['map', 'legend.deEnergized', 'Enerjisiz', 'De-energized'],
+  ['map', 'panel.detail.field.deEnergizedBy', 'Karartan kesinti', 'De-energized by'],
 
   [
     'map',

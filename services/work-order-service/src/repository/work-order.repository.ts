@@ -119,6 +119,24 @@ export async function findById(id: string): Promise<WorkOrderRow | null> {
   return row ?? null;
 }
 
+/**
+ * Bitmemiş durumlar — bu durumlardaki bir iş emri varken aynı elemana ikincisi açılamaz.
+ * `DONE` ve `CANCELLED` kapanmış sayılır.
+ */
+const ACTIVE_WORK_ORDER_STATUSES = ['STARTED', 'ASSIGNED', 'IN_PROGRESS', 'ENERGIZED'] as const;
+
+/** Elemanın üzerinde süren iş emrini döner (kapı sorgusu). */
+export async function findActiveByCbsId(cbsId: string): Promise<WorkOrderRow | null> {
+  const [row] = await db
+    .select()
+    .from(workOrders)
+    .where(and(eq(workOrders.cbsId, cbsId), inArray(workOrders.status, [...ACTIVE_WORK_ORDER_STATUSES])))
+    .orderBy(desc(workOrders.createdAt))
+    .limit(1);
+
+  return row ?? null;
+}
+
 /** İş emirlerini filtreler, sıralar ve sayfalanmış olarak listeler. */
 export async function list(
   filters: WorkOrderFilters,

@@ -4,10 +4,12 @@ set -euo pipefail
 # Kafka topic'lerini ve DLQ topic'lerini oluşturur.
 # `--if-not-exists` parametresi ile güvenle tekrar çalıştırılabilir.
 
+# `packages/contracts/src/topics.ts` ile senkron tutulmalı — producer'da
+# `allowAutoTopicCreation: false`, yani burada olmayan bir topic'e yayın hata verir.
 TOPICS=(
-  outage.created outage.energized outage.linked
+  outage.created outage.energized outage.linked outage.cancelled
   outage.impact.calculated outage.cascaded
-  work-order.created work-order.done work-order.linked
+  work-order.created work-order.done work-order.linked work-order.cancelled
   translation.published
 )
 DLQ_SUFFIX=".DLQ"

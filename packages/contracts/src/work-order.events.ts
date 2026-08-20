@@ -43,6 +43,18 @@ export const WorkOrderDonePayload = z.object({
 export type WorkOrderDonePayload = z.infer<typeof WorkOrderDonePayload>;
 
 /**
+ * İş emri iptal edildiğinde yayınlanır. `outage.cancelled` ile simetriktir; bağlı kesinti
+ * bu olayla iptal edilir. Döngü koruması tüketimde `shouldTriggerCounterpart` ile yapılır.
+ */
+export const WorkOrderCancelledPayload = z.object({
+  workOrderId: z.uuid(),
+  cbsId: CbsId,
+  cancelledAt: z.iso.datetime(),
+  outageId: z.uuid().nullable(),
+});
+export type WorkOrderCancelledPayload = z.infer<typeof WorkOrderCancelledPayload>;
+
+/**
  * İş emrine var olan bir kesinti bağlandığında yayınlanan event payload'ı.
  * Tüketici servisler bu event ile yeni kayıt açmaz, yalnızca mevcut iş emrini günceller.
  */
@@ -63,3 +75,9 @@ export type WorkOrderDoneEvent = z.infer<typeof WorkOrderDoneEvent>;
 
 export const WorkOrderLinkedEvent = envelopeOf(TOPICS.WORK_ORDER_LINKED, WorkOrderLinkedPayload);
 export type WorkOrderLinkedEvent = z.infer<typeof WorkOrderLinkedEvent>;
+
+export const WorkOrderCancelledEvent = envelopeOf(
+  TOPICS.WORK_ORDER_CANCELLED,
+  WorkOrderCancelledPayload,
+);
+export type WorkOrderCancelledEvent = z.infer<typeof WorkOrderCancelledEvent>;

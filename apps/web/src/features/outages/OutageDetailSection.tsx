@@ -2,10 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowRight, FiLink, FiLock, FiMap } from 'react-icons/fi';
+import { FiArrowRight, FiLock, FiMap } from 'react-icons/fi';
 import { z } from 'zod';
 import { ApiError } from '../../shared/api/errors.ts';
 import { DetailSectionLayout, type TabConfig } from '../../shared/components/DetailSectionLayout.tsx';
+import { RecordLink } from '../../shared/components/RecordLink.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
 import { Field, SelectInput, TextField } from '../../shared/components/form';
@@ -240,15 +241,11 @@ function OutageDetailTab({
           <span className={styles.infoLabel}>{t('outage.column.workOrderId')}</span>
           <div>
             {outage.workOrderId ? (
-              <button
-                type="button"
+              <RecordLink
+                id={outage.workOrderId}
                 onClick={() => onOpenWorkOrder(outage.workOrderId!)}
-                className="link"
                 title={t('outage.action.openWorkOrder')}
-              >
-                <FiLink />
-                <span className="font-mono">{outage.workOrderId.slice(0, 8)}</span>
-              </button>
+              />
             ) : (
               <span className="text-muted">—</span>
             )}

@@ -42,7 +42,7 @@ export async function startWorkOrderConsumer(handler: EventHandler, logger: Logg
   consumerHandle = await startConsumer(
     kafka,
     CONSUMER_GROUPS.WORK_ORDER_SERVICE,
-    [TOPICS.OUTAGE_CREATED, TOPICS.OUTAGE_LINKED, TOPICS.OUTAGE_ENERGIZED],
+    [TOPICS.OUTAGE_CREATED, TOPICS.OUTAGE_LINKED, TOPICS.OUTAGE_ENERGIZED, TOPICS.OUTAGE_CANCELLED],
     handler,
     getProducer(),
     logger,

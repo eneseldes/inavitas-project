@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { FiAlertTriangle } from 'react-icons/fi';
 import { clsx } from 'clsx';
@@ -6,7 +7,6 @@ import { z } from 'zod';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
 import { SelectField, TextField } from '../../shared/components/form';
-import { ApiError } from '../../shared/api/errors.ts';
 import { toDateTimeLocalInput } from '../../shared/datetime.ts';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
@@ -15,8 +15,11 @@ import { useCreateOutage } from '../outages/useOutages.ts';
 import { WORK_ORDER_TYPES } from '../../types/work-order.ts';
 import { useCreateWorkOrder } from '../work-orders/useWorkOrders.ts';
 import type { NetworkComponentDetail } from '../../types/network.ts';
+import { CascadeConfirmDialog } from './CascadeConfirmDialog.tsx';
+import { gateBlockMessageKey, toCreateErrorMessage } from './operationErrors.ts';
 import { DetailRow, DetailSection } from './MapDetailRows.tsx';
 import { useImpactPreview } from './useNetwork.ts';
+import { useOperationGuards } from './useOperationGuards.ts';
 import styles from './CreateOperationDialog.module.scss';
 
 interface CreateOperationDialogProps {
@@ -49,14 +52,17 @@ const workOrderSchema = z.object({ type: z.enum(WORK_ORDER_TYPES) });
  * ikisi de aynı bilgiyi (eleman, etki) tekrar göstermeden aynı anda yapılabilecek iki
  * ayrı tıklamaya bölünmüştü.
  *
- * ⚠️ Buradaki etki sayısı bir bilgilendirmedir, bir yetki kararı değildir. Kaydın kendisi
+ * Buradaki etki sayısı bir bilgilendirmedir, bir yetki kararı değildir. Kaydın kendisi
  * sunucuda read-model'den okunan topoloji seviyesiyle yeniden doğrulanır.
  */
 export function CreateOperationDialog({ component, kind, onClose }: CreateOperationDialogProps) {
   const { t } = useTranslation();
+  const [cascadePending, setCascadePending] = useState(false);
+  const cascadeConfirmedRef = useRef(false);
   const labels = useLabels();
   const { hasPermission } = useAuth();
   const { data: preview, isLoading: isPreviewLoading, isError: isPreviewError } = useImpactPreview(component.id);
+  const guards = useOperationGuards(component.id);
   const { show } = useToast();
   const createOutage = useCreateOutage();
   const createWorkOrder = useCreateWorkOrder();
@@ -71,6 +77,8 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
    * yasaklardı. Uyarı yine gösterilir, kararı sunucu türle birlikte verir.
    */
   const isBlocked = kind === 'outage' && isHighImpact && !hasPermission('outage:write-high-impact');
+  // Sunucudaki 409 kapıları burada erkenden gösterilir; karar yine sunucuda verilir.
+  const isGateBlocked = kind === 'outage' ? guards.outageBlocked : guards.workOrderBlocked;
   const title = kind === 'outage' ? t('map.confirm.outageTitle') : t('map.confirm.workOrderTitle');
   const outageSchema = useOutageSchema();
 
@@ -85,7 +93,20 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
     defaultValues: { type: 'BASIC_WORK' },
   });
 
+  /**
+   * Alt kesinti varsa kaskad onay modalı çıkar. Onay bir API alanı olarak **gönderilmez** —
+   * bağı zaten sunucu kuruyor; modal kullanıcıya ne olacağını söyler.
+   *
+   * Onay, form doğrulamasından **sonra** sorulur. Doğrulamadan önce sorulsaydı geçersiz
+   * bir formda modal açılır, kullanıcı onaylar, gönderim sessizce doğrulamaya takılır ve
+   * modal hiç kapanmazdı.
+   */
   const onSubmitOutage = outageForm.handleSubmit(async (values) => {
+    if (guards.childOutageCount > 0 && !cascadeConfirmedRef.current) {
+      setCascadePending(true);
+      return;
+    }
+
     try {
       await createOutage.mutateAsync({
         cbsId: component.id,
@@ -95,9 +116,19 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
       show('success', t('outage.toast.createSuccess'));
       onClose();
     } catch (err) {
-      outageForm.setError('root', { message: err instanceof ApiError ? t(err.message) : t('outage.toast.createError') });
+      outageForm.setError('root', { message: toCreateErrorMessage(err, 'outage', t) });
+    } finally {
+      // Yeniden denemede onay tekrar sorulur: bu arada alt kesinti kümesi değişmiş olabilir.
+      cascadeConfirmedRef.current = false;
+      setCascadePending(false);
     }
   });
+
+  const confirmCascade = () => {
+    cascadeConfirmedRef.current = true;
+    setCascadePending(false);
+    void onSubmitOutage();
+  };
 
   const onSubmitWorkOrder = workOrderForm.handleSubmit(async (values) => {
     try {
@@ -105,9 +136,7 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
       show('success', t('work-order.toast.createSuccess'));
       onClose();
     } catch (err) {
-      workOrderForm.setError('root', {
-        message: err instanceof ApiError ? t(err.message) : t('work-order.toast.createError'),
-      });
+      workOrderForm.setError('root', { message: toCreateErrorMessage(err, 'workOrder', t) });
     }
   });
 
@@ -193,6 +222,7 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
         )}
 
         {isBlocked && <p className={styles.blocked}>{t('map.confirm.highImpactForbidden')}</p>}
+        {isGateBlocked && <p className={styles.blocked}>{t(gateBlockMessageKey(kind, guards))}</p>}
 
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn--ghost">
@@ -200,7 +230,7 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || isPreviewLoading || isBlocked}
+            disabled={isSubmitting || isPreviewLoading || isBlocked || isGateBlocked}
             className={clsx('btn', isHighImpact ? 'btn--danger' : 'btn--primary')}
           >
             {isSubmitting
@@ -211,6 +241,16 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
           </button>
         </div>
       </form>
+
+      {cascadePending && (
+        <CascadeConfirmDialog
+          childOutages={guards.childOutages}
+          childOutageCount={guards.childOutageCount}
+          onCancel={() => setCascadePending(false)}
+          // Onay sonrası istek yine AYNI uca gider — oluşturma yolu tektir.
+          onConfirm={confirmCascade}
+        />
+      )}
     </Modal>
   );
 }

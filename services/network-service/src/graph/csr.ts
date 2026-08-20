@@ -27,7 +27,16 @@ export interface GraphNodeInput {
   isCustomer: boolean;
   switchable: boolean;
   energized: boolean;
+  /** `network.components.topology_level`; abonelerde yoktur ({@link CUSTOMER_TOPOLOGY_LEVEL}). */
+  topologyLevel: number;
 }
+
+/**
+ * Abonelerin topoloji seviyesi yoktur — şebekenin en ucundadırlar. Enerjilenme sebep
+ * etiketlemesinde kökler seviyeye göre sıralanır; abone hiçbir zaman kök olmadığından bu değer
+ * yalnız "en sonda" anlamına gelen bir dolgudur.
+ */
+export const CUSTOMER_TOPOLOGY_LEVEL = 127;
 
 export interface GraphEdgeInput {
   fromId: string;
@@ -43,6 +52,8 @@ export interface CsrGraph {
   /** id → düğüm indeksi. */
   nodeIndex: Map<string, number>;
   nodeFlags: Uint8Array;
+  /** Düğüm indeksi → topoloji seviyesi. Enerjilenme sebep etiketlemesinde kök sırasını belirler. */
+  topologyLevels: Int8Array;
   /** `offsets[i] … offsets[i+1]-1` → düğüm i'nin komşularının `targets` içindeki aralığı. */
   offsets: Uint32Array;
   targets: Uint32Array;
@@ -57,11 +68,13 @@ export function buildCsr(nodes: GraphNodeInput[], edges: GraphEdgeInput[]): CsrG
   const nodeIds = new Array<string>(nodeCount);
   const nodeIndex = new Map<string, number>();
   const nodeFlags = new Uint8Array(nodeCount);
+  const topologyLevels = new Int8Array(nodeCount);
 
   for (let i = 0; i < nodeCount; i++) {
     const n = nodes[i]!;
     nodeIds[i] = n.id;
     nodeIndex.set(n.id, i);
+    topologyLevels[i] = n.topologyLevel;
 
     let flags = 0;
     if (n.switchable) flags |= NodeFlag.Switchable;
@@ -121,6 +134,7 @@ export function buildCsr(nodes: GraphNodeInput[], edges: GraphEdgeInput[]): CsrG
     nodeIds,
     nodeIndex,
     nodeFlags,
+    topologyLevels,
     offsets,
     targets,
     edgeFlags,

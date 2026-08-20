@@ -247,7 +247,20 @@
 // Örneğin rengi katman başına ayrı bir sınıftır; satır bileşeni renk değeri taşımaz.
 // Harita katmanları ile aynı token'lardan boyanır, böylece efsane ile harita ayrışamaz.
 .swatchHvLine {
+  // Siyah çekirdek + açık kontur — haritadaki HV hattının aynısı (bkz. networkLayers.ts).
   background: var(--c-map-line-hv);
+  box-shadow: 0 0 0 1px var(--c-map-line-hv-case);
+}
+// Enerjisizlik örneği haritadaki vurgu katmanı gibi kesikli çizilir.
+.swatchDeEnergized {
+  width: 1.125rem;
+  height: 0.1875rem;
+  border-radius: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--c-map-deenergized) 0 0.25rem,
+    transparent 0.25rem 0.4rem
+  );
 }
 .swatchMvMain {
   background: var(--c-map-line-mv);

@@ -4,9 +4,11 @@ import { Router } from 'express';
 import { db } from '../db.ts';
 import { isGraphLoaded } from '../graph/loader.ts';
 import { getAdmin } from '../kafka.ts';
+import { isEnergizationReady } from '../modules/energization/service.ts';
 import { redis } from '../redis.ts';
 import * as componentsController from './controllers/components.controller.ts';
 import * as customersController from './controllers/customers.controller.ts';
+import * as energizationController from './controllers/energization.controller.ts';
 import * as impactController from './controllers/impact.controller.ts';
 import * as queryController from './controllers/query.controller.ts';
 import * as tilesController from './controllers/tiles.controller.ts';
@@ -28,6 +30,10 @@ export function buildRouter(): Router {
         redis: () => redis.ping(),
         kafka: () => getAdmin().listTopics(),
         graph: () => (isGraphLoaded() ? Promise.resolve() : Promise.reject(new Error('graf henüz yüklenmedi'))),
+        // Read-model bayatlarsa şebeke yanlış boyanır; hazırlık kontrolü hesabın en az bir
+        // kez yapıldığını doğrular.
+        energization: () =>
+          isEnergizationReady() ? Promise.resolve() : Promise.reject(new Error('enerjilenme henüz hesaplanmadı')),
       });
 
       res.status(ready ? 200 : 503).json({ status: ready ? 'ready' : 'degraded', checks });
@@ -88,6 +94,14 @@ export function buildRouter(): Router {
     '/components/:id/impact-preview',
     requirePermission(PERMISSIONS.NETWORK_READ),
     asyncHandler<AuthedRequest>(impactController.impactPreview),
+  );
+
+  // --- Enerjilenme Durumu ---
+  // Görünüm penceresi kapsamlı: `setFeatureState` yalnız yüklü tile'lara yazılabilir.
+  networkRouter.get(
+    '/energization',
+    requirePermission(PERMISSIONS.NETWORK_READ),
+    asyncHandler<AuthedRequest>(energizationController.getEnergization),
   );
 
   // --- Alan (Poligon) Sorgusu ---

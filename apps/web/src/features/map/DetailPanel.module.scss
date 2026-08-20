@@ -181,3 +181,10 @@
     text-decoration: underline;
   }
 }
+
+// Kapı engelinin sebebi — pasif düğmenin hemen altında, "neden" sorusunu cevaplar.
+.blockReason {
+  font-size: v.$control-font-size;
+  color: v.$color-danger-soft-ink;
+  margin: 0 0 v.$space-3;
+}

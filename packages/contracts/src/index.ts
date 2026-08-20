@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { OutageImpactCalculatedEvent } from './network.events.ts';
 import {
+  OutageCancelledEvent,
   OutageCascadedEvent,
   OutageCreatedEvent,
   OutageEnergizedEvent,
@@ -8,6 +9,7 @@ import {
 } from './outage.events.ts';
 import { TOPICS, type Topic } from './topics.ts';
 import {
+  WorkOrderCancelledEvent,
   WorkOrderCreatedEvent,
   WorkOrderDoneEvent,
   WorkOrderLinkedEvent,
@@ -28,11 +30,13 @@ export const EVENT_SCHEMAS = {
   [TOPICS.OUTAGE_CREATED]: OutageCreatedEvent,
   [TOPICS.OUTAGE_ENERGIZED]: OutageEnergizedEvent,
   [TOPICS.OUTAGE_LINKED]: OutageLinkedEvent,
+  [TOPICS.OUTAGE_CANCELLED]: OutageCancelledEvent,
   [TOPICS.OUTAGE_IMPACT_CALCULATED]: OutageImpactCalculatedEvent,
   [TOPICS.OUTAGE_CASCADED]: OutageCascadedEvent,
   [TOPICS.WORK_ORDER_CREATED]: WorkOrderCreatedEvent,
   [TOPICS.WORK_ORDER_DONE]: WorkOrderDoneEvent,
   [TOPICS.WORK_ORDER_LINKED]: WorkOrderLinkedEvent,
+  [TOPICS.WORK_ORDER_CANCELLED]: WorkOrderCancelledEvent,
   [TOPICS.TRANSLATION_PUBLISHED]: TranslationPublishedEvent,
 } as const;
 

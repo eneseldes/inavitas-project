@@ -3,8 +3,10 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
+import { gateBlockMessageKey, toCreateErrorMessage } from '../map/operationErrors.ts';
+import { useOperationGuards } from '../map/useOperationGuards.ts';
+import { useDebounce } from '../../shared/hooks/useDebounce.ts';
 import { SelectField, TextField } from '../../shared/components/form';
-import { ApiError } from '../../shared/api/errors.ts';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
 import { WORK_ORDER_TYPES } from '../../types/work-order.ts';
@@ -17,6 +19,9 @@ function useCreateWorkOrderSchema() {
     type: z.enum(WORK_ORDER_TYPES),
   });
 }
+
+/** Kapı sorgusu, kullanıcı yazmayı bıraktıktan bu kadar sonra çalışır. */
+const GUARD_DEBOUNCE_MS = 400;
 
 interface CreateWorkOrderDialogProps {
   onClose: () => void;
@@ -35,6 +40,7 @@ export function CreateWorkOrderDialog({ onClose, presetCbsId }: CreateWorkOrderD
     register,
     handleSubmit,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -42,13 +48,21 @@ export function CreateWorkOrderDialog({ onClose, presetCbsId }: CreateWorkOrderD
     defaultValues: { type: 'BASIC_WORK', ...(presetCbsId ? { cbsId: presetCbsId } : {}) },
   });
 
+  // CBS ID yazıldıkça kapı çalışır. İş emri **enerjisizlik nedeniyle engellenmez** — enerjisi
+  // kesik elemana iş emri açmak zaten onarımın kendisidir; engel yalnız "zaten aktif iş emri
+  // var" durumudur.
+  // Debounce şart: her tuş vuruşunda etki önizlemesi sunucuda bir graf gezinmesi demektir.
+  const cbsId = watch('cbsId');
+  const debouncedCbsId = useDebounce(cbsId, GUARD_DEBOUNCE_MS);
+  const guards = useOperationGuards(debouncedCbsId && debouncedCbsId.length > 0 ? debouncedCbsId : undefined);
+
   const onSubmit = handleSubmit(async (values) => {
     try {
       await createWorkOrder.mutateAsync(values);
       show('success', t('work-order.toast.createSuccess'));
       onClose();
     } catch (err) {
-      setError('root', { message: err instanceof ApiError ? t(err.message) : t('work-order.toast.createError') });
+      setError('root', { message: toCreateErrorMessage(err, 'workOrder', t) });
     }
   });
 
@@ -72,11 +86,15 @@ export function CreateWorkOrderDialog({ onClose, presetCbsId }: CreateWorkOrderD
           ))}
         </SelectField>
 
+        {guards.workOrderBlocked && (
+          <div className="form-error-banner">{t(gateBlockMessageKey('workOrder', guards))}</div>
+        )}
+
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn--ghost">
             {t('common.action.cancel')}
           </button>
-          <button type="submit" disabled={isSubmitting} className="btn btn--primary">
+          <button type="submit" disabled={isSubmitting || guards.workOrderBlocked} className="btn btn--primary">
             {isSubmitting ? t('common.action.creating') : t('common.action.create')}
           </button>
         </div>
