@@ -1,4 +1,12 @@
-import { correlationMiddleware, errorHandler, httpLogger, notFoundHandler, type Logger } from '@inavitas/shared';
+import {
+  correlationMiddleware,
+  errorHandler,
+  httpLogger,
+  metricsHandler,
+  metricsMiddleware,
+  notFoundHandler,
+  type Logger,
+} from '@inavitas/shared';
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
 import { buildRouter } from './http/routes.ts';
@@ -13,6 +21,13 @@ export function createApp(logger: Logger): Express {
 
   app.use(correlationMiddleware());
   app.use(httpLogger(logger));
+  app.use(metricsMiddleware());
+
+  // Prometheus kazıması yalnız docker ağından gelir; uç dışa açılmaz ve gateway `/api/**`
+  // dışındaki hiçbir yolu proxy'lemez. Kimlik doğrulamadan ÖNCE bağlanır: metrik toplamak
+  // için token üretmek gerekmemeli.
+  app.get('/metrics', metricsHandler());
+
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 

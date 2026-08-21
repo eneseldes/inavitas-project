@@ -1,4 +1,4 @@
-import { createLogger, isDevelopment } from '@inavitas/shared';
+import { configureMetrics, createLogger, isDevelopment } from '@inavitas/shared';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
@@ -12,6 +12,10 @@ const logger = await createLogger({
   level: config.LOG_LEVEL,
   pretty: isDevelopment(config.NODE_ENV),
 });
+
+// Tüm metrik serileri servis adıyla etiketlenir; Prometheus'un `job` etiketi kazıma
+// yapılandırmasından gelir ve sorgu yazarken ikisinin aynı olduğuna güvenilmemeli.
+configureMetrics({ service: 'work-order-service' });
 
 const app = createApp(logger);
 const server = app.listen(config.WORK_ORDER_SERVICE_PORT, () => {

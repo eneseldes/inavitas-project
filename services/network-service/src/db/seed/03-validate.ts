@@ -43,9 +43,6 @@ export async function validateSeed(
   const edgesRes = await db.execute(sql`SELECT count(*)::int AS count FROM network.topology_edges;`);
   counts.topology_edges = Number(edgesRes.rows[0].count);
 
-  const ringsRes = await db.execute(sql`SELECT count(*)::int AS count FROM network.rings;`);
-  counts.rings = Number(ringsRes.rows[0].count);
-
   const customersRes = await db.execute(sql`SELECT count(*)::int AS count FROM customer.customers;`);
   counts.customers = Number(customersRes.rows[0].count);
 
@@ -55,6 +52,10 @@ export async function validateSeed(
   let hasError = false;
   for (const [table, expected] of Object.entries(manifest.row_counts)) {
     if (table === 'seed_manifest') continue;
+    // `rings` katmanı gpkg'de duruyor ama BİLEREK yüklenmiyor: manevra projeden çıkarıldı
+    // (Faz 10), ring tanımlarını okuyan tek şey oydu. Manifest v3.0 dondurulmuş veri setinin
+    // imzasıdır ve elle düzenlenmez — "bu katmanı yüklemiyoruz" bilgisinin yeri burasıdır.
+    if (table === 'rings') continue;
     const actual = counts[table];
     if (actual !== expected) {
       log(`[03-validate] HATA: Tablo '${table}' - Beklenen: ${expected}, Gerçekleşen: ${actual}`);

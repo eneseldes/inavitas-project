@@ -93,9 +93,6 @@ export const components = networkSchema.table('components', {
   lat: doublePrecision('lat').notNull(),
   lon: doublePrecision('lon').notNull(),
   switchable: boolean('switchable').notNull().default(false),
-  loadBreak: boolean('load_break').notNull().default(false),
-  normallyOpen: boolean('normally_open').notNull().default(false),
-  isClosed: boolean('is_closed').notNull().default(true),
   status: varchar('status', { length: 32 }).notNull(),
   isEnergized: boolean('is_energized').notNull().default(true),
   name: varchar('name', { length: 255 }),
@@ -108,9 +105,11 @@ export const topologyEdges = networkSchema.table('topology_edges', {
   fromId: varchar('from_id', { length: 64 }).notNull(),
   toId: varchar('to_id', { length: 64 }).notNull(),
   connectionType: varchar('connection_type', { length: 64 }).notNull(),
+  /**
+   * Kenar şu an kapalı mı. Normalde açık tie kenarları `false` gelir ve grafın dışında kalır —
+   * şebekenin radyalliğini ayakta tutan tek alan budur. Seed'den gelir, runtime'da değişmez.
+   */
   isClosed: boolean('is_closed').notNull().default(true),
-  normallyOpen: boolean('normally_open').notNull().default(false),
-  ringId: varchar('ring_id', { length: 64 }),
   participatesInOutageGraph: boolean('participates_in_outage_graph').notNull().default(true),
   componentId: varchar('component_id', { length: 64 }),
   lengthM: doublePrecision('length_m'),
@@ -139,26 +138,13 @@ export const outageStatesRo = networkSchema.table(
     index('idx_outage_states_ro_cbs').on(table.cbsId),
     // Aktif küme tek taramayla okunsun: boot'ta ve her yeniden hesapta sorgulanan tek şey bu.
     index('idx_outage_states_ro_active').on(table.cbsId).where(sql`${table.status} = 'STARTED'`),
+    // Planlı kesinti zamanlayıcısı iki soruyu sorar ve ikisi de bu indeksten cevaplanır:
+    // "şu an yürürlükte olanlar" (`started_at <= now()`) ve "sıradaki başlangıç ne zaman"
+    // (`MIN(started_at)` gelecek tarafta). Sıralı bir kısmi indeks olmadan ikisi de tam
+    // tarama olurdu.
+    index('idx_outage_states_ro_started_at').on(table.startedAt).where(sql`${table.status} = 'STARTED'`),
   ],
 );
-
-/** Ring tanımları tablosu (`network.rings`) */
-export const rings = networkSchema.table('rings', {
-  ringId: varchar('ring_id', { length: 64 }).primaryKey(),
-  ringType: varchar('ring_type', { length: 64 }).notNull(),
-  status: varchar('status', { length: 32 }).notNull(),
-  tmId: varchar('tm_id', { length: 64 }),
-  tieSwitchIds: jsonb('tie_switch_ids'),
-});
-
-/** Manevra Günlüğü tablosu (`network.switching_operations`) */
-export const switchingOperations = networkSchema.table('switching_operations', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  componentId: varchar('component_id', { length: 64 }).notNull(),
-  action: varchar('action', { length: 32 }).notNull(),
-  performedBy: varchar('performed_by', { length: 255 }).notNull(),
-  performedAt: timestamp('performed_at', { mode: 'date' }).defaultNow().notNull(),
-});
 
 /** Aboneler tablosu (`customer.customers`) */
 export const customers = customerSchema.table('customers', {

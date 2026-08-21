@@ -99,7 +99,8 @@ export function buildRouter(): Router {
   );
 
   // --- Enerjilenme Durumu ---
-  // Görünüm penceresi kapsamlı: `setFeatureState` yalnız yüklü tile'lara yazılabilir.
+  // Kapsam **pencere değil, kullanıcının yetkisidir**: yanıt kimlik listesi taşımaz, enerjisiz
+  // kümenin vurgu token'ını döner (bkz. modules/highlight/sets.ts).
   networkRouter.get(
     '/energization',
     requirePermission(PERMISSIONS.NETWORK_READ),
@@ -115,7 +116,15 @@ export function buildRouter(): Router {
     asyncHandler<AuthedRequest>(queryController.within),
   );
 
-  // --- Vector Tile Uç Noktası ---
+  // --- Vector Tile Uç Noktaları ---
+  //
+  // ⚠️ Sıra önemli: `/tiles/set/...` dört parçalıdır, `/tiles/:z/:x/:y.mvt` üç — Express
+  // parça sayısına baktığı için çakışmazlar, ama okuyan için sıra niyeti anlatır.
+  networkRouter.get(
+    '/tiles/set/:token/:z/:x/:y.mvt',
+    requirePermission(PERMISSIONS.NETWORK_READ),
+    asyncHandler<AuthedRequest>(tilesController.getHighlightTile),
+  );
   networkRouter.get(
     '/tiles/:z/:x/:y.mvt',
     requirePermission(PERMISSIONS.NETWORK_READ),

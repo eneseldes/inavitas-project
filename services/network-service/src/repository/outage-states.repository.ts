@@ -5,7 +5,7 @@
  * deseni); okuması boot'ta ve `/ready` kontrolünde kullanılır.
  */
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, gt, lte, sql } from 'drizzle-orm';
 import { db, type Tx } from '../db.ts';
 import { outageStatesRo } from '../db/schema.ts';
 
@@ -49,11 +49,46 @@ export async function updateStatusTx(tx: Tx, outageId: string, status: string): 
     .where(eq(outageStatesRo.outageId, outageId));
 }
 
-/** Enerjisizlik yaratan tüm kesintileri döner — boot'ta ve her yeniden hesapta okunur. */
+/**
+ * Enerjisizlik yaratan tüm kesintileri döner — boot'ta ve her yeniden hesapta okunur.
+ *
+ * ⚠️ **`started_at <= now()` süzmesi burada, tek yerde durur.** Gelecek tarihli (planlı) bir
+ * kesinti `STARTED` doğar ama başlangıcı gelene kadar şebekeyi karartmamalıdır; süzme
+ * çağıranlara bırakılsaydı bir çağıran unutur ve harita saatler öncesinden kararırdı.
+ * Zaman kaynağı **veritabanıdır** (`now()`), sürecin saati değil: enerjilenme hesabı ile
+ * read-model aynı saati okumak zorunda.
+ */
 export async function findActive(): Promise<OutageStateRow[]> {
   return db
     .select()
     .from(outageStatesRo)
-    .where(eq(outageStatesRo.status, ACTIVE_OUTAGE_STATUS))
+    .where(and(eq(outageStatesRo.status, ACTIVE_OUTAGE_STATUS), lte(outageStatesRo.startedAt, sql`now()`)))
     .orderBy(sql`${outageStatesRo.startedAt} ASC`);
+}
+
+/** Başlangıcı henüz gelmemiş planlı kesintilerin özeti. */
+export interface PendingStarts {
+  /** Sıradaki başlangıç anı; bekleyen kesinti yoksa `null`. */
+  nextStartAt: Date | null;
+  /** Bekleyen planlı kesinti sayısı — zamanlayıcı ölürse bu sayı düşmeyi bırakır. */
+  count: number;
+}
+
+/**
+ * Gelecekte başlayacak (`started_at > now()`) kesintilerin sayısını ve en yakın başlangıç
+ * anını döner. Zamanlayıcı uyanma vaktini buradan öğrenir.
+ */
+export async function findPendingStarts(): Promise<PendingStarts> {
+  const [row] = await db
+    .select({
+      nextStartAt: sql<string | null>`MIN(${outageStatesRo.startedAt})`,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(outageStatesRo)
+    .where(and(eq(outageStatesRo.status, ACTIVE_OUTAGE_STATUS), gt(outageStatesRo.startedAt, sql`now()`)));
+
+  return {
+    nextStartAt: row?.nextStartAt ? new Date(row.nextStartAt) : null,
+    count: row?.count ?? 0,
+  };
 }

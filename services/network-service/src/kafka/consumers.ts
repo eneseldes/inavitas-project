@@ -1,5 +1,6 @@
 import {
   CONSUMER_GROUPS,
+  IMPACT_ID_LIMIT,
   parseEvent,
   SYSTEM_ACTOR,
   TOPICS,
@@ -13,14 +14,14 @@ import { ZodError } from 'zod';
 import { db } from '../db.ts';
 import { getGraph } from '../graph/loader.ts';
 import * as energizationService from '../modules/energization/service.ts';
-import { computeDownstreamImpact } from '../modules/impact/service.ts';
+import { computeCascadeCandidates, computeDownstreamImpact } from '../modules/impact/service.ts';
 import { markProcessed } from '../repository/idempotency.repository.ts';
 import * as customersRepository from '../repository/customers.repository.ts';
 import * as outageStatesRepository from '../repository/outage-states.repository.ts';
 import { redis } from '../redis.ts';
 import { enqueueOutageImpactCalculatedTx } from './producer.ts';
 
-/** İlk hesap her zaman 1. revizyondur; manevra sonrası yeniden hesap bunu artırır. */
+/** Bugün tek revizyon vardır: etki bir kez hesaplanır, yeniden hesaplanmaz. */
 const FIRST_REVISION = 1;
 
 /**
@@ -43,15 +44,31 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
 
   const impact = computeDownstreamImpact(cbsId);
 
+  // ⚠️ Kimlik listelerinin kırpıldığı **tek** yer burasıdır ve sebebi tamamen taşımadır:
+  // Kafka broker'ının varsayılan `message.max.bytes` sınırı 1 MB'tır; 600 bin elemanlı bir
+  // etki kümesi tek bir olayda oraya sığmaz ve mesaj reddedilirse kesinti etkisiz kalır.
+  // Hesabın kendisi, HTTP uçları ve harita vurgusu kırpılmaz (bkz. impact/service.ts).
+  // Sayılar her durumda TAMDIR — kırpılan yalnız listelerdir, `overflowed` bunu söyler.
+  const overflowed =
+    impact.affectedElementIds.length > IMPACT_ID_LIMIT || impact.affectedCustomerIds.length > IMPACT_ID_LIMIT;
+
   // Abone özetleri (PII'sız) etkiyle birlikte taşınır — `outage-service` bunları doğrudan
   // `outage_affected_customers` read-model'ine yazar, ayrıca sormaz.
-  const customers = await customersRepository.findAffectedByIds(impact.affectedCustomerIds);
+  const customers = await customersRepository.findAffectedByIds(
+    impact.affectedCustomerIds.slice(0, IMPACT_ID_LIMIT),
+  );
+
+  // Kaskad kararı BURADA verilir, kimlik listesi taşınarak değil: `outage-service` kapsamayı
+  // kırpılmış `affectedElementIds` üzerinden çıkarmaya çalışıyordu ve 10.000'inci elemandan
+  // sonrasında duran kesintileri hiç bağlayamıyordu (bkz. `onceden-yapilanlar.md` §11.4).
+  // Bu iki alan **kırpılmamış** küme üzerinden hesaplanır.
+  const cascade = await computeCascadeCandidates(cbsId, impact.affectedElementIds, outageId);
 
   const payload: OutageImpactCalculatedPayload = {
     outageId,
     cbsId,
     revision: FIRST_REVISION,
-    affectedElementIds: impact.affectedElementIds,
+    affectedElementIds: impact.affectedElementIds.slice(0, IMPACT_ID_LIMIT),
     affectedElementCount: impact.affectedElementCount,
     affectedCustomerCount: impact.affectedCustomerCount,
     customers: customers.map((row) => ({
@@ -59,7 +76,9 @@ export async function handleOutageCreated(envelope: OutageCreatedEvent, log: Log
       unitPath: row.unitPath,
       customerType: row.customerType,
     })),
-    overflowed: impact.overflowed,
+    overflowed,
+    containedOutageIds: cascade.containedOutageIds,
+    containingOutageId: cascade.containingOutageId,
     radialityViolated: impact.radialityViolated,
   };
 

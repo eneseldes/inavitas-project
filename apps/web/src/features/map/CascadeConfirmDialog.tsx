@@ -32,7 +32,8 @@ export function CascadeConfirmDialog({
   const hiddenCount = childOutageCount - childOutages.length;
 
   return (
-    <Modal title={t('map.cascade.title')} onClose={onCancel}>
+    // `lg`: uyarı satırı + alt kesinti listesi varsayılan genişlikte üç satıra sarıyordu.
+    <Modal title={t('map.cascade.title')} onClose={onCancel} size="lg">
       <p className={styles.warningBanner}>
         <FiAlertTriangle /> {t('map.cascade.body', { count: childOutageCount.toLocaleString('tr-TR') })}
       </p>

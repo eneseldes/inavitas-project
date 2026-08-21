@@ -1,57 +1,50 @@
-import {
-  PERMISSIONS,
-  scopeFilterAnyUnit,
-  UnauthenticatedError,
-  type AuthedRequest,
-} from '@inavitas/shared';
+import { UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
 import type { Response } from 'express';
-import { components } from '../../db/schema.ts';
 import * as energizationService from '../../modules/energization/service.ts';
-import { resolveZoomLod } from '../../modules/tiles/zoom-lod.ts';
-import * as componentsRepository from '../../repository/components.repository.ts';
-import { EnergizationQuery } from '../schemas.ts';
+import { registerHighlightSet } from '../../modules/highlight/sets.ts';
 
 /**
- * `GET /network/energization?bbox=minLon,minLat,maxLon,maxLat&zoom=`
+ * `GET /network/energization`
  *
- * O görünüm penceresindeki **enerjisiz** eleman kimliklerini döner. İstemci bunları
- * `setFeatureState` ile haritaya yazar.
+ * Enerjisiz kümenin **vurgu token'ını** döner; kimlik listesi istemciye hiç gitmez.
  *
- * Liste kapsam süzgecinden geçer: tile'ı süzüp bu ucu açık bırakmak, kapsam dışı
- * elemanların kimliklerini pencereyi kaydırarak toplanabilir hale getirirdi.
+ * Eskiden bu uç `bbox` + `zoom` alıyor, pencereye ve zoom LOD'una göre kırpılmış bir kimlik
+ * listesi dönüyordu. İki sonucu vardı: (1) ekrandan çıkan hat kimlik listesinden düşüyor ve
+ * `feature-state` temizlendiği için kırmızılığını kaybediyordu, (2) LV hattı gibi düşük
+ * zoom'da tile'a hiç girmeyen tipler hiçbir zaman boyanamıyordu. Küme tile'ı ikisini de
+ * ortadan kaldırır: kırpma yok, LOD yok — yalnız görünen kare indirilir
+ * (bkz. `onceden-yapilanlar.md` §11.1).
  */
 export async function getEnergization(req: AuthedRequest, res: Response): Promise<void> {
   if (!req.user) throw new UnauthenticatedError();
 
-  const { bbox, zoom } = EnergizationQuery.parse(req.query);
   const state = energizationService.getState();
 
-  // Hiçbir kesinti yoksa veritabanına hiç gidilmez — kesintisiz bir günde bu uç her
-  // `moveend`'de çağrılıyor olacak.
-  if (state.deEnergizedCount === 0 && state.deEnergizedCustomerCount === 0 && state.openSwitchIds.length === 0) {
-    res.json({ version: state.version, deEnergizedIds: [], openSwitchIds: [], truncated: false });
+  // Hiçbir kesinti yoksa küme de yoktur; istemci `setToken: null` görünce vurgu katmanlarını
+  // hiç açmaz ve tek bir tile isteği bile çıkmaz.
+  if (state.deEnergizedCount === 0 && state.openSwitchIds.length === 0) {
+    res.json({
+      version: state.version,
+      setToken: null,
+      deEnergizedCount: 0,
+      openSwitchCount: 0,
+      truncated: false,
+    });
     return;
   }
 
-  const lod = resolveZoomLod(zoom);
-  const { ids, truncated } = await componentsRepository.findIdsInViewport(
-    bbox,
-    {
-      types: lod.componentTypes,
-      includeServiceEntry: lod.includeServiceEntry,
-      includeBuildings: lod.includeBuildings,
-    },
-    scopeFilterAnyUnit(req.user, components.unitPath, components.unitPaths, PERMISSIONS.NETWORK_READ),
-  );
-
-  const inViewport = new Set(ids);
+  const set = await registerHighlightSet(req.user, [
+    { role: 'dead', ids: energizationService.listDeEnergizedComponentIds() },
+    // Açık kesici enerjisizin üstünde bir roldür (bkz. sets.ts ROLE_PRIORITY): kesici
+    // üstünden beslendiği için enerjilidir, ama "açık kontak" olarak çizilmelidir.
+    { role: 'open', ids: state.openSwitchIds },
+  ]);
 
   res.json({
     version: state.version,
-    deEnergizedIds: energizationService.filterDeEnergized(ids),
-    // Açık kesiciler viewport'a göre süzülür ama listeye tile'da olmayanlar da girmez;
-    // `setFeatureState` zaten yalnız yüklü tile'lara yazılabiliyor.
-    openSwitchIds: state.openSwitchIds.filter((id) => inViewport.has(id)),
-    truncated,
+    setToken: set?.token ?? null,
+    deEnergizedCount: state.deEnergizedCount,
+    openSwitchCount: state.openSwitchIds.length,
+    truncated: set?.truncated ?? false,
   });
 }

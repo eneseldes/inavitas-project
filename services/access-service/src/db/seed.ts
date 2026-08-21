@@ -53,7 +53,6 @@ const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   'translation:publish': 'Çeviri yayınlama',
   'network:read': 'Şebeke ve idari birim verilerini görme',
   'network:trace': 'Besleme zinciri ve etki izi sorgulama',
-  'network:switch': 'Anahtar işletme (manevra)',
   'customer:read': 'Abone verilerini görme (PII hariç)',
   'customer:read-pii': 'Abone tesisat/sözleşme numarasını görme',
 };

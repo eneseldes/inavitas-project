@@ -147,18 +147,6 @@
   color: v.$color-danger-soft-ink;
 }
 
-.linkedId {
-  display: inline-flex;
-  align-items: center;
-  gap: v.$space-1;
-  color: v.$color-brand-600;
-  font-weight: 600;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
 // Kapı engelinin sebebi — pasif düğmenin hemen altında, "neden" sorusunu cevaplar.
 .blockReason {
   font-size: v.$control-font-size;

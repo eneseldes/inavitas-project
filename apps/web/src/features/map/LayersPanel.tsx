@@ -69,8 +69,6 @@ interface LayersPanelProps {
   onToggleLegendGroup: (ids: readonly LegendId[]) => void;
   showAdminBoundaries: boolean;
   onShowAdminBoundariesChange: (value: boolean) => void;
-  showDeEnergized: boolean;
-  onShowDeEnergizedChange: (value: boolean) => void;
   showOutages: boolean;
   onShowOutagesChange: (value: boolean) => void;
   showWorkOrders: boolean;
@@ -106,8 +104,6 @@ export function LayersPanel({
   onToggleLegendGroup,
   showAdminBoundaries,
   onShowAdminBoundariesChange,
-  showDeEnergized,
-  onShowDeEnergizedChange,
   showOutages,
   onShowOutagesChange,
   showWorkOrders,
@@ -198,27 +194,21 @@ export function LayersPanel({
 
       <HeatmapGroup activeHeatmap={activeHeatmap} onActiveHeatmapChange={onActiveHeatmapChange} />
 
-      {/* Kendi grup gövdesi olmayan tekil katmanlar — her biri tek satır. Enerjisiz bölgeler
-          kapatılabilir olmalı: kalabalık bir kesinti gününde harita aksi halde okunmaz olur. */}
+      {/* Enerjisiz bölgelerin açma/kapama kutusu YOK — kapatılabilir bir katman değil.
+          "Hangi hat kesik" haritanın ana bilgisidir; kullanıcının ayrıca açması gereken bir
+          şey olamaz. Satır yalnız efsane olarak durur: kesikli kırmızı çizginin ne anlama
+          geldiğini başka hiçbir yerde yazmıyoruz. Kesinti yokken sunucu zaten boş küme
+          döner (bkz. energization.controller.ts) — kapatmanın performans gerekçesi de yoktu. */}
       <section className={styles.group}>
         <div className={styles.groupHeader}>
-          <label className={clsx(styles.checkLabel, styles.simpleRow)}>
-            <span className={styles.checkbox}>
-              <input
-                type="checkbox"
-                checked={showDeEnergized}
-                onChange={() => onShowDeEnergizedChange(!showDeEnergized)}
-              />
-              <span className={styles.checkboxBox}>
-                <FiCheck />
-              </span>
-            </span>
+          <span className={clsx(styles.checkLabel, styles.simpleRow, styles.legendOnlyRow)}>
             <span className={clsx(styles.swatch, styles.swatchDeEnergized)} aria-hidden />
             {t('map.layer.deEnergized')}
-          </label>
+          </span>
         </div>
       </section>
 
+      {/* Kendi grup gövdesi olmayan tekil katmanlar — her biri tek satır. */}
       <section className={styles.group}>
         <div className={styles.groupHeader}>
           <label className={clsx(styles.checkLabel, styles.simpleRow)}>

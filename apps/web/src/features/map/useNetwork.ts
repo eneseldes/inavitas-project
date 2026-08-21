@@ -1,5 +1,4 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import type { Bbox } from '../../types/network.ts';
 import {
   fetchComponent,
   fetchEnergization,
@@ -85,20 +84,17 @@ export function useImpactPreview(id: string | undefined) {
 }
 
 /**
- * Görünüm penceresindeki enerjisiz eleman kimlikleri.
+ * Enerjisiz kümenin vurgu token'ı.
  *
- * `bbox` anahtara **yuvarlanmış** girer: her piksel hareketinde yeni bir sorgu açmak yerine
- * ~100 m'lik bir ızgaraya oturur. `keepPreviousData` pan sırasında kırmızıların bir kare
- * kaybolup geri gelmesini önler.
+ * Sorgu anahtarında **kamera yok**: pan/zoom bu sorguyu hiç tetiklemez. Yalnız enerjilenme
+ * SSE'si geldiğinde tazelenir ve o zaman yeni bir token döner; token değişince haritanın
+ * vurgu kaynağı kendi tile'larını yeniden yükler. Eskiden bbox ~100 m'lik bir ızgaraya
+ * yuvarlanıyordu ve neredeyse her `moveend` yeni bir istek açıyordu.
  */
-export function useEnergization(bbox: Bbox | undefined, zoom: number, enabled = true) {
-  const rounded = bbox ? (bbox.map((v) => Math.round(v * 1000) / 1000) as Bbox) : undefined;
-  const roundedZoom = Math.floor(zoom);
-
+export function useEnergization() {
   return useQuery({
-    queryKey: [NETWORK_ENERGIZATION_KEY, rounded, roundedZoom],
-    queryFn: () => fetchEnergization(rounded!, roundedZoom),
-    enabled: enabled && rounded !== undefined,
+    queryKey: [NETWORK_ENERGIZATION_KEY],
+    queryFn: () => fetchEnergization(),
     placeholderData: keepPreviousData,
   });
 }

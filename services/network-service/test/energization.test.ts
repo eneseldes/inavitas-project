@@ -25,7 +25,7 @@ function node(
 }
 
 function edge(fromId: string, toId: string, overrides: Partial<GraphEdgeInput> = {}): GraphEdgeInput {
-  return { fromId, toId, isClosed: true, normallyOpen: false, inOutageGraph: true, ...overrides };
+  return { fromId, toId, isClosed: true, inOutageGraph: true, ...overrides };
 }
 
 function buildTestGraph() {
@@ -50,7 +50,7 @@ function buildTestGraph() {
     edge('lvj', 'kofraBrk'),
     edge('kofraBrk', 'ev'),
     // Normalde açık tie: tabanda da erişilemez, enerjisiz SAYILMAMALI.
-    edge('TM', 'ada', { isClosed: false, normallyOpen: true }),
+    edge('TM', 'ada', { isClosed: false }),
   ];
 
   return buildCsr(nodes, edges);

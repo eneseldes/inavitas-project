@@ -163,16 +163,48 @@ export async function listWithin(
   return { items, total: overflowed ? WITHIN_ROW_LIMIT : counted, overflowed };
 }
 
+/**
+ * Poligonun içine düşen elemanların **kimlikleri** — sayfasız.
+ *
+ * `listWithin` yalnız bir sayfa döndürür; harita ise alanın tamamını vurgulamalı, kullanıcı
+ * hangi sayfada olursa olsun. Sadece `id` seçildiği için sorgu indeks üstünde kalır ve
+ * `WITHIN_ROW_LIMIT` ile aynı sınıra tabidir — sayfalı listeyle aynı kırpma noktası.
+ */
+export async function listWithinIds(polygon: unknown, filters: ComponentFilters): Promise<string[]> {
+  const conditions = buildConditions(filters);
+  conditions.push(sql`ST_Intersects(${components.geom}, ${searchArea(polygon)})`);
+
+  const rows = await db
+    .select({ id: components.id })
+    .from(components)
+    .where(and(...conditions))
+    .limit(WITHIN_ROW_LIMIT);
+
+  return rows.map((row) => row.id);
+}
+
 /** Eleman ID ile tek kaydı arar. */
 export async function findById(id: string): Promise<ComponentRow | null> {
   const [row] = await db.select().from(components).where(eq(components.id, id));
   return row ?? null;
 }
 
-/** Birden çok eleman ID'sini tek sorguda getirir (besleme zinciri gibi küçük kimlik kümeleri için). */
+/**
+ * `id = ANY($1)` — kimlik listesi **tek** bind parametresi olarak gider.
+ *
+ * ⚠️ `inArray()` kullanılamaz: drizzle onu `id in ($1, $2, …, $N)` diye açar ve PostgreSQL'in
+ * genişletilmiş sorgu protokolü bir ifadede en fazla **65.535** bind parametresi kabul eder.
+ * Etki kümesi artık kırpılmadığı için (bkz. modules/impact/service.ts) bir TM izi rahatlıkla
+ * bu sayıyı aşar; `inArray` ile `/trace` ucu o noktada sorguyu bile kuramadan patlardı.
+ */
+function anyId(ids: string[]): SQL {
+  return sql`${components.id} = ANY(${sql.param(ids)}::text[])`;
+}
+
+/** Birden çok eleman ID'sini tek sorguda getirir. */
 export async function findByIds(ids: string[]): Promise<ComponentRow[]> {
   if (ids.length === 0) return [];
-  return db.select().from(components).where(inArray(components.id, ids));
+  return db.select().from(components).where(anyId(ids));
 }
 
 export interface Bbox {
@@ -191,7 +223,7 @@ export async function findBoundingBox(ids: string[]): Promise<Bbox | null> {
 
   const result = await db.execute(sql`
     SELECT ST_XMin(ext) AS min_lon, ST_YMin(ext) AS min_lat, ST_XMax(ext) AS max_lon, ST_YMax(ext) AS max_lat
-    FROM (SELECT ST_Extent(${components.geom}) AS ext FROM ${components} WHERE ${inArray(components.id, ids)}) t
+    FROM (SELECT ST_Extent(${components.geom}) AS ext FROM ${components} WHERE ${anyId(ids)}) t
   `);
 
   const row = result.rows[0] as unknown as
@@ -203,56 +235,6 @@ export async function findBoundingBox(ids: string[]): Promise<Bbox | null> {
   }
 
   return { minLon: row.min_lon, minLat: row.min_lat, maxLon: row.max_lon, maxLat: row.max_lat };
-}
-
-/**
- * Enerjisizlik sorgusunun sunucu tarafı üst sınırı. `setFeatureState` yalnız **yüklü**
- * tile'lara yazılabildiği için sorgu zaten viewport kapsamlıdır; bu sınır hatalı bir
- * "tüm Ankara" bbox'ının yanıtı şişirmesini engeller.
- */
-export const ENERGIZATION_ROW_LIMIT = 20_000;
-
-export interface ViewportFilter {
-  /** `TYPE_MIN_ZOOM`'dan gelen görünür eleman tipleri. */
-  types: string[];
-  /** Kofra kesicisi (`SERVICE_ENTRY`) bu zoom'da görünüyor mu. */
-  includeServiceEntry: boolean;
-  /** Bina izi açık mı — TM/DM/trafo kesicileri de bu zoom'da çizilir ve durum taşıyabilir. */
-  includeBuildings: boolean;
-}
-
-/**
- * Görünüm penceresindeki (bbox + zoom) eleman kimliklerini döner.
- *
- * Zoom eleme kuralı tile üretimiyle **aynı kaynaktan** (`resolveZoomLod`) gelir: ekranda
- * çizilmeyen bir elemanın durumunu taşımanın faydası yok, maliyeti var. Kesici tiplerinin
- * eşleşmesi de tile sorgusunun aynısıdır — kofra `type` ile değil `breaker_role` ile ayrılır.
- */
-export async function findIdsInViewport(
-  bbox: Bbox,
-  filter: ViewportFilter,
-  scope: SQL | undefined,
-  limit: number = ENERGIZATION_ROW_LIMIT,
-): Promise<{ ids: string[]; truncated: boolean }> {
-  const typeMatches = filter.types.length > 0 ? inArray(components.type, filter.types) : sql`false`;
-  const breakerMatches = filter.includeBuildings
-    ? sql`${components.type} = 'CIRCUIT_BREAKER'`
-    : sql`(${filter.includeServiceEntry} AND ${components.breakerRole} = 'SERVICE_ENTRY')`;
-
-  const rows = await db
-    .select({ id: components.id })
-    .from(components)
-    .where(
-      and(
-        sql`(${typeMatches} OR ${breakerMatches})`,
-        sql`${components.geom} && ST_MakeEnvelope(${bbox.minLon}, ${bbox.minLat}, ${bbox.maxLon}, ${bbox.maxLat}, 4326)`,
-        scope,
-      ),
-    )
-    .limit(limit + 1);
-
-  const truncated = rows.length > limit;
-  return { ids: rows.slice(0, limit).map((row) => row.id), truncated };
 }
 
 /**

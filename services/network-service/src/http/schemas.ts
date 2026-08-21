@@ -40,32 +40,31 @@ export const TileParams = z.object({
 });
 export type TileParams = z.infer<typeof TileParams>;
 
+/**
+ * Tile isteğinin sorgu parametresi. `v` istemcinin beklediği MVT şema sürümüdür ve
+ * **önbellek anahtarına girmez** (anahtar sunucunun kendi sabitinden türer); yalnız
+ * istemci-sunucu ayrışmasını görünür kılmak için okunur (bkz. tiles.controller.ts).
+ */
+export const TileQuery = z.object({
+  v: z.coerce.number().int().min(0).max(999).optional(),
+});
+export type TileQuery = z.infer<typeof TileQuery>;
+
+/**
+ * Vurgu kümesi tile'ının yol parametreleri. Token, kümenin içeriğinden türetilmiş kısa bir
+ * sha1 özetidir (bkz. modules/highlight/sets.ts) — biçimi burada da doğrulanır ki uydurma
+ * bir token Redis'e hiç gitmesin.
+ */
+export const HighlightTileParams = TileParams.extend({
+  token: z.string().regex(/^[0-9a-f]{20}$/),
+});
+export type HighlightTileParams = z.infer<typeof HighlightTileParams>;
+
 /** Eleman izi (trace) sorgu parametreleri şeması. */
 export const TraceQuery = z.object({
   direction: z.enum(['up', 'down']),
 });
 export type TraceQuery = z.infer<typeof TraceQuery>;
-
-/**
- * Enerjisizlik sorgusu parametreleri.
- *
- * `bbox` neden zorunlu: `setFeatureState` yalnız **yüklü** tile'lara yazılabilir. Ekranda
- * olmayan bir elemanın durumunu taşımanın faydası yok, maliyeti var.
- */
-export const EnergizationQuery = z.object({
-  bbox: csv
-    .pipe(z.array(z.string()).length(4))
-    .transform((parts) => parts.map(Number))
-    .refine((values) => values.every(Number.isFinite), { message: 'bbox sayısal olmalı' })
-    .transform(([minLon, minLat, maxLon, maxLat]) => ({
-      minLon: minLon!,
-      minLat: minLat!,
-      maxLon: maxLon!,
-      maxLat: maxLat!,
-    })),
-  zoom: z.coerce.number().min(0).max(22),
-});
-export type EnergizationQuery = z.infer<typeof EnergizationQuery>;
 
 /**
  * Alan (poligon) sorgusu gövdesi.

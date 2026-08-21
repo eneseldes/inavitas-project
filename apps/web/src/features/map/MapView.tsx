@@ -12,17 +12,23 @@ import type { Bbox, VoltageLevel } from '../../types/network.ts';
 import type { OutageMapItem } from '../../types/outage.ts';
 import type { WorkOrderMapItem } from '../../types/work-order.ts';
 import { BASEMAP_PMTILES_URL, BASEMAP_SOURCE_ID, buildBasemapLayers, isBasemapAvailable, registerPmtilesProtocol } from './basemap.ts';
-import type { TraceDirection } from './api.ts';
 import { addClusterImage, registerMarkerImages } from './markerIcons.ts';
 import type { MapView as MapViewState } from './useMapState.ts';
 import { useUnitLabels } from './useNetwork.ts';
+import {
+  buildHighlightLayers,
+  buildHighlightSource,
+  HIGHLIGHT_STATE_SOURCE_ID,
+  HIGHLIGHT_QUERY_SOURCE_ID,
+  highlightAnchors,
+  highlightLayerIds,
+} from './highlightLayers.ts';
 import {
   buildingFilters,
   buildNetworkLayers,
   buildNetworkSource,
   CLICKABLE_LAYER_IDS,
   componentFilters,
-  emphasisVisibility,
   legendVisibility,
   NETWORK_SOURCE_ID,
   SELECTABLE_SOURCE_LAYERS,
@@ -71,28 +77,23 @@ interface MapViewProps {
   onSelect: (id: string | undefined) => void;
   flyTo?: { lng: number; lat: number; zoom: number };
   /**
-   * Açık izdeki eleman kimlikleri ve yönü. İz ayrı bir katman üretmez; bu kimliklerin
-   * `feature-state`'i boyanır (bkz. networkLayers.ts iz ifadeleri).
+   * Kullanıcının açık sorgusunun **vurgu kümesi token'ı** — iz (up/down) ya da alan seçimi.
+   * Sunucu sorgu sonucuyla birlikte döner. Vurgu artık kimlik listesinden değil, o token'ın
+   * kendi tile'larından çizilir (bkz. highlightLayers.ts): kimlik listesi kırpılıyordu ve
+   * `setFeatureState` yalnız o zoom'da tile'a girmiş elemanı boyayabiliyordu.
    */
-  tracedIds: string[] | undefined;
-  traceDirection: TraceDirection | undefined;
+  queryHighlightToken: string | null | undefined;
   /**
    * İzin kapsayan dikdörtgeni — sunucu tek `ST_Extent` sorgusuyla döner. Geldiğinde kamera
    * buraya oturur; iz kapanınca kullanıcının seçimden önceki konumuna geri döner.
    */
   traceBbox: Bbox | null | undefined;
   /**
-   * Görünüm penceresindeki enerjisiz eleman kimlikleri. İzle aynı mekanizma: ayrı katman
-   * üretilmez, bu kimliklerin `feature-state`'i boyanır. Enerji durumu tile'a **gömülmez** —
-   * gömülseydi her manevrada tüm tile önbelleği boşalırdı.
+   * Enerjisiz küme + açık kesicilerin vurgu token'ı. Pencereye göre değil, enerjilenme
+   * **sürümüne** göre değişir; kamera hareketi bu token'a hiç dokunmaz — "ekrandan
+   * uzaklaşınca kesinti hattı kayboluyor" davranışı buradan çıkıyordu.
    */
-  deEnergizedIds: string[] | undefined;
-  /** Kesintinin kökü olan kesiciler — "açık kontak" olarak çizilir (içi boş + kırmızı kontur). */
-  openSwitchIds: string[] | undefined;
-  /** Efsanedeki "Enerjisiz Bölgeler" satırı kapalıysa durum hiç yazılmaz. */
-  showDeEnergized: boolean;
-  /** Kamera durduğunda görünüm penceresi yukarı bildirilir — enerjisizlik sorgusu bbox kapsamlı. */
-  onViewportChange?: (bbox: Bbox, zoom: number) => void;
+  stateHighlightToken: string | null | undefined;
   /** İşletim katmanları — `/outages/map` ve `/work-orders/map` özetleri. */
   outages: OutageMapItem[] | undefined;
   workOrders: WorkOrderMapItem[] | undefined;
@@ -116,6 +117,46 @@ interface MapViewProps {
 registerPmtilesProtocol();
 
 const EMPTY_STYLE: StyleSpecification = { version: 8, sources: {}, layers: [] };
+
+/**
+ * Vurgu katmanlarının çizim sırasındaki çapası: bu katmanın hemen ALTINA girerler.
+ * Isı haritası seçildi çünkü `rebuildLayers` onu her zaman ekler (görünürlüğü kapalı olsa
+ * bile katman durur) ve kesinti/iş emri işaretçilerinin ALTINDA, şebeke katmanlarının
+ * ÜSTÜNDEDİR — vurgunun ait olduğu yer.
+ *
+ * Bu çapa aynı zamanda "kesinti/iş emri rozetleri her şeyin en üstündedir" kuralının
+ * uygulandığı yerdir: rozet katmanları `rebuildLayers`'ta ısı haritasından SONRA eklenir,
+ * vurgu ise ısı haritasının altına girer.
+ */
+const HIGHLIGHT_ANCHOR_LAYER_ID = OUTAGE_HEATMAP_LAYER_ID;
+
+/**
+ * Çizim sırası (alttan üste): şebeke → **enerjisizlik** → **iz/alan sorgusu** → ısı
+ * haritası → kesinti/iş emri rozetleri.
+ *
+ * **İz (up/down) enerjisizlik hattının ÜSTÜNDE durur.** İz kullanıcının o an sorduğu sorudur
+ * ("bunu kesersem kim kararır"); kesintinin kırmızı kesik hattı ise arka plandaki kalıcı
+ * durumdur. Soru cevabının altında kalırsa iz kırmızıyla parça parça kesilir ve zincir takip
+ * edilemez.
+ *
+ * ⚠️ İki aday listesi eskiden **tersti** ve bu, `useHighlightSource`'un kendi belgelediği
+ * niyetle çelişiyordu ("`state` `query`nin altına girer") — yani bir karar değil, iki sabitin
+ * yer değiştirmesiydi. `highlightLayers.ts` başlığındaki "sorgu durumu ezer" kuralı da ancak
+ * bu sırayla doğru. Kesinti hattı kaybolmuyor: enerjisizlik kesik ve **daha kalın** çizilir
+ * (`widthByType(2.2)`), izin gövdesi ince ve düzdür (`1.6`) — kırmızı kesikler izin iki
+ * yanından okunmaya devam eder.
+ *
+ * 🚨 **İz yalnız bir kademe yükselir, tepeye çıkmaz.** Çapa hâlâ ısı haritasıdır; dolayısıyla
+ * iz, kesinti/iş emri **rozetlerinin altında** kalır. Bu ayrı ve bozulmaması gereken bir
+ * kuraldır: nokta işaretçisi üstünden geçen bir hat tarafından örtülmemeli — rozet "burada
+ * bir kayıt var" der, hat yalnız "buradan geçiyor" der.
+ *
+ * İki kaynak birbirinden bağımsız zamanlarda kurulduğu için çapa tek bir katman değil bir
+ * **aday listesidir**: enerjisizlik önce izin ilk katmanını dener, o yoksa ortak çapaya
+ * düşer. Aday listesi olmadan, önce kurulan kaynak her zaman altta kalırdı — hangisinin
+ * token'ının önce geldiği ise kullanıcının hangi paneli açtığına bağlı, yani rastgele.
+ */
+const { state: STATE_ANCHORS, query: QUERY_ANCHORS } = highlightAnchors(HIGHLIGHT_ANCHOR_LAYER_ID);
 
 /** Türkiye odaklı — batıda Yunanistan, doğuda Azerbaycan'a kadar; kaydırma bunun dışına çıkamaz. */
 const TURKEY_MAX_BOUNDS: [[number, number], [number, number]] = [
@@ -157,13 +198,9 @@ export function MapView({
   showOutageHeatmap,
   selectedOperationId,
   onSelectOperation,
-  tracedIds,
-  traceDirection,
+  queryHighlightToken,
   traceBbox,
-  deEnergizedIds,
-  openSwitchIds,
-  showDeEnergized,
-  onViewportChange,
+  stateHighlightToken,
   isAreaDrawing,
   areaPolygon,
   onAreaDrawn,
@@ -187,11 +224,6 @@ export function MapView({
   unitLabelsRef.current = unitLabels;
   // Önceki seçimin `feature-state`'ini temizleyebilmek için tutulur.
   const selectedFeatureRef = useRef<string | undefined>(undefined);
-  // Aynısının iz karşılığı — iz kapanınca boyanmış her kimlik tek tek geri alınır.
-  const tracedFeatureIdsRef = useRef<string[]>([]);
-  // Enerjisizlik karşılığı; kesinti bitince ya da pencere değişince tek tek temizlenir.
-  const energizedFeatureIdsRef = useRef<string[]>([]);
-  const openSwitchFeatureIdsRef = useRef<string[]>([]);
   // İz açılmadan önceki kamera; iz kapanınca buraya dönülür.
   const savedCameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const drawRef = useRef<PolygonDrawController | null>(null);
@@ -215,8 +247,6 @@ export function MapView({
   onAreaDrawingChangeRef.current = onAreaDrawingChange;
   const onMapReadyRef = useRef(onMapReady);
   onMapReadyRef.current = onMapReady;
-  const onViewportChangeRef = useRef(onViewportChange);
-  onViewportChangeRef.current = onViewportChange;
   // Kesinti/iş emri verisi katmanlar kurulmadan da gelebilir; son hâli burada tutulur ki
   // tema değişiminde katmanlar yeniden kurulurken veri kaybolmasın.
   const outagesRef = useRef(outages);
@@ -275,15 +305,10 @@ export function MapView({
         if (!window.location.pathname.startsWith('/map')) return;
         const center = map!.getCenter();
         onViewChangeRef.current({ lng: center.lng, lat: center.lat, zoom: map!.getZoom() });
-
-        // Enerjisizlik sorgusu görünüm penceresi kapsamlıdır (`setFeatureState` yalnız yüklü
-        // tile'lara yazılabilir), o yüzden pencere her durduğunda yukarı bildirilir. Yukarıdaki
-        // "haritadan çıkamama" koruması bu bildirimi de kapsar — bilerek aynı bloktadır.
-        const b = map!.getBounds();
-        onViewportChangeRef.current?.(
-          [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()],
-          map!.getZoom(),
-        );
+        // ⚠️ Buraya başka hiçbir şey eklenmemeli. Eskiden burada görünüm penceresi de yukarı
+        // bildiriliyor ve her `moveend` bir enerjisizlik sorgusu açıyordu; vurgu artık
+        // pencereden bağımsız bir küme token'ıyla geldiği için kamera hareketinin ağ maliyeti
+        // yalnızca tile isteğidir.
       });
 
       // Küme rozetleri her sayı için ayrı bir görseldir; sayı sınırsız olduğundan hepsi
@@ -363,13 +388,6 @@ export function MapView({
 
       map.on('load', () => {
         loadedRef.current = true;
-        // İlk pencere `moveend` beklemeden bildirilir — kullanıcı haritayı hiç oynatmazsa
-        // enerjisizlik sorgusu hiç açılmazdı.
-        const initial = map!.getBounds();
-        onViewportChangeRef.current?.(
-          [initial.getWest(), initial.getSouth(), initial.getEast(), initial.getNorth()],
-          map!.getZoom(),
-        );
         drawRef.current = new PolygonDrawController(map!, {
           onComplete: (polygon) => onAreaDrawnRef.current(polygon),
           onDrawingChange: (drawing) => onAreaDrawingChangeRef.current(drawing),
@@ -522,82 +540,25 @@ export function MapView({
     }
   }, [selectedId, layersVersion]);
 
-  // İz vurgusu — seçimle aynı mekanizma (`feature-state`), ayrı bir katman üretilmez.
-  // Önceki iz her seferinde tek tek temizlenir: `removeFeatureState` kaynağın tamamını
-  // sıfırlayabilirdi ama o seçimi de silerdi.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || layersVersion === 0) return;
-
-    for (const id of tracedFeatureIdsRef.current) {
-      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
-        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, 'traced');
-      }
-    }
-    tracedFeatureIdsRef.current = [];
-
-    if (!tracedIds || !traceDirection) return;
-    for (const id of tracedIds) {
-      // Hangi kaynak katmanda olduğu bilinmediğinden hepsine yazılır; olmayan tarafta
-      // `feature-state` sessizce boşa gider (seçimde de aynı desen kullanılıyor).
-      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
-        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, { traced: traceDirection });
-      }
-    }
-    tracedFeatureIdsRef.current = tracedIds;
-  }, [tracedIds, traceDirection, layersVersion]);
-
-  // Enerjisizlik — izle birebir aynı desen. `layersVersion` bağımlılıkta: tema değişiminde
-  // katmanlar yeniden kurulur ve durumlar yeniden yazılmazsa enerjisizlik sessizce kaybolur.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || layersVersion === 0) return;
-
-    // Tek tek temizlenir; kaynağın tamamını sıfırlamak seçimi ve izi de silerdi.
-    for (const id of energizedFeatureIdsRef.current) {
-      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
-        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, 'energized');
-      }
-    }
-    for (const id of openSwitchFeatureIdsRef.current) {
-      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
-        map.removeFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, 'switchOpen');
-      }
-    }
-    energizedFeatureIdsRef.current = [];
-    openSwitchFeatureIdsRef.current = [];
-
-    if (!showDeEnergized) return;
-
-    for (const id of deEnergizedIds ?? []) {
-      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
-        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, { energized: false });
-      }
-    }
-    for (const id of openSwitchIds ?? []) {
-      for (const sourceLayer of SELECTABLE_SOURCE_LAYERS) {
-        map.setFeatureState({ source: NETWORK_SOURCE_ID, sourceLayer, id }, { switchOpen: true });
-      }
-    }
-
-    energizedFeatureIdsRef.current = deEnergizedIds ?? [];
-    openSwitchFeatureIdsRef.current = openSwitchIds ?? [];
-  }, [deEnergizedIds, openSwitchIds, showDeEnergized, layersVersion]);
-
-  // Kesikli enerjisizlik katmanları yalnız efsane satırı açıkken VE enerjisiz küme boş
-  // değilken açılır (bkz. `emphasisVisibility` — performans notu orada).
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || layersVersion === 0) return;
-
-    const hasEmphasis = showDeEnergized && (deEnergizedIds?.length ?? 0) > 0;
-
-    for (const { layerId, visible } of emphasisVisibility(legend, hasEmphasis)) {
-      if (map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
-      }
-    }
-  }, [deEnergizedIds, showDeEnergized, legend, layersVersion]);
+  /**
+   * Vurgu kaynakları — iz, alan seçimi ve enerjisizliğin **tek** yolu.
+   *
+   * Eskiden burada üç ayrı efekt vardı (iz, enerjisizlik, kesikli katman görünürlüğü) ve
+   * üçü de `SELECTABLE_SOURCE_LAYERS` boyunca kimlik başına dört `setFeatureState` yazıyordu:
+   * 10 bin kimlikli bir izde tek karede 40 bin çağrı. Artık yapılan iş, token değişince bir
+   * kaynağı kurup dört katman eklemekten ibaret — pan/zoom sırasında ise hiç.
+   *
+   * ⚠️ Sıra: `state` (enerjisizlik) `query`nin (iz/alan) **altına** girer. İki kaynak
+   * birbirinden bağımsız zamanlarda kurulduğu için çapa tek bir katman değil, bir **aday
+   * listesidir**: `state` önce `query`nin ilk katmanını dener, o yoksa ortak çapaya düşer.
+   * Aday listesi olmadan, `state` `query`den önce kurulduğunda en üste ekleniyor ve iz
+   * açıldığında altta kalması gerekirken üstünde kalıyordu.
+   */
+  useHighlightSource(mapRef, HIGHLIGHT_QUERY_SOURCE_ID, queryHighlightToken ?? null, layersVersion, QUERY_ANCHORS);
+  // Enerjisiz bölgeler kapatılamaz: "hangi hat kesik" haritanın ana bilgisidir, kullanıcının
+  // ayrıca açması gereken bir katman değil. Kesinti yoksa token zaten `null` gelir ve tek bir
+  // tile isteği bile çıkmaz — kapatma anahtarının performans gerekçesi de yok.
+  useHighlightSource(mapRef, HIGHLIGHT_STATE_SOURCE_ID, stateHighlightToken ?? null, layersVersion, STATE_ANCHORS);
 
   // Harita odağı: iz açılınca kamera izin kapsayan dikdörtgenine oturur, iz kapanınca
   // kullanıcının seçimden ÖNCEKİ konumuna geri döner. Ayrı bir "temizle" butonuna
@@ -650,6 +611,47 @@ export function MapView({
   return <div ref={containerRef} className={styles.container} />;
 }
 
+/**
+ * Bir vurgu kaynağını token'ıyla birlikte var eder / yok eder.
+ *
+ * `layersVersion` bağımlılıkta: tema değişiminde tüm katmanlar yeniden kurulur ve vurgu
+ * kaynakları da silinir; yeniden kurulmazlarsa vurgu sessizce kaybolur.
+ *
+ * `anchorCandidates` çizim sırasını belirler — katmanlar, listede **var olan ilk** katmanın
+ * hemen ALTINA girer (MapLibre'de `beforeId` "bunun altına" demektir). Hiçbiri yoksa en üste
+ * eklenir.
+ */
+function useHighlightSource(
+  mapRef: { current: MapLibreMap | null },
+  sourceId: string,
+  setToken: string | null,
+  layersVersion: number,
+  anchorCandidates: readonly string[],
+): void {
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || layersVersion === 0) return;
+
+    const teardown = () => {
+      for (const layerId of highlightLayerIds(sourceId)) {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+      }
+      if (map.getSource(sourceId)) map.removeSource(sourceId);
+    };
+
+    teardown();
+    if (!setToken) return;
+
+    map.addSource(sourceId, buildHighlightSource(setToken));
+    const before = anchorCandidates.find((id) => map.getLayer(id));
+    for (const layer of buildHighlightLayers(sourceId)) map.addLayer(layer, before);
+
+    // Katmanlar tema değişiminde `rebuildLayers` tarafından zaten sökülüyor; bu temizlik
+    // token değiştiğinde eski kümenin ekranda bir kare kalmasını önler.
+    return teardown;
+  }, [mapRef, sourceId, setToken, layersVersion, anchorCandidates]);
+}
+
 interface RebuildInput {
   outages: OutageMapItem[] | undefined;
   workOrders: WorkOrderMapItem[] | undefined;
@@ -662,6 +664,8 @@ interface RebuildInput {
 async function rebuildLayers(map: MapLibreMap, theme: 'light' | 'dark', input: RebuildInput): Promise<void> {
   const ownedSources = [
     NETWORK_SOURCE_ID,
+    HIGHLIGHT_STATE_SOURCE_ID,
+    HIGHLIGHT_QUERY_SOURCE_ID,
     UNIT_LABEL_SOURCE_ID,
     OUTAGE_SOURCE_ID,
     WORK_ORDER_SOURCE_ID,
@@ -679,11 +683,17 @@ async function rebuildLayers(map: MapLibreMap, theme: 'light' | 'dark', input: R
   removeBasemap(map);
 
   // Katman sırası: altlık harita → il/ilçe renkleri → il/ilçe adları → hatlar → bina izi →
-  // düğümler → çizim poligonu → ısı haritası → kesinti/iş emri işaretçileri (en üstte).
+  // düğümler → **vurgu (önce enerjisizlik, üstüne iz)** → çizim poligonu → ısı haritası →
+  // kesinti/iş emri işaretçileri (en üstte).
   map.addSource(NETWORK_SOURCE_ID, buildNetworkSource());
   const layers = buildNetworkLayers(theme);
   for (const layer of layers) map.addLayer(layer);
   const firstLayerId = layers[0]!.id;
+
+  // Vurgu kaynakları burada KURULMAZ — token'larıyla birlikte `useHighlightSource` tarafından
+  // var edilir. Buradaki tek sorumluluk, tema değişiminde eskilerini sökmek (`ownedSources`)
+  // ve çizim sıralarının çapası olan katmanın (`HIGHLIGHT_ANCHOR_LAYER_ID`) var olmasını
+  // sağlamak — o çapa aşağıda eklenen ısı haritası katmanıdır.
 
   // Adlar il/ilçe dolgularının hemen üstüne, hatların altına girer: eskiden HTML işaretçisi
   // oldukları için her şeyin üstünde duruyor ve elemanların üstünü kapatıyorlardı.

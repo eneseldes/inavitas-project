@@ -84,9 +84,14 @@ export function DetailPanel({
               <DetailRow label="ID">
                 <span className="font-mono">{selectedId}</span>
               </DetailRow>
+              {/* Kesici rolü VARSA tip yerine o yazılır, ikisi yan yana DEĞİL: bir kofranın
+                  ham tipi `CIRCUIT_BREAKER` olduğu için satır "Kesici · Kofra Kesicisi"
+                  diye okunuyordu — kofra tek bir birimdir, adı da tektir. Aynı kural
+                  `CreateOperationDialog`te zaten uygulanıyordu; iki ekran ayrışmasın. */}
               <DetailRow label={t('map.result.column.type')}>
-                {t(`network.enum.componentType.${component.type}`)}
-                {component.breakerRole && ` · ${t(`network.enum.breakerRole.${component.breakerRole}`)}`}
+                {component.breakerRole
+                  ? t(`network.enum.breakerRole.${component.breakerRole}`)
+                  : t(`network.enum.componentType.${component.type}`)}
               </DetailRow>
               <DetailRow label={t('map.panel.detail.field.voltageLevel')}>
                 {t(`network.enum.voltageLevel.${component.voltageLevel}`)}
@@ -221,6 +226,7 @@ function TraceSummary({
 
   if (trace.direction === 'down') {
     // Radyallik bozuksa etki kümesi güvenilmez ve boş döner; sayı yerine uyarı gösterilir.
+    // Kamera da hareket etmez (`bbox: null`) — uyarı olmadan "düğme çalışmadı" gibi durur.
     if (trace.radialityViolated) {
       return (
         <p className={clsx(styles.traceSummary, styles.traceWarning)}>
@@ -236,12 +242,31 @@ function TraceSummary({
             customers: trace.affectedCustomerCount.toLocaleString('tr-TR'),
           })}
         </p>
-        {/* Sayılar kırpılmaz, **kimlik listesi** kırpılır (bkz. IMPACT_ID_LIMIT). Yani sayı
-            doğru ama haritada boyanan küme eksik — bu ayrım açıkça söylenir. */}
-        {trace.overflowed && <p className={styles.traceNote}>{t('map.trace.overflowed')}</p>}
+        <TraceExtentNotes trace={trace} />
       </>
     );
   }
 
-  return <p className={styles.traceSummary}>{t('map.trace.upstreamSummary', { count: trace.chain.length })}</p>;
+  return (
+    <>
+      <p className={styles.traceSummary}>{t('map.trace.upstreamSummary', { count: trace.chain.length })}</p>
+      <TraceExtentNotes trace={trace} />
+    </>
+  );
+}
+
+/**
+ * İzin haritadaki karşılığıyla ilgili iki sessiz durumun açık karşılığı: vurgu kümesinin
+ * kırpılması ve kapsayan dikdörtgenin hesaplanamaması. İkisi de "harita bir şey yapmadı"
+ * gibi görünür; söylenmezse kullanıcı düğmenin bozuk olduğunu sanır.
+ */
+function TraceExtentNotes({ trace }: { trace: DownstreamImpact | UpstreamChain }) {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      {trace.setTruncated && <p className={styles.traceNote}>{t('map.trace.setTruncated')}</p>}
+      {trace.bbox === null && <p className={styles.traceNote}>{t('map.trace.noBbox')}</p>}
+    </>
+  );
 }

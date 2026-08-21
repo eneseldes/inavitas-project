@@ -22,6 +22,13 @@
       "when": 1787235016928,
       "tag": "0002_drop_retired_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787310837974,
+      "tag": "0003_drop_switch_permission_key",
+      "breakpoints": true
     }
   ]
 }

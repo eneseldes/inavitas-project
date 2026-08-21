@@ -1,0 +1,15 @@
+# Pano sağlayıcısı — `observability/dashboards/` altındaki JSON dosyaları Grafana'ya
+# otomatik yüklenir. Panolar dosyada durur, Grafana'nın veritabanında değil: elle
+# düzenlenen bir pano konteyner silinince kaybolur, dosya kaybolmaz.
+apiVersion: 1
+providers:
+  - name: inavitas
+    orgId: 1
+    folder: Inavitas
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
+      foldersFromFilesStructure: false

@@ -6,6 +6,7 @@ import {
   type AuthedRequest,
 } from '@inavitas/shared';
 import type { Response } from 'express';
+import { registerHighlightSet } from '../../modules/highlight/sets.ts';
 import * as impactService from '../../modules/impact/service.ts';
 import * as componentsRepository from '../../repository/components.repository.ts';
 import { toBboxDto, toDownstreamImpactDto, toImpactPreviewDto, toUpstreamChainDto } from '../dto.ts';
@@ -26,7 +27,14 @@ async function assertTraceableFrom(req: AuthedRequest, id: string): Promise<void
   assertInScope(req.user, PERMISSIONS.NETWORK_TRACE, component.unitPath, id);
 }
 
-/** `GET /components/:id/trace?direction=up|down` */
+/**
+ * `GET /components/:id/trace?direction=up|down`
+ *
+ * Yanıt bir **vurgu token'ı** taşır (`setToken`); harita izi kimliklerden değil o token'ın
+ * tile'larından çizilir (bkz. `onceden-yapilanlar.md` §11.1). Kimlik listesi yanıtta **yoktur**:
+ * panel yalnız sayıları gösteriyor, listeyi okuyan kimse yoktu ve yüz binlerce elemanlı bir
+ * izde tarayıcıya megabaytlarca ölü JSON taşınıyordu.
+ */
 export async function trace(req: AuthedRequest, res: Response): Promise<void> {
   const id = req.params.id as string;
   const { direction } = TraceQuery.parse(req.query);
@@ -35,12 +43,26 @@ export async function trace(req: AuthedRequest, res: Response): Promise<void> {
 
   if (direction === 'down') {
     const impact = await impactService.computeDownstreamTrace(id);
-    res.json({ direction, ...toDownstreamImpactDto(impact), bbox: toBboxDto(impact.bbox) });
+    const set = await registerHighlightSet(req.user!, [{ role: 'down', ids: [id, ...impact.affectedElementIds] }]);
+    res.json({
+      direction,
+      ...toDownstreamImpactDto(impact),
+      bbox: toBboxDto(impact.bbox),
+      setToken: set?.token ?? null,
+      setTruncated: set?.truncated ?? false,
+    });
     return;
   }
 
   const { chain, bbox } = await impactService.computeUpstreamChain(id);
-  res.json({ direction, ...toUpstreamChainDto(id, chain), bbox: toBboxDto(bbox) });
+  const set = await registerHighlightSet(req.user!, [{ role: 'up', ids: [id, ...chain.map((row) => row.id)] }]);
+  res.json({
+    direction,
+    ...toUpstreamChainDto(id, chain),
+    bbox: toBboxDto(bbox),
+    setToken: set?.token ?? null,
+    setTruncated: set?.truncated ?? false,
+  });
 }
 
 /** `GET /components/:id/impact-preview` */

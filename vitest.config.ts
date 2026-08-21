@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
-    include: ['{packages,services,apps}/*/test/**/*.test.ts'],
+    // Kök `test/` klasörü depo geneli denetimler içindir (bkz. test/security-surface.test.ts):
+    // tek bir workspace'e ait olmayan, "bu karar her yerde uygulandı mı" testleri.
+    include: ['{packages,services,apps}/*/test/**/*.test.ts', 'test/**/*.test.ts'],
     // Altyapı gerektiren (Testcontainers) entegrasyon testleri kapsam dışıdır;
     // şu anki testlerin hepsi saf birim testi, paralel çalışabilir.
     environment: 'node',

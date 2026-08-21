@@ -63,12 +63,14 @@ export function fetchWorkOrderHistory(id: string): Promise<{ items: WorkOrderHis
   return apiFetch(`/api/work-orders/${id}/history`);
 }
 
-/** Harita katmanı için hafif özet — sayfalama yok, sunucuda üst sınır var. */
+/** Harita katmanı için hafif özet — `limit` gerekçesi için bkz. outages/api.ts `MAP_ITEM_LIMIT`. */
+export const MAP_ITEM_LIMIT = 5_000;
+
 export function fetchWorkOrderMapItems(
   filters: WorkOrderFilters,
 ): Promise<{ items: WorkOrderMapItem[]; truncated: boolean }> {
   const params = new URLSearchParams();
   appendFilters(params, filters);
-  const query = params.toString();
-  return apiFetch(`/api/work-orders/map${query ? `?${query}` : ''}`);
+  params.set('limit', String(MAP_ITEM_LIMIT));
+  return apiFetch(`/api/work-orders/map?${params.toString()}`);
 }

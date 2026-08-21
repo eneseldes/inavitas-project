@@ -46,6 +46,38 @@ export function clusterImageIdPrefix(kind: OperationKind): string {
   return `op-cluster-${kind}-`;
 }
 
+// --- Akış yönü oku -----------------------------------------------------------
+//
+// İz katmanı hattın üstüne, hattın çizim yönünde bir ok dizer (bkz. highlightLayers.ts).
+// Görsel rol başına ayrı üretilir çünkü `icon-color` yalnız SDF görsellerde çalışır; SDF
+// ise kenarlık (kontur) taşıyamaz ve okun altlık üstünde okunması konturuna bağlı.
+
+/** Katman ifadesi kimliği `['concat', PREFIX, ['get','role']]` ile kurar — biçim tek yerde. */
+export const TRACE_ARROW_IMAGE_PREFIX = 'trace-arrow-';
+
+/** Ok görselinin üretildiği roller — `highlightLayers.ts` `TRACE_ROLES` ile aynı olmalı. */
+const TRACE_ARROW_ROLES = ['up', 'down'] as const;
+type TraceArrowRole = (typeof TRACE_ARROW_ROLES)[number];
+
+const TRACE_ARROW_TOKEN: Record<TraceArrowRole, string> = {
+  up: '--c-map-trace-up',
+  down: '--c-map-trace-down',
+};
+
+/** Ok görselinin ölçüleri (CSS pikseli) — `icon-size` bunu zoom'a göre ölçekler. */
+const ARROW_WIDTH = 13;
+const ARROW_HEIGHT = 12;
+
+/**
+ * Ok, +x yönüne (sağa) bakar: `symbol-placement: 'line'` sembolü hattın çizim yönüne
+ * döndürdüğü için "sağa bakan ok" ekranda akış yönünü gösterir.
+ */
+function arrowSvg(fill: string, stroke: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${ARROW_WIDTH}" height="${ARROW_HEIGHT}" viewBox="0 0 ${ARROW_WIDTH} ${ARROW_HEIGHT}">
+  <path d="M 2.5 1.5 L 11 6 L 2.5 10.5 L 4.5 6 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.4" stroke-linejoin="round"/>
+</svg>`;
+}
+
 /**
  * O ana kadar üretilmiş küme rozetleri. Tema değişiminde silinmeleri gerekir: kayıtlı bir
  * görsel için `styleimagemissing` bir daha ateşlenmez, silinmezlerse rozetler eski temanın
@@ -158,10 +190,22 @@ export async function registerMarkerImages(map: MapLibreMap): Promise<void> {
     Object.entries(OPERATION_STATUS_TOKENS[kind]).map(([status, colorToken]) => ({
       id: markerImageId(kind, status),
       svg: markerSvg(kind, token(colorToken), stroke, ink),
+      width,
+      height,
     })),
   );
 
-  const images = await Promise.all(entries.map((entry) => loadSvgImage(entry.svg, width, height)));
+  // Akış okları da token'lardan boyanır — tema değişiminde rozetlerle birlikte yenilenmeli.
+  for (const role of TRACE_ARROW_ROLES) {
+    entries.push({
+      id: `${TRACE_ARROW_IMAGE_PREFIX}${role}`,
+      svg: arrowSvg(token(TRACE_ARROW_TOKEN[role]), stroke),
+      width: ARROW_WIDTH,
+      height: ARROW_HEIGHT,
+    });
+  }
+
+  const images = await Promise.all(entries.map((entry) => loadSvgImage(entry.svg, entry.width, entry.height)));
 
   entries.forEach((entry, index) => {
     // Tema değişiminde aynı kimlik yeniden üretilir; MapLibre çift kayda hata verir.

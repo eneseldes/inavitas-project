@@ -3,8 +3,9 @@
  * tek sorguda. Abone haritada bir katman değildir; kofra kesicisi ev girişini temsil eder,
  * abone bilgisi yalnız eleman detayında görünür.
  *
- * ⚠️ Enerji durumu (`is_closed`, `is_energized`, `status`) tile'a gömülmez — aksi halde her
- * manevrada tüm tile cache'i boşalması gerekirdi. Bu bilgi ileride `setFeatureState` ile taşınır.
+ * ⚠️ Enerji durumu (`is_energized`, `status`) tile'a gömülmez — aksi halde her durum
+ * değişikliğinde tüm tile cache'i boşalması gerekirdi. Bu bilgi ileride `setFeatureState` ile
+ * taşınır.
  *
  * ## Bina izi (z ≥ BUILDING_ZOOM)
  *
@@ -32,6 +33,20 @@ import { components, units } from '../../db/schema.ts';
 import { resolveZoomLod } from './zoom-lod.ts';
 
 const TILE_EXTENT = 4096;
+
+/**
+ * Bu dosyadaki MVT şemasının (katman adları + kolon listesi + `zoom-lod.ts` eşikleri) sürümü.
+ *
+ * Sunucu önbelleğinin anahtarı buradan türer (bkz. tiles.controller.ts `cacheKey`) —
+ * **şema değiştiğinde burası artırılmalı**, aksi halde eski şemalı tile'lar TTL dolana kadar
+ * (1 saat) servis edilmeye devam eder.
+ *
+ * ⚠️ İstemcide de bir eşi var (`apps/web/src/features/map/api.ts` `TILE_SCHEMA_VERSION`) ve
+ * tek bir sabitten türetilemiyor: `apps/web` bilerek hiçbir backend paketine bağımlı değil
+ * (`packages/contracts` tarayıcı paketine girmez). İkisi ayrışırsa bu artık **sessiz**
+ * değildir: `getTile` uyuşmazlığı loglar (bkz. tiles.controller.ts).
+ */
+export const TILE_SCHEMA_VERSION = 9;
 
 export interface TileCoord {
   z: number;

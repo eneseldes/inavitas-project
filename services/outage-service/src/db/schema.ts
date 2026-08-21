@@ -142,8 +142,9 @@ export const outageStatusHistory = pgTable(
 );
 
 /**
- * Etki anlık görüntüsü (snapshot). Her hesap yeni bir revizyon satırıdır — manevra
- * (izolasyon/restorasyon) sonrası yapılan yeni hesap eskisini ezmez, üstüne yazılır.
+ * Etki anlık görüntüsü (snapshot). Ekle-only'dur: her hesap yeni bir revizyon satırıdır,
+ * eskisini ezmez. Bugün her kesintinin tek bir revizyonu (`1`) vardır — etki kesinti
+ * açılırken bir kez hesaplanır; yer ileride revizyon yazılmak istenirse hazır durur.
  */
 export const outageImpact = pgTable(
   'outage_impact',
@@ -166,6 +167,15 @@ export const outageImpact = pgTable(
   (table) => [
     unique('uq_outage_impact_revision').on(table.outageId, table.revision),
     index('idx_outage_impact_outage').on(table.outageId, table.revision.desc()),
+    /**
+     * Kapsama (`@>`) sorgusunun indeksi — kesinti açma kapısı her istekte bunu çalıştırır
+     * (bkz. outage.repository.ts `findContainingOutages`). İndeks olmadan sorgu, süren her
+     * kesintinin on binlerce elemanlı jsonb dizisini tek tek tarıyordu.
+     *
+     * `jsonb_path_ops` seçildi çünkü tek ihtiyacımız kapsama operatörü: varsayılan
+     * `jsonb_ops`'a göre belirgin şekilde küçük ve `@>` üstünde daha hızlıdır.
+     */
+    index('idx_outage_impact_elements').using('gin', sql`${table.affectedElementIds} jsonb_path_ops`),
   ],
 );
 

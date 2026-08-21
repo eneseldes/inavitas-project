@@ -59,7 +59,9 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
   const cascadeConfirmedRef = useRef(false);
   const labels = useLabels();
   const { data: preview, isLoading: isPreviewLoading, isError: isPreviewError } = useImpactPreview(component.id);
-  const guards = useOperationGuards(component.id);
+  // `withCascade`: alt kesinti listesi yalnız burada, kaskad onay modalinde gösteriliyor —
+  // eleman seçmenin bedeli olmasın diye önizleme yalnız bu modal açıkken bağlanır.
+  const guards = useOperationGuards(component.id, { withCascade: true });
   const { show } = useToast();
   const createOutage = useCreateOutage();
   const createWorkOrder = useCreateWorkOrder();

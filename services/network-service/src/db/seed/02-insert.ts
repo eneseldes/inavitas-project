@@ -10,7 +10,7 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
   await db.execute(sql`CREATE SCHEMA IF NOT EXISTS network;`);
   await db.execute(sql`CREATE SCHEMA IF NOT EXISTS customer;`);
 
-  log('[02-insert] 1/6 units tablosu dolduruluyor...');
+  log('[02-insert] 1/5 units tablosu dolduruluyor...');
   await db.execute(sql`
     INSERT INTO network.units (
       path, parent_path, level, name, province_name, district_name,
@@ -34,13 +34,13 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
     FROM staging_seed.admin_units;
   `);
 
-  log('[02-insert] 2/6 components tablosu dolduruluyor...');
+  log('[02-insert] 2/5 components tablosu dolduruluyor...');
   await db.execute(sql`
     INSERT INTO network.components (
       id, type, category, breaker_role, voltage_level, topology_level,
       parent_id, tm_id, feeder_id, dm_id, transformer_id,
       unit_path, unit_paths, unit_path_source, geom, lat, lon,
-      switchable, load_break, normally_open, is_closed, status, is_energized, name, attributes
+      switchable, status, is_energized, name, attributes
     )
     SELECT
       id,
@@ -71,9 +71,6 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
       lat::double precision,
       lon::double precision,
       switchable::boolean,
-      load_break::boolean,
-      normally_open::boolean,
-      (NOT normally_open::boolean) AS is_closed,
       COALESCE(attributes::jsonb->>'status', 'ENERGIZED') AS status,
       (COALESCE(attributes::jsonb->>'status', 'ENERGIZED') = 'ENERGIZED') AS is_energized,
       attributes::jsonb->>'name' AS name,
@@ -81,10 +78,10 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
     FROM staging_seed.components;
   `);
 
-  log('[02-insert] 3/6 topology_edges tablosu dolduruluyor...');
+  log('[02-insert] 3/5 topology_edges tablosu dolduruluyor...');
   await db.execute(sql`
     INSERT INTO network.topology_edges (
-      from_id, to_id, connection_type, is_closed, normally_open, ring_id,
+      from_id, to_id, connection_type, is_closed,
       participates_in_outage_graph, component_id, length_m
     )
     SELECT
@@ -92,29 +89,13 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
       to_id,
       connection_type,
       is_closed::boolean,
-      normally_open::boolean,
-      NULLIF(ring_id, ''),
       participates_in_outage_graph::boolean,
       NULLIF(component_id, ''),
       length_m::double precision
     FROM staging_seed.topology_edges;
   `);
 
-  log('[02-insert] 4/6 rings tablosu dolduruluyor...');
-  await db.execute(sql`
-    INSERT INTO network.rings (
-      ring_id, ring_type, status, tm_id, tie_switch_ids
-    )
-    SELECT
-      ring_id,
-      ring_type,
-      status,
-      NULLIF(tm_id, ''),
-      to_jsonb(string_to_array(NULLIF(tie_switch_ids, ''), ','))
-    FROM staging_seed.rings;
-  `);
-
-  log('[02-insert] 5/6 customers tablosu dolduruluyor...');
+  log('[02-insert] 4/5 customers tablosu dolduruluyor...');
   await db.execute(sql`
     INSERT INTO customer.customers (
       id, parent_id, tm_id, feeder_id, dm_id, transformer_id,
@@ -142,7 +123,7 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
     FROM staging_seed.customers;
   `);
 
-  log('[02-insert] 6/6 customer_pii tablosu dolduruluyor...');
+  log('[02-insert] 5/5 customer_pii tablosu dolduruluyor...');
   await db.execute(sql`
     INSERT INTO customer.customer_pii (
       id, wiring_id, contract_id
@@ -188,7 +169,6 @@ export async function insertAndTransformData(db: NodePgDatabase<any>, log: (msg:
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_from_id_idx ON network.topology_edges (from_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_to_id_idx ON network.topology_edges (to_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_component_id_idx ON network.topology_edges (component_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS topology_edges_ring_id_idx ON network.topology_edges (ring_id);`);
 
   await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_parent_id_idx ON customer.customers (parent_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS customers_tm_id_idx ON customer.customers (tm_id);`);

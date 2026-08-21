@@ -340,9 +340,16 @@ export async function findActiveByCbsId(cbsId: string): Promise<OutageRow | null
 }
 
 /**
- * Verilen elemanı etki kümesinde taşıyan **aktif** kesintileri döner — kapsayan kesinti
- * adayları. Etki kümesi en dar olan (en az eleman etkileyen) en yakın üsttür, o yüzden
- * artan sırada dönülür.
+ * Verilen elemanı etki kümesinde taşıyan **aktif** kesintileri döner — kesinti açma
+ * kapısının ("bu eleman zaten enerjisiz") kullandığı sorgu.
+ *
+ * ⚠️ **Kaskad bağı artık bunu KULLANMAZ** (bkz. modules/cascade/service.ts): kolon Kafka
+ * mesaj sınırı yüzünden kırpılabiliyor ve kapsama kararı grafın sahibine taşındı. Burada
+ * kalmasının sebebi kapının senkron olması — sunucu, olayın dönmesini bekleyemez. Kırpma
+ * yüzünden kaçan bir durum artık zararsız: kesinti açılır, etki hesabı dönünce kaskad onu
+ * **kırpılmamış** küme üzerinden üst kesintiye bağlar ve müşteri-dakikası yine tek yerde sayılır.
+ *
+ * Etki kümesi en dar olan (en az eleman etkileyen) en yakın üsttür, o yüzden artan sırada dönülür.
  */
 export async function findContainingOutages(cbsId: string, excludeOutageId?: string | null): Promise<OutageRow[]> {
   return db
@@ -354,6 +361,11 @@ export async function findContainingOutages(cbsId: string, excludeOutageId?: str
         eq(outages.status, 'STARTED'),
         // Oluşturma kapısında henüz bir kesinti yok — hariç tutulacak kimlik de yok.
         ...(excludeOutageId ? [sql`${outages.id} <> ${excludeOutageId}::uuid`] : []),
+        // ⚠️ Yalnız EN GÜNCEL revizyon. Bu süzgeç olmadan çok revizyonlu bir kesinti hem
+        // birden çok kez eşleşir hem de BAYAT bir revizyonu üzerinden eşleşebilirdi.
+        sql`${outageImpact.revision} = (
+          SELECT max(i2.revision) FROM ${outageImpact} i2 WHERE i2.outage_id = ${outages.id}
+        )`,
         sql`${outageImpact.affectedElementIds} @> ${JSON.stringify([cbsId])}::jsonb`,
       ),
     )
@@ -362,11 +374,18 @@ export async function findContainingOutages(cbsId: string, excludeOutageId?: str
 }
 
 /**
- * Verilen etki kümesinin içinde kalan, henüz bir üste bağlanmamış **aktif** kesintileri
- * döner — yeni açılan üst kesintinin kapsayacağı alt kesintiler.
+ * Verilen kimliklerden **hâlâ bağlanabilir** olanları döner: süren ve henüz bir üste
+ * bağlanmamış kesintiler.
+ *
+ * Girdi artık eleman kimliği değil **kesinti kimliği**: kapsama kararını `network-service`
+ * veriyor (bkz. modules/cascade/service.ts). Eski `findContainedOutages` kırpılmış eleman
+ * listesi üzerinde `cbs_id IN (…)` arıyordu ve listeye sığmayan hiçbir kesintiyi bulamıyordu.
+ *
+ * Yeniden süzmenin sebebi zamanlama: aday listesi olayın üretildiği anın fotoğrafıdır, olay
+ * tüketilene kadar bir kesinti kapanmış ya da başka bir üste bağlanmış olabilir.
  */
-export async function findContainedOutages(elementIds: string[], excludeOutageId: string): Promise<OutageRow[]> {
-  if (elementIds.length === 0) return [];
+export async function findLinkableByIds(outageIds: string[], excludeOutageId: string): Promise<OutageRow[]> {
+  if (outageIds.length === 0) return [];
 
   return db
     .select()
@@ -376,7 +395,7 @@ export async function findContainedOutages(elementIds: string[], excludeOutageId
         eq(outages.status, 'STARTED'),
         isNull(outages.parentOutageId),
         sql`${outages.id} <> ${excludeOutageId}::uuid`,
-        inArray(outages.cbsId, elementIds),
+        sql`${outages.id} = ANY(${sql.param(outageIds)}::uuid[])`,
       ),
     );
 }

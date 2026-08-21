@@ -2,7 +2,6 @@ import {
   AUTH_COOKIE_NAMES,
   CSRF_HEADER_NAME,
   ScopeStaleError,
-  SCOPES_HEADER_NAME,
   scopeKeys,
   UnauthenticatedError,
   type AuthedRequest,
@@ -10,35 +9,17 @@ import {
 } from '@inavitas/shared';
 import type { NextFunction, Request, Response } from 'express';
 import { redis } from '../redis.ts';
+import { isScopeStale } from './guards.ts';
 import { verifyAccessToken } from './verify-token.ts';
 
-/**
- * 🚨 `x-user-scopes` bu listede olmak ZORUNDA. Atlanırsa header dışarıdan enjekte edilir
- * ve tüm bölgesel yetki modeli delinir — süzme kararını alt servisler bu header'a bakarak
- * veriyor.
- */
-const SPOOFABLE_HEADERS = [
-  'x-user-id',
-  'x-user-email',
-  'x-user-roles',
-  'x-user-permissions',
-  SCOPES_HEADER_NAME,
-];
-
-/** Dışarıdan gelen sahte `X-User-*` header'larını temizler. */
-export function stripSpoofedHeaders() {
-  return (req: Request, _res: Response, next: NextFunction): void => {
-    for (const header of SPOOFABLE_HEADERS) delete req.headers[header];
-    next();
-  };
-}
+// Sahte header temizliği saf bir karardır ve `guards.ts`'te durur (Redis'e bağlı olmayan
+// tek modül); buradan yeniden dışa aktarılır ki `app.ts`'in zinciri tek yerden okunsun.
+export { stripSpoofedHeaders } from './guards.ts';
 
 /**
  * Token'daki kapsam kümesini çözer ve bayatlığını denetler.
  *
- * Sürüm kaydı Redis'tedir çünkü gateway veritabanına bağlanmaz. Kayıt hiç yoksa kapsam o
- * kullanıcı için henüz hiç değişmemiştir (ya da TTL dolmuştur) — token kabul edilir; aksi
- * halde Redis'in boşalması herkesi dışarı atardı.
+ * Bayatlık kararı `guards.ts`'tedir; burada yalnız Redis okuması ve hata fırlatma var.
  */
 async function resolveScopes(payload: {
   sub: string;
@@ -47,7 +28,7 @@ async function resolveScopes(payload: {
   scopeVersion?: number;
 }): Promise<ScopeMap> {
   const current = await redis.get(scopeKeys.version(payload.sub));
-  if (current !== null && Number(current) !== payload.scopeVersion) throw new ScopeStaleError();
+  if (isScopeStale(current, payload.scopeVersion)) throw new ScopeStaleError();
 
   if (!payload.scopeRef) return payload.scopes ?? {};
 

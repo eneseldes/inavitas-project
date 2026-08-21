@@ -14,7 +14,8 @@ import { token } from './networkLayers.ts';
  * İşletim katmanları — kesintiler ve iş emirleri.
  *
  * Şebeke katmanlarından farklı olarak bunlar **MVT tile'dan gelmez**: durum sürekli değişen
- * bir işletim verisidir ve tile'a gömülürse her manevrada tüm tile önbelleği boşalır. Bunun
+ * bir işletim verisidir ve tile'a gömülürse her durum değişikliğinde tüm tile önbelleği
+ * boşalır. Bunun
  * yerine `/outages/map` ve `/work-orders/map` uçlarından gelen hafif özet GeoJSON kaynağı
  * olarak beslenir ve SSE ile tazelenir.
  *

@@ -17,8 +17,7 @@ export const NodeFlag = {
 /** `edgeFlags[e]` bit alanları — `e`, `targets` dizisindeki konumdur. */
 export const EdgeFlag = {
   IsClosed: 1 << 0,
-  NormallyOpen: 1 << 1,
-  InOutageGraph: 1 << 2,
+  InOutageGraph: 1 << 1,
 } as const;
 
 export interface GraphNodeInput {
@@ -42,7 +41,6 @@ export interface GraphEdgeInput {
   fromId: string;
   toId: string;
   isClosed: boolean;
-  normallyOpen: boolean;
   inOutageGraph: boolean;
 }
 
@@ -97,7 +95,6 @@ export function buildCsr(nodes: GraphNodeInput[], edges: GraphEdgeInput[]): CsrG
 
     let flags = 0;
     if (e.isClosed) flags |= EdgeFlag.IsClosed;
-    if (e.normallyOpen) flags |= EdgeFlag.NormallyOpen;
     if (e.inOutageGraph) flags |= EdgeFlag.InOutageGraph;
 
     resolvedFrom[resolvedCount] = a;

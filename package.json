@@ -19,7 +19,8 @@
     "db:seed": "npm run db:seed -w services/access-service && npm run db:seed -w services/translation-service && npm run db:seed -w services/network-service && npm run db:seed -w services/outage-service && npm run db:seed -w services/work-order-service",
     "db:seed:read-models": "npm run db:seed:units-ro -w services/access-service && npm run db:seed:outage-states -w services/network-service",
     "topics": "./scripts/create-topics.sh",
-    "reconcile": "dotenv -e .env -- tsx scripts/reconcile.ts"
+    "reconcile": "dotenv -e .env -- tsx scripts/reconcile.ts",
+    "load-test": "dotenv -e .env -- tsx scripts/load-test.ts"
   },
   "license": "ISC",
   "devDependencies": {

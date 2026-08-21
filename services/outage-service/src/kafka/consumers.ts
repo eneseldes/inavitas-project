@@ -298,9 +298,15 @@ export async function handleOutageImpactCalculated(envelope: OutageImpactCalcula
     return;
   }
 
+  // Kaskad kararının girdisi artık `affectedElementIds` DEĞİL: kimin kimi kapsadığını
+  // `network-service` kırpılmamış küme üzerinden hesaplayıp olayda iki hazır alanla
+  // gönderiyor (bkz. `onceden-yapilanlar.md` §11.4).
   const cascade = await applyCascade(
     updated,
-    affectedElementIds,
+    {
+      containedOutageIds: envelope.payload.containedOutageIds,
+      containingOutageId: envelope.payload.containingOutageId,
+    },
     { correlationId: envelope.correlationId, causedBy: envelope },
     log,
   );

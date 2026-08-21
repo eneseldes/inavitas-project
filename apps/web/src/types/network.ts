@@ -54,9 +54,6 @@ export interface NetworkComponent {
   lat: number | null;
   lon: number | null;
   switchable: boolean;
-  loadBreak: boolean;
-  normallyOpen: boolean;
-  isClosed: boolean;
   status: string | null;
   /**
    * Elemanın **şu anki** enerjilenme durumu. Sunucuda kolondan değil, aktif kesintilerden
@@ -82,18 +79,33 @@ export interface NetworkComponentAreaItem extends NetworkComponent {
 
 export type Bbox = [minLon: number, minLat: number, maxLon: number, maxLat: number];
 
-export interface DownstreamImpact {
+/**
+ * Haritanın vurgu kümesine erişimi. Kimlik listesi değil **token** taşınır: harita izi
+ * kimliklerden değil, token'ın kendi tile'larından çizer (bkz. features/map/highlightLayers.ts).
+ */
+export interface HighlightSetRef {
+  /** Küme boşsa `null`. */
+  setToken: string | null;
+  /** Küme sunucudaki üst sınıra dayandı — vurgu eksik olabilir. */
+  setTruncated: boolean;
+}
+
+/**
+ * ⚠️ Kimlik listesi TAŞIMAZ. Vurgu `setToken`'ın tile'larından çizilir, panelde yalnız
+ * sayılar görünür — listeyi kimse okumuyordu ve yüz binlerce elemanlı bir izde tarayıcıya
+ * megabaytlarca ölü JSON iniyordu. Sunucudaki 10.000'lik kırpma da bu yüzden kalktı
+ * (bkz. network-service modules/impact/service.ts).
+ */
+export interface DownstreamImpact extends HighlightSetRef {
   direction: 'down';
   componentId: string;
-  affectedElementIds: string[];
   affectedElementCount: number;
   affectedCustomerCount: number;
-  overflowed: boolean;
   radialityViolated: boolean;
   bbox: Bbox | null;
 }
 
-export interface UpstreamChain {
+export interface UpstreamChain extends HighlightSetRef {
   direction: 'up';
   componentId: string;
   chain: { id: string; type: ComponentType; topologyLevel: number; name: string | null }[];
@@ -115,7 +127,6 @@ export interface ImpactPreview {
   topologyLevel: number;
   affectedElementCount: number;
   affectedCustomerCount: number;
-  overflowed: boolean;
   radialityViolated: boolean;
   isEnergized: boolean;
   deEnergizedBy: string | null;
@@ -125,16 +136,23 @@ export interface ImpactPreview {
   childOutageCount: number;
 }
 
-/** Görünüm penceresindeki enerjisiz eleman kimlikleri. */
+/**
+ * Enerjisiz kümenin özeti. **Kimlik listesi taşımaz** — görünüm penceresine göre kırpılmış
+ * bir liste, ekrandan çıkan hattın kırmızılığını kaybetmesine sebep oluyordu. Harita kümeyi
+ * `setToken`'ın tile'larından çizer; sayılar yalnız panel/uyarı metinleri içindir.
+ */
 export interface EnergizationSnapshot {
-  /** Sunucudaki hesap sürümü — her yeniden hesapta artar. */
+  /** Sunucudaki hesap sürümü — her yeniden hesapta artar; token da bununla değişir. */
   version: number;
-  deEnergizedIds: string[];
+  setToken: string | null;
+  /** Enerjisiz eleman sayısı (abone hariç). */
+  deEnergizedCount: number;
   /**
-   * "Açık konuma geçmiş" kesiciler — haritada içi boş, kırmızı konturlu çizilir.
-   * İstemci bunları türetemez: bir TM kesintisi sunucuda N fider kesicisine genişler.
+   * "Açık konuma geçmiş" kesici sayısı. Kesiciler kümede `open` rolüyle durur ve haritada
+   * içi boş, kırmızı konturlu çizilir; istemci bunları türetemez, bir TM kesintisi sunucuda
+   * N fider kesicisine genişler.
    */
-  openSwitchIds: string[];
-  /** Sorgu sunucudaki satır sınırına dayandı; küme eksik olabilir. */
+  openSwitchCount: number;
+  /** Küme sunucudaki üst sınıra dayandı; vurgu eksik olabilir. */
   truncated: boolean;
 }

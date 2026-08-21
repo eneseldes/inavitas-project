@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FiX, FiXCircle } from 'react-icons/fi';
+import { FiMap, FiX, FiXCircle } from 'react-icons/fi';
 import { clsx } from 'clsx';
 import { RecordLink } from '../../shared/components/RecordLink.tsx';
 import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
@@ -181,8 +181,9 @@ function ComponentSection({
   return (
     <DetailSection title={t('map.panel.detail.section.component', undefined, 'Eleman')}>
       <DetailRow label="CBS ID">
-        <button type="button" className={clsx(styles.linkedId, 'font-mono')} onClick={() => onSelectComponent(cbsId)}>
-          {cbsId}
+        <button type="button" className="link" onClick={() => onSelectComponent(cbsId)} title={t('map.action.showOnMap')}>
+          <FiMap />
+          <span className="font-mono">{cbsId}</span>
         </button>
       </DetailRow>
       {component && (

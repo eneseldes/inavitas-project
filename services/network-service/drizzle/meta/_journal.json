@@ -36,6 +36,20 @@
       "when": 1787224291168,
       "tag": "0004_jazzy_energizer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787310899464,
+      "tag": "0005_damp_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787312359483,
+      "tag": "0006_outage_states_started_at_index",
+      "breakpoints": true
     }
   ]
 }

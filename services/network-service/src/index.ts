@@ -1,4 +1,4 @@
-import { createLogger, isDevelopment } from '@inavitas/shared';
+import { configureMetrics, createLogger, isDevelopment } from '@inavitas/shared';
 import { createApp } from './app.ts';
 import { config } from './config.ts';
 import { disconnectDb } from './db.ts';
@@ -6,6 +6,7 @@ import { loadGraph } from './graph/loader.ts';
 import { connectKafka, disconnectKafka, startNetworkConsumer } from './kafka.ts';
 import { createNetworkEventHandler } from './kafka/consumers.ts';
 import { startOutboxPoller, type OutboxPollerHandle } from './kafka/outbox-poller.ts';
+import { stopScheduler } from './modules/energization/scheduler.ts';
 import { initBaseline, refresh } from './modules/energization/service.ts';
 import { disconnectRedis } from './redis.ts';
 
@@ -14,6 +15,10 @@ const logger = await createLogger({
   level: config.LOG_LEVEL,
   pretty: isDevelopment(config.NODE_ENV),
 });
+
+// Tüm metrik serileri servis adıyla etiketlenir; Prometheus'un `job` etiketi kazıma
+// yapılandırmasından gelir ve sorgu yazarken ikisinin aynı olduğuna güvenilmemeli.
+configureMetrics({ service: 'network-service' });
 
 const app = createApp(logger);
 const server = app.listen(config.NETWORK_SERVICE_PORT, () => {
@@ -55,6 +60,9 @@ async function shutdown(signal: string): Promise<void> {
     }
 
     outboxPoller.stop();
+    // Planlı kesinti zamanlayıcısı `unref`'li olduğu için çıkışı engellemez; yine de açıkça
+    // iptal edilir — kapanış sırasında ateşlenip kapanmış bir havuza sorgu atmasın.
+    stopScheduler();
     await disconnectKafka();
     await disconnectDb();
     await disconnectRedis();

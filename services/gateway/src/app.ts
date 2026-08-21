@@ -1,4 +1,14 @@
-import { asyncHandler, correlationMiddleware, errorHandler, httpLogger, notFoundHandler, runReadinessChecks, type Logger } from '@inavitas/shared';
+import {
+  asyncHandler,
+  correlationMiddleware,
+  errorHandler,
+  httpLogger,
+  metricsHandler,
+  metricsMiddleware,
+  notFoundHandler,
+  runReadinessChecks,
+  type Logger,
+} from '@inavitas/shared';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
@@ -18,6 +28,28 @@ function isPublicPath(req: express.Request): boolean {
 
 /** Login'de henüz CSRF çerezi kurulmadığından muaf; diğer tüm mutasyonlar korunur. */
 const CSRF_EXEMPT_PATHS = new Set(['/api/auth/login']);
+
+/**
+ * Metrik `route` etiketinin alabileceği proxy önekleri.
+ *
+ * Gateway'in asıl işi `app.use()` ile bağlanan proxy'lerdir; onlarda `req.route` hiçbir zaman
+ * dolmaz, dolayısıyla tüm trafik tek bir `unmatched` serisinde toplanırdı. Bu liste etiketi
+ * anlamlı kılar ve kardinaliteyi **kapalı** tutar.
+ *
+ * ⚠️ Aşağıdaki `buildProxy` çağrılarıyla senkron kalmalı — `services/gateway/test/metrics-routes.test.ts`
+ * bunu denetliyor.
+ */
+const PROXY_PATH_PREFIXES = [
+  '/api/auth',
+  '/api/users',
+  '/api/roles',
+  '/api/permissions',
+  '/api/units',
+  '/api/outages',
+  '/api/work-orders',
+  '/api/translations',
+  '/api/network',
+] as const;
 
 /** Express Gateway uygulamasını ve rota yönlendirmelerini yapılandırır. */
 export function createApp(logger: Logger): Express {
@@ -41,6 +73,11 @@ export function createApp(logger: Logger): Express {
   app.use(correlationMiddleware());
   app.use(httpLogger(logger));
   app.use(cookieParser());
+  app.use(metricsMiddleware({ pathPrefixes: PROXY_PATH_PREFIXES }));
+
+  // Prometheus kazıması docker ağından gelir; `/metrics` `/api/**` altında olmadığı için
+  // hiçbir proxy kuralına da düşmez.
+  app.get('/metrics', metricsHandler());
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'gateway' });

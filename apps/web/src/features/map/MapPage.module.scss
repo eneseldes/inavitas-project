@@ -55,3 +55,36 @@
   align-self: flex-start;
   gap: v.$space-3;
 }
+
+// Kırpma uyarısı — haritanın üst ortasında, panellerin ARASINDA duran boşlukta. Panel
+// katmanı (`.dock`) gibi tıklamayı yutmaz: uyarı bir bilgi şerididir, harita onun altında
+// sürüklenmeye devam eder.
+.truncationBanner {
+  position: absolute;
+  top: v.$space-3;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  max-width: min(38rem, calc(100% - 26rem));
+  padding: v.$space-2 v.$space-3;
+  border: 1px solid v.$color-warn-border;
+  border-radius: v.$radius-md;
+  background: v.$color-warn-surface;
+  box-shadow: v.$shadow-md;
+  color: v.$color-warn-ink;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  pointer-events: none;
+
+  svg {
+    flex: none;
+  }
+
+  em {
+    opacity: 0.8;
+    font-style: normal;
+  }
+}

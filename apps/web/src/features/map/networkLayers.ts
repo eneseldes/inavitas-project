@@ -27,15 +27,15 @@ export function buildNetworkSource(): VectorSourceSpecification {
     tiles: [`${window.location.origin}${NETWORK_TILE_URL_TEMPLATE}`],
     minzoom: 0,
     maxzoom: 20,
-    // Seçim ve enerjilenme `feature-state` ile gösterildiğinden her katmanın özellik kimliği
-    // tanıtılmalı. `building_inner` de listede: enerjisiz binanın iç yolu da kırmızı olmalı.
-    // Bu **istemci tarafı** bir değişikliktir, MVT şeması değişmez — `TILE_SCHEMA_VERSION`
-    // artırılmaz.
+    // `feature-state` artık YALNIZ seçim için kullanılıyor (iz ve enerjisizlik kendi vurgu
+    // kaynağından geliyor — bkz. highlightLayers.ts), ama seçim de özellik kimliği ister.
+    // Bu **istemci tarafı** bir ayardır, MVT şeması değişmez — `TILE_SCHEMA_VERSION` artırılmaz.
+    // Yalnız seçimin dokunduğu katmanlar — `building_inner` listeden çıktı, bina içi yolun
+    // artık durum okuyan bir boyası yok (bkz. `SELECTABLE_SOURCE_LAYERS`).
     promoteId: {
       components: 'id',
       building_shapes: 'id',
       building_breakers: 'id',
-      building_inner: 'id',
     },
   };
 }
@@ -113,20 +113,18 @@ const L = {
 } as const;
 
 /** Bir efsane satırı açılıp kapandığında görünürlüğü değişen MapLibre katmanları. */
-// Efsanede kapatılan hat, vurgu eşiyle birlikte kapanmalı — aksi halde kapalı bir katmanın
-// kesikli kırmızısı ekranda kalırdı.
 export const LEGEND_LAYER_IDS: Record<LegendId, string[]> = {
-  HV_LINE: [L.hvCase, L.hv, emphasisIdOf(L.hv)],
-  MV_MAIN: [L.mvMainCase, L.mvMain, L.mvTie, emphasisIdOf(L.mvMain), emphasisIdOf(L.mvTie)],
-  MV_BRANCH: [L.mvBranch, emphasisIdOf(L.mvBranch)],
-  LV_LINE: [L.lvLine, emphasisIdOf(L.lvLine)],
+  HV_LINE: [L.hvCase, L.hv],
+  MV_MAIN: [L.mvMainCase, L.mvMain, L.mvTie],
+  MV_BRANCH: [L.mvBranch],
+  LV_LINE: [L.lvLine],
   TM: [L.tm],
   DM: [L.dm],
   TRANSFORMER: [L.transformer],
   LV_JUNCTION: [L.lvj],
   // "Kofra kesicisi / ev girişi" efsanede tek satırdır: irtibat hattı + kofra kesicisi
   // birlikte açılıp kapanır — kullanıcı için ikisi tek bir görsel bütündür.
-  SERVICE_ENTRY: [L.dropLine, emphasisIdOf(L.dropLine), L.kofra],
+  SERVICE_ENTRY: [L.dropLine, L.kofra],
 };
 
 /**
@@ -140,50 +138,15 @@ export const CLICKABLE_LAYER_IDS = [L.tm, L.dm, L.transformer, L.lvj, L.kofra, L
 /** Bina izi katmanları — görünürlüğü zoom'a değil, ait olduğu birimin efsane satırına bağlıdır. */
 export const BUILDING_LAYER_IDS = [L.bldHalo, L.bldWash, L.bldTint, L.bldOutline, L.bldInner, L.bldBreaker];
 
-// --- İz vurgusu (upstream / downstream) --------------------------------------
+// --- Durum vurgusu nerede? ---------------------------------------------------
 //
-// İz ayrı bir katman ÜRETMEZ; zaten çizilen geometrinin `feature-state`'i boyanır.
-// Durum boolean değil string taşır ('up' | 'down'), çünkü iki yön iki ayrı renktir ve
-// tek bir bayrak bunu ifade edemez. Ayarlanmamış `feature-state` null döner; `==` farklı
-// tipleri sessizce `false` sayar, bu yüzden ek bir varlık kontrolü gerekmez.
-
-const TRACED_UP: ExpressionSpecification = ['==', ['feature-state', 'traced'], 'up'];
-const TRACED_DOWN: ExpressionSpecification = ['==', ['feature-state', 'traced'], 'down'];
-const IS_TRACED: ExpressionSpecification = ['any', TRACED_UP, TRACED_DOWN];
-
-/** Enerjisizlik de aynı mekanizmadan gelir: tile'a gömülmez, `feature-state` ile taşınır. */
-const DE_ENERGIZED: ExpressionSpecification = ['==', ['feature-state', 'energized'], false];
-
-/** Kesintinin kökü olan kesicinin "açık kontak" hâli. */
-const SWITCH_OPEN: ExpressionSpecification = ['==', ['feature-state', 'switchOpen'], true];
-
-/** Vurgulanan her şey — iz ya da enerjisizlik. Kalınlık/opaklık bu koşuldan sürülür. */
-const IS_EMPHASIZED: ExpressionSpecification = ['any', IS_TRACED, DE_ENERGIZED];
-
-/**
- * Durum rengi. Öncelik: **iz (up) > iz (down) > enerjisiz > katmanın kendi rengi.**
- *
- * İz enerjisizliği bilerek ezer: iz, kullanıcının kendi açtığı geçici bir sorgudur ve panel
- * kapanınca düşer; enerjisizlik kalıcı durumdur ve iz kapandığı an geri görünür. Ters sırada
- * olsaydı büyük bir kesinti içinde iz açmak hiçbir şey göstermezdi.
- */
-function stateColor(base: string | ExpressionSpecification): ExpressionSpecification {
-  return [
-    'case',
-    TRACED_UP,
-    token('--c-map-trace-up'),
-    TRACED_DOWN,
-    token('--c-map-trace-down'),
-    DE_ENERGIZED,
-    token('--c-map-deenergized'),
-    base,
-  ];
-}
-
-/** Vurgulanan eleman öne çıksın diye kalınlık/opaklık gibi sayısal değerleri yükseltir. */
-function emphasisValue(base: number, emphasized: number): ExpressionSpecification {
-  return ['case', IS_EMPHASIZED, emphasized, base];
-}
+// İz (upstream/downstream), enerjisizlik ve "açık kesici" burada DEĞİL. Üçü de artık ayrı
+// bir kaynaktan, kendi geometrisiyle çizilir (bkz. highlightLayers.ts). Eskiden bu dosyada
+// `feature-state` okuyan `stateColor`/`emphasisValue` ifadeleri vardı ve her hat katmanının
+// bir de kesikli "vurgu eşi" (`-emph`) üretiliyordu: 290 bin özellikli katmanlar ikiye
+// katlanıyor, üstelik boyanacak geometri ancak o zoom'da tile'a girmişse var oluyordu.
+// Bu dosyada kalan tek `feature-state` **seçim**dir — tek eleman, kullanıcı ona az önce
+// tıkladığı için her zaman ekranda ve her zaman tile'da.
 
 // --- Hat katmanları ----------------------------------------------------------
 
@@ -205,60 +168,12 @@ function lineLayer(
     filter: rememberBaseFilter(id, ['all', LINESTRING_GEOMETRY_FILTER, ['in', ['get', 'type'], ['literal', types]]]),
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      // Vurgulanan hat kendi renginin yerine durum rengiyle, bir tık kalın ve tam opak
-      // çizilir — 0,4 kV hattı gibi soluk katmanlarda vurgu aksi halde fark edilmiyordu.
-      'line-color': stateColor(color),
-      'line-width': emphasisValue(width, width * 2),
-      'line-opacity': emphasisValue(opacity, 1),
+      'line-color': color,
+      'line-width': width,
+      'line-opacity': opacity,
       ...(dash ? { 'line-dasharray': dash } : {}),
     },
   };
-}
-
-/**
- * Enerjisizlik overlay katmanı — kesikli çizginin **tek** yolu.
- *
- * MapLibre tuzağı: `line-dasharray` **veri güdümlü değildir** — `feature-state` ya da
- * `case` ifadesi kabul etmez. `filter` de `feature-state` okuyamaz. Yani "enerjisiz olan hat
- * kesikli çizilsin" doğrudan ifade edilemez.
- *
- * Çözüm: taban katmanın üstüne sabit `line-dasharray` taşıyan bir eş katman konur, görünürlüğü
- * `line-opacity` ile `feature-state`'ten sürülür (opaklık veri güdümlüdür).
- *
- * İzdeki hatta kesik çizilmez: taban katman zaten iz rengiyle boyanıyor ve kesik overlay
- * onun üstüne binip izi kesik gösteriyordu. İz açıkken kesik düşer, iz kapanınca geri gelir —
- * renk önceliğiyle (iz > enerjisiz) aynı kural.
- */
-function emphasisLayer(base: LineLayerSpecification, baseWidth: number): LineLayerSpecification {
-  return {
-    id: emphasisIdOf(base.id),
-    type: 'line',
-    source: NETWORK_SOURCE_ID,
-    'source-layer': 'components',
-    minzoom: base.minzoom,
-    // Taban filtresiyle **aynı** olmalı, yoksa gerilim filtresi bu katmanlara uygulanmaz.
-    // `rememberBaseFilter` ile kaydedilir ki `componentFilters` onu da bulabilsin.
-    filter: rememberBaseFilter(emphasisIdOf(base.id), base.filter as ExpressionSpecification),
-    // Başlangıçta gizli: 290 bin hat özelliği taşıyan bir katmanı (opaklık 0 olsa bile)
-    // sürekli açık tutmak boşuna iş yaptırır. `MapView` görünürlüğü yalnız enerjisiz küme
-    // boş değilken `visible` yapar.
-    layout: { 'line-cap': 'butt', 'line-join': 'round', visibility: 'none' },
-    paint: {
-      'line-dasharray': EMPHASIS_DASH,
-      'line-color': token('--c-map-deenergized'),
-      'line-width': baseWidth * 2.2,
-      // Görünürlüğü sağlayan tek şey bu.
-      'line-opacity': ['case', ['all', DE_ENERGIZED, ['!', IS_TRACED]], 0.95, 0],
-    },
-  };
-}
-
-/** Vurgu katmanlarının sabit kesik deseni — veri güdümlü olamaz (bkz. `emphasisLayer`). */
-const EMPHASIS_DASH: [number, number] = [2.5, 1.75];
-
-/** Taban hat katmanının vurgu eşinin kimliği. */
-export function emphasisIdOf(baseLayerId: string): string {
-  return `${baseLayerId}-emph`;
 }
 
 interface LineLayerSpec {
@@ -292,13 +207,6 @@ function lineLayerSpecs(): LineLayerSpec[] {
   ];
 }
 
-/** Vurgu eşi olan hat katmanlarının kimlikleri — `MapView` görünürlüğü bunlar üzerinden sürer. */
-export const EMPHASIS_LAYER_IDS: string[] = lineLayerSpecsIds();
-
-function lineLayerSpecsIds(): string[] {
-  return [L.lvLine, L.dropLine, L.mvBranch, L.mvMain, L.mvTie, L.hv].map(emphasisIdOf);
-}
-
 // --- Birim / düğüm katmanları ------------------------------------------------
 //
 // BUS, FEEDER ve LV_BUS hiç çizilmez; kaynak veride sahibi oldukları birimle **tam aynı
@@ -322,9 +230,7 @@ function pointLayer(
     minzoom,
     filter: rememberBaseFilter(id, ['all', POINT_GEOMETRY_FILTER, filter]),
     paint: {
-      // Vurgulanan düğüm gövdesinden boyanır; seçim ise yalnız kenarı değiştirir. Böylece
-      // seçili eleman aynı anda izin/enerjisizliğin de parçasıysa ikisi birbirini ezmez.
-      'circle-color': stateColor(color),
+      'circle-color': color,
       'circle-radius': radius,
       // Seçili birim kendi düğümünde de belli olur — bina izinin görünmediği zoom'larda
       // (z<16) tek işaret budur. Ayrı bir halka katmanı YOK: kullanıcı "seçince etrafında
@@ -333,9 +239,7 @@ function pointLayer(
       'circle-stroke-color': [
         'case',
         ['boolean', ['feature-state', 'selected'], false],
-        token('--c-map-selected'),
-        DE_ENERGIZED,
-        token('--c-map-deenergized-dark'),
+        token('--c-map-selected-stroke'),
         stroke,
       ],
       'circle-opacity': 0.95,
@@ -400,13 +304,9 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
     },
 
     // 2. Hatlar — ince olandan kalın olana; her biri kendi zoom eşiğinden sonra çizilir.
-    //    Her hat katmanının hemen üstünde bir vurgu (kesikli) eşi durur; bina izinin altında
-    //    kalır (bina izi 3. sırada).
-    ...lineLayerSpecs().flatMap((spec) => {
-      const base = lineLayer(spec.id, spec.types, spec.color, spec.width, spec.opacity, spec.minzoom, spec.dash);
-      // Kılıf (case) katmanlarının vurgu eşi yoktur: beyaz haleyi kesikli çizmek bir şey anlatmaz.
-      return spec.isCase ? [base] : [base, emphasisLayer(base, spec.width)];
-    }),
+    ...lineLayerSpecs().map((spec) =>
+      lineLayer(spec.id, spec.types, spec.color, spec.width, spec.opacity, spec.minzoom, spec.dash),
+    ),
 
     // 3. Bina izi — "buzlu cam": dış halo, beyaz yıkama, birim tonu, koyu duvar.
     //    Altından GEÇEN hat soluklaşır; birime BAĞLI olan hat üstteki katmanda net kalır.
@@ -440,22 +340,10 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       filter: ['==', ['get', 'ring'], 'wall'],
       minzoom: BUILDING_ZOOM,
       paint: {
-        // Bina izi de vurguya girer: bir fideri izlerken ya da kararttığında altındaki
-        // trafo binaları da boyanır.
-        'fill-color': stateColor(TINT()),
+        'fill-color': TINT(),
         // Seçim, kenar rengini değiştirerek değil yapının dolgusunu koyulaştırarak
         // gösterilir — bina "yanmış" gibi okunur, ince bir çerçeve gibi değil.
-        // Sıra: seçim > iz > enerjisiz > taban.
-        'fill-opacity': [
-          'case',
-          ['boolean', ['feature-state', 'selected'], false],
-          0.8,
-          IS_TRACED,
-          0.6,
-          DE_ENERGIZED,
-          0.5,
-          0.26,
-        ],
+        'fill-opacity': ['case', ['boolean', ['feature-state', 'selected'], false], 0.8, 0.26],
       },
     },
     {
@@ -479,7 +367,7 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       'source-layer': 'building_inner',
       minzoom: BUILDING_ZOOM,
       paint: {
-        'line-color': stateColor(EDGE()),
+        'line-color': EDGE(),
         'line-width': unitTypeMatch(1.8, 1.6, 1.4, 1.2),
         'line-opacity': 0.95,
       },
@@ -492,7 +380,14 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
     pointLayer(L.dm, ['==', ['get', 'type'], 'DM'], radius(3.2, 4.4, 8), token('--c-map-dm'), token('--c-map-dm-dark'), LEGEND_MIN_ZOOM.DM),
     pointLayer(L.tm, ['==', ['get', 'type'], 'TM'], radius(5, 7, 12), token('--c-map-tm'), token('--c-map-tm-dark'), LEGEND_MIN_ZOOM.TM),
 
-    // 6. Birim kesicileri — yalnız bina izi açıkken, duvara yayılmış konumlarında.
+    // 6. Birim kesicileri — yalnız bina izi açıkken, duvara yayılmış konumlarında. Kofra da
+    //    diğer birimler gibi kesicisiyle birlikte çizilir: birim ortada, kesicisi önünde.
+    //
+    //    ⚠️ Kofranın kesicisi AYRI BİR ELEMAN DEĞİL, kofranın kendisidir (bkz. tiles/service.ts
+    //    `unit_breakers`, kofra kolunda `breaker_id = u.id`) — yani `components` katmanındaki
+    //    kofra düğümü ile buradaki kesici noktası **aynı kimliği** taşır. Çizimde sorun yok
+    //    (biri birimin konumu, diğeri kesicinin duvardaki konumu); seçimde ikisi birden
+    //    vurgulanır ve bu da doğrudur: ikisi zaten aynı elemandır.
     {
       id: L.bldBreaker,
       type: 'circle',
@@ -500,25 +395,16 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
       'source-layer': 'building_breakers',
       minzoom: BUILDING_ZOOM,
       paint: {
-        // "Açık kontak" görüntüsü: kesintinin kökü olan kesicinin içi boşaltılır (arka plan
-        // tonuna çekilir) ve konturu kırmızı olur. Kesici üstünden beslendiği için
-        // enerjili kalır ama artık akım geçirmez.
-        'circle-color': ['case', SWITCH_OPEN, token('--c-map-bg'), stateColor(token('--c-map-breaker'))],
+        // "Açık kontak" görüntüsü artık burada değil: kesintinin kökü olan kesici, vurgu
+        // kaynağındaki `open` rolüyle bu katmanın ÜSTÜNE çizilir (bkz. highlightLayers.ts).
+        // Böylece bina izinin açılmadığı zoom'larda da (z<16) görünür.
+        'circle-color': token('--c-map-breaker'),
         'circle-radius': unitTypeMatch(2.8, 2.5, 2.2, 2.2),
-        'circle-stroke-width': [
-          'case',
-          ['boolean', ['feature-state', 'selected'], false],
-          2.6,
-          SWITCH_OPEN,
-          2.2,
-          1.2,
-        ],
+        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2.6, 1.2],
         'circle-stroke-color': [
           'case',
           ['boolean', ['feature-state', 'selected'], false],
-          token('--c-map-selected'),
-          ['any', SWITCH_OPEN, DE_ENERGIZED],
-          token('--c-map-deenergized'),
+          token('--c-map-selected-stroke'),
           token('--c-map-breaker-dark'),
         ],
       },
@@ -528,10 +414,15 @@ export function buildNetworkLayers(theme: 'light' | 'dark'): LayerSpecification[
 }
 
 /**
- * `feature-state` yazılacak kaynak katmanlar — seçim, iz ve enerjisizlik bunların hepsinde
- * işaretlenir. `building_inner` de dahil: enerjisiz binanın iç yolu da kırmızı çizilir.
+ * Seçimin `feature-state`'inin yazıldığı kaynak katmanlar. Elemanın hangisinde olduğu
+ * bilinmediğinden hepsine yazılır; olmayan tarafta durum sessizce boşa gider.
+ *
+ * Liste **yalnız seçim** için: seçim tek elemandır ve kullanıcı ona az önce tıkladığı için
+ * kesin olarak ekranda ve yüklü bir tile'dadır — `feature-state`'in doğru kullanımı budur.
+ * İz ve enerjisizlik binlerce elemanı kapsadığı ve çoğu o zoom'da tile'a hiç girmediği için
+ * buradan çıkarıldı (bkz. highlightLayers.ts).
  */
-export const SELECTABLE_SOURCE_LAYERS = ['components', 'building_shapes', 'building_breakers', 'building_inner'];
+export const SELECTABLE_SOURCE_LAYERS = ['components', 'building_shapes', 'building_breakers'];
 
 // --- Filtreler ---------------------------------------------------------------
 
@@ -542,34 +433,9 @@ export const SELECTABLE_SOURCE_LAYERS = ['components', 'building_shapes', 'build
  */
 export function legendVisibility(active: Set<LegendId>): { layerId: string; visible: boolean }[] {
   return LEGEND_IDS.flatMap((legendId) =>
-    LEGEND_LAYER_IDS[legendId]
-      // Vurgu katmanları buradan sürülmez: görünürlükleri efsaneye **ve** ortada gerçekten bir
-      // vurgu olup olmadığına birlikte bağlıdır (bkz. `emphasisVisibility`). İki efekt aynı
-      // katmanı sürerse biri diğerini ezer.
-      .filter((layerId) => !EMPHASIS_LAYER_ID_SET.has(layerId))
-      .map((layerId) => ({ layerId, visible: active.has(legendId) })),
+    LEGEND_LAYER_IDS[legendId].map((layerId) => ({ layerId, visible: active.has(legendId) })),
   );
 }
-
-/**
- * Kesikli enerjisizlik katmanlarının görünürlüğü: efsane satırı açık **ve** enerjisiz küme
- * boş değilse açılır.
- *
- * Performans: 290 bin hat özelliği taşıyan bir katmanı opaklık 0 olsa bile sürekli açık
- * tutmak boşuna iş yaptırır.
- */
-export function emphasisVisibility(
-  active: Set<LegendId>,
-  hasEmphasis: boolean,
-): { layerId: string; visible: boolean }[] {
-  return LEGEND_IDS.flatMap((legendId) =>
-    LEGEND_LAYER_IDS[legendId]
-      .filter((layerId) => EMPHASIS_LAYER_ID_SET.has(layerId))
-      .map((layerId) => ({ layerId, visible: hasEmphasis && active.has(legendId) })),
-  );
-}
-
-const EMPHASIS_LAYER_ID_SET = new Set(EMPHASIS_LAYER_IDS);
 
 /** Bina izi katmanlarının filtresi — yalnız efsanede açık olan birim tipleri çizilir. */
 export function buildingFilters(active: Set<LegendId>): { layerId: string; filter: ExpressionSpecification }[] {
@@ -581,6 +447,7 @@ export function buildingFilters(active: Set<LegendId>): { layerId: string; filte
     [L.bldTint]: 'wall',
     [L.bldOutline]: 'wall',
   };
+
   return BUILDING_LAYER_IDS.map((layerId) => {
     const ring = ringOf[layerId];
     return { layerId, filter: ring ? (['all', inTypes, ['==', ['get', 'ring'], ring]] as ExpressionSpecification) : inTypes };

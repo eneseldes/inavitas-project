@@ -92,10 +92,18 @@ export function fetchOutageAffectedCustomers(
   return apiFetch(`/api/outages/${id}/affected-customers?page=${page}&pageSize=${pageSize}`);
 }
 
-/** Harita katmanı için hafif özet — sayfalama yok, sunucuda üst sınır var. */
+/**
+ * Harita katmanı için hafif özet — sayfalama yok, sunucuda üst sınır var.
+ *
+ * `limit` **açıkça** gönderilir: parametre yokken sunucu varsayılanı 2.000'dir ve en eski
+ * kayıtlar (sıralama `startedAt DESC`) haritada sessizce kaybolur. Tavan (5.000) istenir,
+ * dolduğunda `truncated` döner ve harita üzerinde uyarı şeridi çıkar (bkz. TruncationBanner).
+ */
+export const MAP_ITEM_LIMIT = 5_000;
+
 export function fetchOutageMapItems(filters: OutageFilters): Promise<{ items: OutageMapItem[]; truncated: boolean }> {
   const params = new URLSearchParams();
   appendFilters(params, filters);
-  const query = params.toString();
-  return apiFetch(`/api/outages/map${query ? `?${query}` : ''}`);
+  params.set('limit', String(MAP_ITEM_LIMIT));
+  return apiFetch(`/api/outages/map?${params.toString()}`);
 }

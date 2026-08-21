@@ -1,0 +1,43 @@
+# Prometheus kazıma yapılandırması.
+#
+# Servisler `/metrics` ucunu host'a AÇMAZ — Prometheus onlara docker ağı üzerinden,
+# konteyner adıyla ulaşır. Bu, "dışa yalnız nginx açıktır" kuralını bozmadan metrik
+# toplamanın tek yoludur.
+#
+# `job` etiketi servis adıdır ve serilerdeki `service` etiketiyle bilerek aynı yazılır;
+# panolar `job`'a göre sorguluyor, `service` ise bir serinin hangi süreçten geldiğini
+# metriğin kendisinden okuyabilmek için duruyor.
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: gateway
+    static_configs:
+      - targets: ['gateway:8080']
+
+  - job_name: access-service
+    static_configs:
+      - targets: ['access-service:3001']
+
+  - job_name: outage-service
+    static_configs:
+      - targets: ['outage-service:3002']
+
+  - job_name: work-order-service
+    static_configs:
+      - targets: ['work-order-service:3003']
+
+  - job_name: translation-service
+    static_configs:
+      - targets: ['translation-service:3004']
+
+  - job_name: network-service
+    static_configs:
+      - targets: ['network-service:3005']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

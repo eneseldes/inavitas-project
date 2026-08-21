@@ -8,6 +8,8 @@ import {
 } from '@inavitas/shared';
 import type { Response } from 'express';
 import { components } from '../../db/schema.ts';
+import { areaQuerySeconds } from '../../metrics.ts';
+import { registerHighlightSet } from '../../modules/highlight/sets.ts';
 import * as componentsRepository from '../../repository/components.repository.ts';
 import { toComponentAreaDto } from '../dto.ts';
 import { QueryWithinBody } from '../schemas.ts';
@@ -34,22 +36,32 @@ export async function within(req: AuthedRequest, res: Response): Promise<void> {
   const scope = scopeFilterAnyUnit(req.user, components.unitPath, components.unitPaths, PERMISSIONS.NETWORK_READ);
   const pagination = { page: body.page, pageSize: body.pageSize };
 
-  const { items, total, overflowed } = await componentsRepository.listWithin(
-    body.polygon,
-    {
-      type: body.type,
-      category: body.category,
-      breakerRole: body.breakerRole,
-      voltageLevel: body.voltageLevel,
-      q: body.q,
-      scope,
-    },
-    pagination,
-  );
+  const filters = {
+    type: body.type,
+    category: body.category,
+    breakerRole: body.breakerRole,
+    voltageLevel: body.voltageLevel,
+    q: body.q,
+    scope,
+  };
+
+  // Sayfa ve vurgu kümesi birlikte hesaplanır: liste bir sayfa gösterir ama haritada alanın
+  // TAMAMI vurgulanmalı — kullanıcı hangi sayfada olursa olsun seçtiği alan aynı alandır.
+  const done = areaQuerySeconds.startTimer();
+  const [{ items, total, overflowed }, ids] = await Promise.all([
+    componentsRepository.listWithin(body.polygon, filters, pagination),
+    componentsRepository.listWithinIds(body.polygon, filters),
+  ]);
+  // Üst sınıra dayanan sorgu farklı bir maliyet eğrisidir; ayrı etiketlenmezse p95 karışır.
+  done({ overflowed: String(overflowed) });
+
+  const set = await registerHighlightSet(req.user, [{ role: 'area', ids }]);
 
   res.json({
     ...toPageResult(items.map(toComponentAreaDto), total, body.page, body.pageSize),
     // Sonuç üst sınıra dayandı: sayı da liste de eksiktir, kullanıcıya alanı daraltması söylenir.
     overflowed,
+    setToken: set?.token ?? null,
+    setTruncated: set?.truncated ?? false,
   });
 }

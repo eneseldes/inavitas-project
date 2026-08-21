@@ -19,8 +19,15 @@ import {
   type EnergizationState,
 } from '../../graph/energization.ts';
 import { getFeederBreakersOfTm, getGraph, isGraphLoaded } from '../../graph/loader.ts';
+import {
+  activeOutages,
+  deEnergizedComponents,
+  deEnergizedCustomers,
+  energizationRecomputeSeconds,
+} from '../../metrics.ts';
 import * as outageStatesRepository from '../../repository/outage-states.repository.ts';
 import { notifyEnergizationChanged } from '../../realtime.ts';
+import { scheduleNextRecompute } from './scheduler.ts';
 
 let baseline: Uint8Array | undefined;
 let state: EnergizationState | undefined;
@@ -117,17 +124,27 @@ export function initBaseline(logger: Logger): void {
  * Aktif kesintileri read-model'den okuyup enerjisiz kümeyi yeniden hesaplar ve değişimi yayınlar.
  *
  * Hesap transaction'ın **dışında** yapılır — bellek işidir, DB'yi kilitlemez.
+ *
+ * ⚠️ Okunan küme **başlangıcı gelmiş** kesintilerdir (`started_at <= now()`, bkz.
+ * `outage-states.repository.ts`). Gelecek tarihli planlı kesintiler için sonda bir
+ * zamanlayıcı kurulur; o an gelince bu fonksiyon yeniden çağrılır.
  */
 export async function refresh(logger: Logger): Promise<EnergizationState> {
   if (!baseline) throw new Error('Enerjilenme taban çizgisi hesaplanmadı — initBaseline() çağrılmadı');
 
   const startedAt = Date.now();
+  const done = energizationRecomputeSeconds.startTimer();
   const rows = await outageStatesRepository.findActive();
   const roots = toCutRoots(rows);
 
   const next = recompute(getGraph(), baseline, roots, (state?.version ?? 0) + 1);
   state = next;
   fallbackState = undefined;
+  done({});
+
+  activeOutages.set({}, rows.length);
+  deEnergizedComponents.set({}, next.deEnergizedCount);
+  deEnergizedCustomers.set({}, next.deEnergizedCustomerCount);
 
   const durationMs = Date.now() - startedAt;
   logger.info(
@@ -146,6 +163,11 @@ export async function refresh(logger: Logger): Promise<EnergizationState> {
     { version: next.version, deEnergizedCount: next.deEnergizedCount },
     logger,
   );
+
+  // Zamanlayıcı yayından SONRA kurulur: kurulumu bir DB sorgusu, yayın ise kullanıcının
+  // beklediği şey. Kurulum her hesabın sonunda yenilendiği için iptal edilen ya da tarihi
+  // değişen planlı kesinti kendiliğinden dikkate alınır.
+  await scheduleNextRecompute(logger, refresh);
 
   return next;
 }
@@ -178,7 +200,30 @@ export function deEnergizedBy(componentId: string): string | null {
   return current.causeOutageIds[slot] ?? null;
 }
 
-/** Verilen kimliklerden enerjisiz olanları süzer (viewport sorgusunun bellek-içi adımı). */
+/**
+ * Enerjisiz **elemanların** tüm kimlikleri (abone düğümleri hariç).
+ *
+ * Eskiden istemci pencereye göre kimlik istiyordu; artık istemci hiç kimlik almıyor — bu liste
+ * yalnız vurgu kümesini kurmak için, sunucu içinde kullanılır (bkz. modules/highlight/sets.ts).
+ * Kapsam süzmesi burada yapılmaz: küme tile'ının SQL'i zaten kapsamı uyguluyor.
+ */
+export function listDeEnergizedComponentIds(): string[] {
+  if (!isGraphLoaded()) return [];
+
+  const graph = getGraph();
+  const current = getState();
+  const out: string[] = [];
+
+  for (let i = 0; i < graph.nodeIds.length; i++) {
+    if (current.deEnergized[i] !== 1) continue;
+    if ((graph.nodeFlags[i]! & NodeFlag.IsCustomer) !== 0) continue;
+    out.push(graph.nodeIds[i]!);
+  }
+
+  return out;
+}
+
+/** Verilen kimliklerden enerjisiz olanları süzer (eleman detayı gibi tekil sorgular için). */
 export function filterDeEnergized(componentIds: readonly string[]): string[] {
   if (!isGraphLoaded()) return [];
 

@@ -1,18 +1,22 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { NETWORK_COMPONENT_KEY, NETWORK_ENERGIZATION_KEY, NETWORK_IMPACT_PREVIEW_KEY } from './useNetwork.ts';
+import { invalidateEnergization, invalidateNetworkRuntime } from './networkRuntime.ts';
 
 const RECONNECT_DELAY_MS = 3_000;
 
-/** Art arda gelen olayları TEK invalidate'e toplar (bkz. `useOutageStream`). */
+/**
+ * Enerjilenme özetinin kendi debounce'ı — `invalidateNetworkRuntime`'ınkinden ayrıdır çünkü
+ * bu tazeleme haritanın vurgu kaynağını baştan kurar ve yalnız bu kanaldan tetiklenir.
+ */
 const INVALIDATE_DEBOUNCE_MS = 300;
 
 /**
  * Gateway'in enerjilenme SSE kanalını dinler.
  *
- * Mesaj **veri taşımaz**, yalnız "değişti" der; istemci kendi görünüm penceresi için yeniden
- * sorgular. Enerjilenme sorgusunun yanında eleman detayı ve etki önizlemesi de tazelenir:
- * ikisi de `isEnergized`/`deEnergizedBy` taşıyor, bayat kalırlarsa panel haritayla çelişir.
+ * Mesaj **veri taşımaz**, yalnız "değişti" der; istemci vurgu kümesinin yeni token'ını
+ * yeniden sorgular. Eleman detayı ve etki önizlemesi de bayatlar (`isEnergized`/
+ * `deEnergizedBy`) ama onların tazelenmesi bu kanala ÖZEL değildir — kesinti kanalı da aynı
+ * şeyi tetikler, o yüzden ortak bir pencereden geçer (bkz. networkRuntime.ts).
  */
 export function useEnergizationStream(): boolean {
   const queryClient = useQueryClient();
@@ -31,11 +35,11 @@ export function useEnergizationStream(): boolean {
       source.onopen = () => setConnected(true);
       source.onmessage = () => {
         clearTimeout(invalidateTimer);
-        invalidateTimer = setTimeout(() => {
-          void queryClient.invalidateQueries({ queryKey: [NETWORK_ENERGIZATION_KEY] });
-          void queryClient.invalidateQueries({ queryKey: [NETWORK_COMPONENT_KEY] });
-          void queryClient.invalidateQueries({ queryKey: [NETWORK_IMPACT_PREVIEW_KEY] });
-        }, INVALIDATE_DEBOUNCE_MS);
+        invalidateTimer = setTimeout(() => invalidateEnergization(queryClient), INVALIDATE_DEBOUNCE_MS);
+        // Eleman detayı ve etki önizlemesi ORTAK noktadan tazelenir: aynı kesinti hem bu
+        // kanalı hem kesinti kanalını tetikliyor, ikisi ayrı ayrı tazelerse aynı graf
+        // gezinmesi arka arkaya iki kez yaptırılır (bkz. networkRuntime.ts).
+        invalidateNetworkRuntime(queryClient);
       };
       source.onerror = () => {
         setConnected(false);

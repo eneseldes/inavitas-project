@@ -57,6 +57,13 @@
       "when": 1787149126144,
       "tag": "0007_mighty_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787309771695,
+      "tag": "0008_icy_sleeper",
+      "breakpoints": true
     }
   ]
 }

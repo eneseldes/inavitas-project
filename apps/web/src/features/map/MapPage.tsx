@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import type { Polygon } from 'geojson';
@@ -12,11 +12,11 @@ import { MapToolRail, type MapTool } from './MapToolRail.tsx';
 import { MapView, type MapZoomApi } from './MapView.tsx';
 import { MapZoomControl } from './MapZoomControl.tsx';
 import { OperationDetailPanel } from './OperationDetailPanel.tsx';
+import { TruncationBanner } from './TruncationBanner.tsx';
 import { useAreaResults, useAreaSelectionState } from './useAreaSelection.ts';
 import { useMapState } from './useMapState.ts';
 import { useComponent, useEnergization, useTrace, useUnit } from './useNetwork.ts';
 import { useEnergizationStream } from './useEnergizationStream.ts';
-import type { Bbox } from '../../types/network.ts';
 import type { TraceDirection } from './api.ts';
 import { useOutageMapItems } from '../outages/useOutages.ts';
 import { useOutageStream } from '../outages/useOutageStream.ts';
@@ -51,8 +51,6 @@ export function MapPage() {
     voltageLevels,
     showAdminBoundaries,
     setShowAdminBoundaries,
-    showDeEnergized,
-    setShowDeEnergized,
     showOutages,
     setShowOutages,
     showWorkOrders,
@@ -91,13 +89,11 @@ export function MapPage() {
   const { data: trace, isLoading: isTraceLoading } = useTrace(selectedId, traceDirection);
 
   /**
-   * Enerjisizlik görünüm penceresi kapsamlıdır: `setFeatureState` yalnız yüklü tile'lara
-   * yazılabilir, ekranda olmayan elemanın durumunu taşımanın faydası yok. Pencere
-   * `MapView`'den `moveend`'de gelir.
+   * Enerjisizlik artık görünüm penceresine bağlı DEĞİL: sorgu parametresizdir ve yalnız bir
+   * vurgu kümesi token'ı döner. Kamera hareketi bu sorguyu hiç tetiklemez — ne `viewport`
+   * durumu ne de `moveend` bildirimi kaldı.
    */
-  const [viewport, setViewport] = useState<{ bbox: Bbox; zoom: number } | undefined>(undefined);
-  const { data: energization } = useEnergization(viewport?.bbox, viewport?.zoom ?? 0, showDeEnergized);
-  const handleViewportChange = useCallback((bbox: Bbox, zoom: number) => setViewport({ bbox, zoom }), []);
+  const { data: energization } = useEnergization();
 
   // Canlılık: kesinti ve iş emri akışlarına abone olunur; gelen her olay ilgili sorguları
   // invalidate ettiği için harita katmanı sayfa yenilenmeden tazelenir.
@@ -170,15 +166,6 @@ export function MapPage() {
     setAction(undefined);
   }, [selectedId]);
 
-  /**
-   * Vurgulanacak kimlikler. Tıklanan elemanın kendisi de listeye girer — iz onunla başlar,
-   * kullanıcı hangi elemandan baktığını görmelidir.
-   */
-  const tracedIds = useMemo(() => {
-    if (!trace) return undefined;
-    if (trace.direction === 'down') return [trace.componentId, ...trace.affectedElementIds];
-    return [trace.componentId, ...trace.chain.map((item) => item.id)];
-  }, [trace]);
 
   /**
    * Haritadaki bir kesinti/iş emri noktasına tıklamak ilgili detay sayfasını açar —
@@ -271,9 +258,29 @@ export function MapPage() {
     if (activeTool !== 'area' && isAreaDrawing) setIsAreaDrawing(false);
   }, [activeTool, area.polygon, isAreaDrawing, startDrawing]);
 
+  /**
+   * Kullanıcı sorgusunun vurgu kümesi — iz ve alan seçimi **aynı** kaynağı kullanır.
+   * İkisi aynı anda açıksa iz kazanır: iz seçili elemandan çıkar ve kullanıcının o an
+   * baktığı şey odur; alan seçimi arka planda duran bir listedir.
+   */
+  const queryHighlightToken = trace?.setToken ?? areaResults.components?.setToken ?? null;
+
+  /**
+   * Sessiz kırpmaların tek toplandığı yer. Dördü de "haritada olması gereken bir şey yok"
+   * demek; kullanıcıya tek bir şeritte söylenir (bkz. TruncationBanner).
+   */
+  const truncation = {
+    records: (outageData?.truncated ?? false) || (workOrderData?.truncated ?? false),
+    highlight:
+      (trace?.setTruncated ?? false) ||
+      (energization?.truncated ?? false) ||
+      (areaResults.components?.setTruncated ?? false),
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.mapArea}>
+        <TruncationBanner state={truncation} />
         <MapView
           view={view}
           onViewChange={setView}
@@ -283,13 +290,9 @@ export function MapPage() {
           selectedId={selectedId}
           onSelect={selectComponent}
           flyTo={flyTo}
-          tracedIds={tracedIds}
-          traceDirection={traceDirection}
+          queryHighlightToken={queryHighlightToken}
           traceBbox={trace?.bbox}
-          deEnergizedIds={energization?.deEnergizedIds}
-          openSwitchIds={energization?.openSwitchIds}
-          showDeEnergized={showDeEnergized}
-          onViewportChange={handleViewportChange}
+          stateHighlightToken={energization?.setToken}
           outages={outageItems}
           workOrders={workOrderItems}
           showOutages={showOutages}
@@ -366,8 +369,6 @@ export function MapPage() {
             onToggleLegendGroup={toggleLegendGroup}
             showAdminBoundaries={showAdminBoundaries}
             onShowAdminBoundariesChange={setShowAdminBoundaries}
-            showDeEnergized={showDeEnergized}
-            onShowDeEnergizedChange={setShowDeEnergized}
             showOutages={showOutages}
             onShowOutagesChange={setShowOutages}
             showWorkOrders={showWorkOrders}

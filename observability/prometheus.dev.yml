@@ -1,0 +1,47 @@
+# Prometheus kazıma yapılandırması — **geliştirme modu** (`npm run dev`).
+#
+# `prometheus.yml`'nin ikizi; tek farkı hedef adresleri. Neden ayrı bir dosya:
+# `npm run dev` servisleri **host'ta** çalıştırır (tsx watch), konteynerde değil. Konteyner
+# adları (`network-service:3005`) o modda çözülmez; Prometheus konteynerden host'a
+# `host.docker.internal` üzerinden ulaşır.
+#
+# Kullanım:
+#   PROMETHEUS_CONFIG=prometheus.dev.yml docker compose up -d prometheus grafana
+#
+# ⚠️ İki dosya senkron tutulmalı: yeni bir servis eklenince ikisine de `scrape_config` girer.
+# Prometheus koşullu yapılandırmayı desteklemiyor, bu yüzden tek dosyada iki hedef kümesi
+# tutulamıyor (kullanılmayan küme kalıcı olarak DOWN görünürdü).
+
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: gateway
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+  - job_name: access-service
+    static_configs:
+      - targets: ['host.docker.internal:3001']
+
+  - job_name: outage-service
+    static_configs:
+      - targets: ['host.docker.internal:3002']
+
+  - job_name: work-order-service
+    static_configs:
+      - targets: ['host.docker.internal:3003']
+
+  - job_name: translation-service
+    static_configs:
+      - targets: ['host.docker.internal:3004']
+
+  - job_name: network-service
+    static_configs:
+      - targets: ['host.docker.internal:3005']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

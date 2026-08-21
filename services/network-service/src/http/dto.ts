@@ -47,9 +47,6 @@ export function toComponentDto(row: ComponentRow) {
     lat: row.lat,
     lon: row.lon,
     switchable: row.switchable,
-    loadBreak: row.loadBreak,
-    normallyOpen: row.normallyOpen,
-    isClosed: row.isClosed,
     status: row.status,
     isEnergized: energizationService.isEnergized(row.id),
     deEnergizedBy: energizationService.deEnergizedBy(row.id),
@@ -75,10 +72,12 @@ export function toComponentDetailDto(row: ComponentRow, unitAncestors: UnitRow[]
 export function toDownstreamImpactDto(impact: DownstreamImpact) {
   return {
     componentId: impact.componentId,
-    affectedElementIds: impact.affectedElementIds,
+    // ⚠️ Kimlik listesi yanıtta **yok**. Harita izi kimliklerden değil `setToken`'ın
+    // tile'larından çizilir (bkz. impact.controller.ts `trace`) ve panelde yalnız sayılar
+    // gösterilir; listeyi ayrıca göndermek yüz binlerce elemanlı bir izde tarayıcıya
+    // megabaytlarca kullanılmayan JSON taşımak demekti.
     affectedElementCount: impact.affectedElementCount,
     affectedCustomerCount: impact.affectedCustomerCount,
-    overflowed: impact.overflowed,
     radialityViolated: impact.radialityViolated,
   };
 }
@@ -107,7 +106,6 @@ export function toImpactPreviewDto(preview: ImpactPreview) {
     topologyLevel: preview.topologyLevel,
     affectedElementCount: preview.affectedElementCount,
     affectedCustomerCount: preview.affectedCustomerCount,
-    overflowed: preview.overflowed,
     radialityViolated: preview.radialityViolated,
     isEnergized: preview.isEnergized,
     deEnergizedBy: preview.deEnergizedBy,

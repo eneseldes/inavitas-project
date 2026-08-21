@@ -268,7 +268,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'permission.translation.publish', 'Çeviri yayınlama', 'Publish translations'],
   ['user-management', 'permission.network.read', 'Şebeke ve idari birim verilerini görme', 'View network and administrative unit data'],
   ['user-management', 'permission.network.trace', 'Besleme zinciri ve etki izi sorgulama', 'Query the supply chain and impact trace'],
-  ['user-management', 'permission.network.switch', 'Anahtar işletme (manevra)', 'Operate switches (switching)'],
   ['user-management', 'permission.customer.read', 'Abone verilerini görme (PII hariç)', 'View customer data (excluding PII)'],
   ['user-management', 'permission.customer.read-pii', 'Abone tesisat/sözleşme numarasını görme', 'View customer wiring/contract numbers'],
 
@@ -449,7 +448,10 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['network', 'enum.breakerRole.DM_ENTRY', 'DM Giriş Kesicisi', 'DM Entry Breaker'],
   ['network', 'enum.breakerRole.TRANSFORMER', 'Trafo Kesicisi', 'Transformer Breaker'],
   ['network', 'enum.breakerRole.TIE', 'Bağlantı (Tie) Kesicisi', 'Tie Breaker'],
-  ['network', 'enum.breakerRole.SERVICE_ENTRY', 'Kofra Kesicisi', 'Service Entry Breaker'],
+  // Kofranın KENDİSİ kesicidir (bkz. network-service tiles/service.ts `unit_breakers`);
+  // ayrı bir "kesicisi" yoktur. Etiket bu yüzden birimin adıdır: eleman detayında
+  // "Kesici · Kofra Kesicisi" diye okunuyordu.
+  ['network', 'enum.breakerRole.SERVICE_ENTRY', 'Kofra', 'Service Entry (Kofra)'],
 
   // Gerilim her yerde kV olarak yazılır — kısaltma tek başına bırakılmaz.
   // Veri setinde yalnız bu iki abone tipi var (ölçüldü: `SELECT DISTINCT customer_type`).
@@ -569,6 +571,14 @@ const SEED_KEYS: [string, string, string, string][] = [
     'Sonuçlar üst sınıra ulaştı — filtreyi daraltın.',
     'Results hit the limit — narrow the filter.',
   ],
+  [
+    'map',
+    'truncated.banner',
+    'Haritada eksik veri var — üst sınıra dayanıldı. Filtreyi daraltın.',
+    'Some map data is missing — a server limit was reached. Narrow the filter.',
+  ],
+  ['map', 'truncated.records', 'kesinti/iş emri listesi', 'outage/work order list'],
+  ['map', 'truncated.highlight', 'vurgulanan küme', 'highlighted set'],
   ['map', 'filter.status', 'Durum', 'Status'],
   ['map', 'filter.origin', 'Kaynak', 'Origin'],
   ['map', 'filter.type', 'Tür', 'Type'],
@@ -637,8 +647,8 @@ const SEED_KEYS: [string, string, string, string][] = [
   [
     'map',
     'cascade.body',
-    'Bu elemanın beslediği hatta hâlihazırda {count} kesinti sürüyor. Yeni kesinti açılırsa bu kesintiler kapsanan kesinti olarak buna bağlanacak ve müşteri-dakikaları yalnız üst kesintide sayılacak.',
-    '{count} outages are already ongoing downstream of this element. If you open a new outage, they will be linked to it as contained outages and customer-minutes will be counted only on the parent.',
+    'Aşağı akıştaki {count} kesinti buna bağlanacak; müşteri-dakikaları yalnız üst kesintide sayılacak.',
+    '{count} downstream outages will be linked to this one; customer-minutes count only on the parent.',
   ],
   ['map', 'cascade.confirm', 'Onayla ve Devam', 'Confirm and Continue'],
   ['map', 'cascade.customerCount', '{count} abone', '{count} customers'],
@@ -661,12 +671,17 @@ const SEED_KEYS: [string, string, string, string][] = [
     'Etkilenen: {elements} şebeke elemanı, {customers} abone.',
     'Affected: {elements} network elements, {customers} customers.',
   ],
-  // Sayılar kesindir; kırpılan yalnız kimlik listesidir — vurgu eksik kalır, sayı değil.
   [
     'map',
-    'trace.overflowed',
-    'Sayılar tamdır, haritadaki vurgu ilk 10.000 elemanla sınırlıdır.',
-    'The counts are exact; the map highlight is limited to the first 10,000 elements.',
+    'trace.setTruncated',
+    'Haritadaki vurgu üst sınıra dayandı — bir kısmı çizilmiyor.',
+    'The map highlight hit its limit — part of it is not drawn.',
+  ],
+  [
+    'map',
+    'trace.noBbox',
+    'İzin coğrafi kapsamı hesaplanamadı; kamera olduğu yerde kaldı.',
+    'The trace has no computable extent; the camera stayed where it was.',
   ],
   [
     'map',

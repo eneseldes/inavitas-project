@@ -60,7 +60,6 @@ interface EdgeRow {
   from_id: string;
   to_id: string;
   is_closed: boolean;
-  normally_open: boolean;
   participates_in_outage_graph: boolean;
 }
 
@@ -78,7 +77,7 @@ export async function loadGraph(logger: Logger): Promise<void> {
     ),
     db.execute(sql`SELECT id FROM customer.customers`),
     db.execute(
-      sql`SELECT from_id, to_id, is_closed, normally_open, participates_in_outage_graph FROM network.topology_edges`,
+      sql`SELECT from_id, to_id, is_closed, participates_in_outage_graph FROM network.topology_edges`,
     ),
   ]);
 
@@ -122,7 +121,6 @@ export async function loadGraph(logger: Logger): Promise<void> {
     fromId: row.from_id,
     toId: row.to_id,
     isClosed: row.is_closed,
-    normallyOpen: row.normally_open,
     inOutageGraph: row.participates_in_outage_graph,
   }));
 

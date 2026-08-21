@@ -1,0 +1,1 @@
+CREATE INDEX "idx_outage_impact_elements" ON "outage_impact" USING gin ("affected_element_ids" jsonb_path_ops);

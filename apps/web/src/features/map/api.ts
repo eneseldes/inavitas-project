@@ -2,8 +2,8 @@ import type { Polygon } from 'geojson';
 import { apiFetch } from '../../shared/api/client.ts';
 import type { PageResult } from '../../types/api.ts';
 import type {
-  Bbox,
   ComponentCategory,
+  HighlightSetRef,
   DownstreamImpact,
   EnergizationSnapshot,
   ImpactPreview,
@@ -31,6 +31,11 @@ import type {
  *     kolonundan geliyor (`hashtext(path) % 8` yerine) — iki komşu ilçe artık aynı renk olamaz.
  * 9 — ilçe verisi z8 değil z7'den itibaren gönderiliyor (bkz. zoom-lod.ts) — il↔ilçe
  *     bindirmeli solması (z7,5-8,5) z7 tile'ında geometri bulabilsin diye.
+ *
+ * ⚠️ **Sunucuda bir eşi var** — `services/network-service/src/modules/tiles/service.ts`
+ * `TILE_SCHEMA_VERSION`. Tek sabitten türetilemiyor: `apps/web` bilerek hiçbir backend
+ * paketine bağımlı değil. İkisi ayrışırsa artık sessiz kalmaz — sunucu `?v=` ile geleni
+ * kendi sabitiyle karşılaştırıp uyarı loglar. **İkisi birlikte artırılmalıdır.**
  */
 const TILE_SCHEMA_VERSION = 9;
 
@@ -93,13 +98,14 @@ export function fetchImpactPreview(id: string): Promise<ImpactPreview> {
 }
 
 /**
- * Görünüm penceresindeki enerjisiz elemanlar.
+ * Enerjisiz kümenin özeti + vurgu token'ı.
  *
- * Sorgu **bbox kapsamlıdır**: `setFeatureState` yalnız yüklü tile'lara yazılabilir, ekranda
- * olmayan bir elemanın durumunu taşımanın faydası yok, maliyeti var.
+ * Parametresizdir: sorgu artık ne görünüm penceresine ne zoom'a bakar. Küme haritaya
+ * token'ın tile'larından iner, o tile'lar da zaten yalnız görünen kareyi taşır — pencereye
+ * göre **kırpmak** (veri kaybı) yerine pencereye göre **tile'lamak** (kayıpsız).
  */
-export function fetchEnergization(bbox: Bbox, zoom: number): Promise<EnergizationSnapshot> {
-  return apiFetch(`/api/network/energization?bbox=${bbox.join(',')}&zoom=${zoom}`);
+export function fetchEnergization(): Promise<EnergizationSnapshot> {
+  return apiFetch('/api/network/energization');
 }
 
 /** Alan sorgusunun gövdesi — poligon + `/components` ile aynı sözlükten gelen filtreler. */
@@ -111,8 +117,13 @@ export interface AreaQueryBody {
   pageSize: number;
 }
 
-/** Alan sorgusunun yanıtı; `overflowed` sonucun sunucudaki üst sınıra dayandığını söyler. */
-export interface AreaQueryResult extends PageResult<NetworkComponentAreaItem> {
+/**
+ * Alan sorgusunun yanıtı; `overflowed` sonucun sunucudaki üst sınıra dayandığını söyler.
+ *
+ * `setToken` sayfadan **bağımsızdır**: liste bir sayfa gösterir, harita alanın tamamını
+ * vurgular (bkz. HighlightSetRef).
+ */
+export interface AreaQueryResult extends PageResult<NetworkComponentAreaItem>, HighlightSetRef {
   overflowed: boolean;
 }
 

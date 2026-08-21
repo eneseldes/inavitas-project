@@ -103,12 +103,15 @@ export async function getById(req: AuthedRequest, res: Response): Promise<void> 
 /**
  * Kesinti açılabilir mi — sunucu tarafı kapı.
  *
- * İki bilinen sınır **kabul edilmiştir**:
- * 1. Etki kümesi `IMPACT_ID_LIMIT` ile kırpılır; kırpılmış bir kümede kapsama sorgusu bazı
- *    elemanları kaçırabilir. Kaçarsa ikinci kesinti açılır ve kaskad motoru onu zaten üst
- *    kesintiye **bağlar** — sonuç yanlış değil, sadece daha az sıkı.
+ * İki bilinen sınır **kabul edilmiştir**; ikisinin de emniyet ağı kaskad motorudur:
+ * 1. `findContainingOutages` kayıtlı etki kümesini okur ve o kolon Kafka mesaj sınırı yüzünden
+ *    `IMPACT_ID_LIMIT`'te kırpılabilir; kırpılmış bir kümede kapsama sorgusu bazı elemanları
+ *    kaçırabilir. Kaçarsa ikinci kesinti açılır ve kaskad motoru onu üst kesintiye **bağlar**.
+ *    ⚠️ Bu ağ eskiden delikti — kaskad da aynı kırpılmış listeyi okuyordu. Artık kapsama
+ *    kararını `network-service` kırpılmamış küme üzerinden veriyor, dolayısıyla buradaki
+ *    gevşeklik gerçekten zararsız (bkz. modules/cascade/service.ts).
  * 2. Etki asenkrondur (`impactStatus: 'PENDING'`); kesinti açıldıktan ~300 ms sonrasına kadar
- *    alt elemana ikinci kesinti açılabilir. Yine kaskad ağı yakalar. Emniyet ağı budur, kapı değil.
+ *    alt elemana ikinci kesinti açılabilir. Yine kaskad ağı yakalar.
  */
 async function assertOutageAllowed(cbsId: string): Promise<void> {
   const activeOnSelf = await outageRepository.findActiveByCbsId(cbsId);
