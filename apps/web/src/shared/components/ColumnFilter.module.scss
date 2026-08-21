@@ -99,3 +99,11 @@
     transform: translateY(0);
   }
 }
+
+// Aralık tutarsızlığının (başlangıç > bitiş) gerekçesi — "Uygula" pasifken kullanıcı
+// nedenini okumadan kalmasın.
+.error {
+  margin: 0 0 v.$space-2;
+  font-size: 0.75rem;
+  color: v.$color-error;
+}

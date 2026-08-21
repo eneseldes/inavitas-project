@@ -105,7 +105,6 @@ export function toImpactPreviewDto(preview: ImpactPreview) {
   return {
     componentId: preview.componentId,
     topologyLevel: preview.topologyLevel,
-    highImpact: preview.highImpact,
     affectedElementCount: preview.affectedElementCount,
     affectedCustomerCount: preview.affectedCustomerCount,
     overflowed: preview.overflowed,

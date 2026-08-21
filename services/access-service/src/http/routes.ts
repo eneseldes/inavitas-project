@@ -6,6 +6,7 @@ import { redis } from '../redis.ts';
 import * as authController from './controllers/auth.controller.ts';
 import { buildPermissionRouter } from './controllers/permission.controller.ts';
 import { buildRoleRouter } from './controllers/role.controller.ts';
+import { buildUnitRouter } from './controllers/unit.controller.ts';
 import { buildUserRouter } from './controllers/user.controller.ts';
 import { authenticate } from './authenticate.ts';
 
@@ -39,6 +40,7 @@ export function buildRouter(): Router {
   router.use('/users', buildUserRouter());
   router.use('/roles', buildRoleRouter());
   router.use('/permissions', buildPermissionRouter());
+  router.use('/units', buildUnitRouter());
 
   return router;
 }

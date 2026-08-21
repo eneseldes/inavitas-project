@@ -89,6 +89,9 @@ export function createApp(logger: Logger): Express {
   app.use(buildProxy('/api/users/**', SERVICE_TARGETS.access, { '^/api/users': '/users' }));
   app.use(buildProxy('/api/roles/**', SERVICE_TARGETS.access, { '^/api/roles': '/roles' }));
   app.use(buildProxy('/api/permissions/**', SERVICE_TARGETS.access, { '^/api/permissions': '/permissions' }));
+  // Birim ağacı access-service'ten gelir: kapsam ataması `units_ro` read-model'i üzerinden
+  // doğrulanıyor, `/api/network/units` ise şebeke tarafının kendi (coğrafi) uçlarıdır.
+  app.use(buildProxy('/api/units/**', SERVICE_TARGETS.access, { '^/api/units': '/units' }));
   app.use(buildProxy('/api/outages/**', SERVICE_TARGETS.outage, { '^/api/outages': '/outages' }, { forwardCookies: false }));
   app.use(
     buildProxy('/api/work-orders/**', SERVICE_TARGETS.workOrder, { '^/api/work-orders': '/work-orders' }, { forwardCookies: false }),

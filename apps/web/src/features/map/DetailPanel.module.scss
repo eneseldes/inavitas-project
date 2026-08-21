@@ -147,29 +147,6 @@
   color: v.$color-danger-soft-ink;
 }
 
-// --- Elemana bağlı kayıtlar — diğer bölümlerle aynı çizgili satır dili ---------
-// Eskiden kendi kutucuğu olan kartlardı; artık Genel/Eleman ile aynı görünsün diye
-// tam genişlikte, aralarında ince çizgi olan tıklanabilir satırlardır.
-
-.linkedRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: v.$space-3;
-  width: 100%;
-  padding: v.$space-2 0;
-  border-bottom: 1px solid v.$color-hairline;
-  color: v.$color-ink;
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &:hover {
-    background: v.$color-row-hover;
-  }
-}
-
 .linkedId {
   display: inline-flex;
   align-items: center;

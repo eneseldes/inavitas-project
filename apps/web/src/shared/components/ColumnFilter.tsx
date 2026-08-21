@@ -214,7 +214,7 @@ function SelectFilterBody({ value, onApply, options, onDone }: SelectFilterProps
       <div className={styles.optionList}>
         <label className={styles.option}>
           <input type="radio" name="column-select-filter" checked={draft === ''} onChange={() => setDraft('')} />
-          {t('common.filter.any', undefined, 'Tümü')}
+          {t('common.filter.any')}
         </label>
         {options.map((option) => (
           <label key={option.value} className={styles.option}>
@@ -309,11 +309,15 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
   const [fromFocused, setFromFocused] = useState(false);
   const [toFocused, setToFocused] = useState(false);
 
+  // "Tarihler arası" modunda başlangıç bitişten sonra olamaz; aksi halde sunucuya hiçbir
+  // satırın eşleşemeyeceği bir aralık gidiyor ve tablo sessizce boş görünüyordu.
+  const invalidRange = operator === 'between' && from !== '' && to !== '' && from > to;
+
   return (
     <div>
       <div className={styles.dateGroup}>
         <Field
-          label={t('common.filter.date.operator', undefined, 'Filtre Modu')}
+          label={t('common.filter.date.operator')}
           floated
           focused={operatorFocused}
           htmlFor="column-filter-date-operator"
@@ -325,19 +329,20 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
             onFocus={() => setOperatorFocused(true)}
             onBlur={() => setOperatorFocused(false)}
           >
-            <option value="between">{t('common.filter.date.between', undefined, 'Tarihler Arası')}</option>
-            <option value="after">{t('common.filter.date.after', undefined, 'Sonrasında (>=)')}</option>
-            <option value="before">{t('common.filter.date.before', undefined, 'Öncesinde (<=)')}</option>
+            <option value="between">{t('common.filter.date.between')}</option>
+            <option value="after">{t('common.filter.date.after')}</option>
+            <option value="before">{t('common.filter.date.before')}</option>
           </SelectInput>
         </Field>
 
         {(operator === 'between' || operator === 'after') && (
-          <Field label={t('common.filter.date.from', undefined, 'Başlangıç')} floated focused={fromFocused} htmlFor="column-filter-date-from">
+          <Field label={t('common.filter.date.from')} floated focused={fromFocused} htmlFor="column-filter-date-from">
             <TextInput
               id="column-filter-date-from"
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
+              error={invalidRange}
               onFocus={() => setFromFocused(true)}
               onBlur={() => setFromFocused(false)}
             />
@@ -345,18 +350,21 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
         )}
 
         {(operator === 'between' || operator === 'before') && (
-          <Field label={t('common.filter.date.to', undefined, 'Bitiş')} floated focused={toFocused} htmlFor="column-filter-date-to">
+          <Field label={t('common.filter.date.to')} floated focused={toFocused} htmlFor="column-filter-date-to">
             <TextInput
               id="column-filter-date-to"
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
+              error={invalidRange}
               onFocus={() => setToFocused(true)}
               onBlur={() => setToFocused(false)}
             />
           </Field>
         )}
       </div>
+
+      {invalidRange && <p className={styles.error}>{t('common.filter.date.rangeInvalid')}</p>}
 
       <div className={styles.actions}>
         <button
@@ -372,6 +380,7 @@ function DateFilterBody({ value, onApply, onDone }: DateFilterProps & { onDone: 
         <button
           type="button"
           className="btn btn--primary"
+          disabled={invalidRange}
           onClick={() => {
             onApply({
               operator,
@@ -395,11 +404,18 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
   const [minFocused, setMinFocused] = useState(false);
   const [maxFocused, setMaxFocused] = useState(false);
 
+  // Bu filtrenin bağlandığı alanlar (süre, abone sayısı) negatif olamaz; artı/eksi okları
+  // gizlendiği için (bkz. index.scss `.input[type='number']`) değer elle yazılıyor ve
+  // doğrulama tamamen buraya düşüyor.
+  const isNumeric = (raw: string) => raw === '' || /^\d+$/.test(raw);
+  const invalidRange = min !== '' && max !== '' && Number(min) > Number(max);
+  const canApply = isNumeric(min) && isNumeric(max) && !invalidRange;
+
   return (
     <div>
       <div className={styles.dateGroup}>
         <Field
-          label={t('common.filter.number.min', undefined, 'En az')}
+          label={t('common.filter.number.min')}
           floated={minFocused || min !== ''}
           focused={minFocused}
           htmlFor="column-filter-number-min"
@@ -407,6 +423,9 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
           <TextInput
             id="column-filter-number-min"
             type="number"
+            min={0}
+            step={1}
+            error={!isNumeric(min) || invalidRange}
             value={min}
             onChange={(e) => setMin(e.target.value)}
             onFocus={() => setMinFocused(true)}
@@ -414,7 +433,7 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
           />
         </Field>
         <Field
-          label={t('common.filter.number.max', undefined, 'En çok')}
+          label={t('common.filter.number.max')}
           floated={maxFocused || max !== ''}
           focused={maxFocused}
           htmlFor="column-filter-number-max"
@@ -422,6 +441,9 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
           <TextInput
             id="column-filter-number-max"
             type="number"
+            min={0}
+            step={1}
+            error={!isNumeric(max) || invalidRange}
             value={max}
             onChange={(e) => setMax(e.target.value)}
             onFocus={() => setMaxFocused(true)}
@@ -429,6 +451,8 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
           />
         </Field>
       </div>
+
+      {invalidRange && <p className={styles.error}>{t('common.filter.number.rangeInvalid')}</p>}
 
       <div className={styles.actions}>
         <button
@@ -446,6 +470,7 @@ function NumberRangeFilterBody({ value, onApply, onDone }: NumberRangeFilterProp
         <button
           type="button"
           className="btn btn--primary"
+          disabled={!canApply}
           onClick={() => {
             onApply({
               min: min !== '' ? Number(min) : undefined,

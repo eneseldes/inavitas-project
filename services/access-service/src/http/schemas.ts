@@ -1,3 +1,4 @@
+import { PaginationQuery } from '@inavitas/shared';
 import { z } from 'zod';
 
 /** Giriş yapma HTTP istek gövdesi şeması. */
@@ -29,11 +30,22 @@ export const ListUsersQuery = z.object({
 });
 export type ListUsersQuery = z.infer<typeof ListUsersQuery>;
 
+/**
+ * Rol ataması — kapsam rolün yanında taşınır. `unit_path` bir ltree yolu olduğundan
+ * yalnız harf/rakam/alt çizgi ve nokta içerebilir; serbest metin kabul edilirse ilerideki
+ * `::ltree` cast'i sorgu zamanında patlar.
+ */
+export const Assignment = z.object({
+  roleCode: z.string().min(1),
+  unitPath: z.string().regex(/^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)*$/, 'Geçersiz birim yolu'),
+});
+export type Assignment = z.infer<typeof Assignment>;
+
 export const CreateUserBody = z.object({
   email: z.email('Geçerli bir e-posta adresi girin'),
   fullName: z.string().min(1).max(128),
   password: z.string().min(8, 'Parola en az 8 karakter olmalı'),
-  roleCodes: z.array(z.string()).default([]),
+  assignments: z.array(Assignment).default([]),
 });
 export type CreateUserBody = z.infer<typeof CreateUserBody>;
 
@@ -44,10 +56,10 @@ export const UpdateUserBody = z.object({
 });
 export type UpdateUserBody = z.infer<typeof UpdateUserBody>;
 
-export const SetUserRolesBody = z.object({
-  roleCodes: z.array(z.string()),
+export const SetUserAssignmentsBody = z.object({
+  assignments: z.array(Assignment),
 });
-export type SetUserRolesBody = z.infer<typeof SetUserRolesBody>;
+export type SetUserAssignmentsBody = z.infer<typeof SetUserAssignmentsBody>;
 
 export const ResetPasswordBody = z.object({
   password: z.string().min(8, 'Parola en az 8 karakter olmalı'),
@@ -71,3 +83,15 @@ export const SetPermissionsBody = z.object({
   permissionCodes: z.array(z.string()),
 });
 export type SetPermissionsBody = z.infer<typeof SetPermissionsBody>;
+
+// --- Birim ağacı ---
+
+/**
+ * Birim ağacı sorgusu. `parent` verilmezse kökler döner; `q` verilirse ağaç değil arama
+ * sonucu (eşleşmeler + ataları) döner — arama sunucu tarafındadır.
+ */
+export const UnitTreeQuery = PaginationQuery.extend({
+  parent: z.string().optional(),
+  q: z.string().min(1).optional(),
+});
+export type UnitTreeQuery = z.infer<typeof UnitTreeQuery>;

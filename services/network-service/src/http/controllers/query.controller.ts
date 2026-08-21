@@ -1,10 +1,16 @@
-import { toPageResult, UnauthenticatedError, ValidationError, type AuthedRequest } from '@inavitas/shared';
+import {
+  PERMISSIONS,
+  scopeFilterAnyUnit,
+  toPageResult,
+  UnauthenticatedError,
+  ValidationError,
+  type AuthedRequest,
+} from '@inavitas/shared';
 import type { Response } from 'express';
 import { components } from '../../db/schema.ts';
 import * as componentsRepository from '../../repository/components.repository.ts';
 import { toComponentAreaDto } from '../dto.ts';
 import { QueryWithinBody } from '../schemas.ts';
-import { scopeFilter } from '../scope-filter.ts';
 
 /**
  * Haritada çizilen alanın içine düşen şebeke elemanlarını listeler.
@@ -25,7 +31,7 @@ export async function within(req: AuthedRequest, res: Response): Promise<void> {
     ]);
   }
 
-  const scope = scopeFilter(req.user, components.unitPath);
+  const scope = scopeFilterAnyUnit(req.user, components.unitPath, components.unitPaths, PERMISSIONS.NETWORK_READ);
   const pagination = { page: body.page, pageSize: body.pageSize };
 
   const { items, total, overflowed } = await componentsRepository.listWithin(

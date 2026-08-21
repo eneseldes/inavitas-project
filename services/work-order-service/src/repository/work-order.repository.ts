@@ -18,6 +18,8 @@ export interface WorkOrderFilters {
   createdAtTo?: Date;
   origin?: ('USER' | 'SYSTEM')[];
   hasOutage?: boolean;
+  /** Bölgesel yetki süzgeci — kullanıcının seçtiği filtre değil, sunucunun koyduğu sınır. */
+  scope?: SQL;
 }
 
 export interface CreateWorkOrderInput {
@@ -95,6 +97,7 @@ function buildConditions(filters: WorkOrderFilters): SQL[] {
   if (filters.createdAtTo) conditions.push(lt(workOrders.createdAt, filters.createdAtTo));
   if (filters.hasOutage === true) conditions.push(isNotNull(workOrders.outageId));
   if (filters.hasOutage === false) conditions.push(isNull(workOrders.outageId));
+  if (filters.scope) conditions.push(filters.scope);
 
   return conditions;
 }

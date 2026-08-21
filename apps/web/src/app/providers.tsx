@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '../features/auth/useAuth.tsx';
 import { I18nProvider } from '../features/i18n/I18nProvider.tsx';
 import { ThemeProvider } from '../features/theme/ThemeProvider.tsx';
+import { setScopeStaleListener } from '../shared/api/client.ts';
 import { ToastProvider } from '../shared/components/Toast.tsx';
 
 const queryClient = new QueryClient({
@@ -14,6 +15,10 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Kapsam değişimi bir "yeniden oturum"dur: token yenilendikten sonra önbellekte kalan eski
+// kayıtlar kapsam dışına düşmüş olabilir, tamamı atılır.
+setScopeStaleListener(() => queryClient.clear());
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (

@@ -5,9 +5,10 @@ import {
   fetchUsers,
   patchUser,
   resetPassword,
-  setUserRoles,
+  setUserAssignments,
   type UsersQuery,
 } from '../api.ts';
+import type { Assignment } from '../../../types/user-management.ts';
 
 export const USERS_KEY = 'users';
 
@@ -44,11 +45,11 @@ export function usePatchUser() {
   });
 }
 
-export function useSetUserRoles() {
+export function useSetUserAssignments() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, roleCodes }: { id: string; roleCodes: string[] }) =>
-      setUserRoles(id, roleCodes),
+    mutationFn: ({ id, assignments }: { id: string; assignments: Assignment[] }) =>
+      setUserAssignments(id, assignments),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [USERS_KEY] }),
   });
 }

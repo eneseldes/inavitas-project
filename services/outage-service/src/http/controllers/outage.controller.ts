@@ -1,5 +1,5 @@
 import {
-  assertHighImpactAllowed,
+  assertInScope,
   ComponentDeEnergizedError,
   ComponentNotFoundError,
   ConflictError,
@@ -7,13 +7,18 @@ import {
   OutageAlreadyActiveError,
   PaginationQuery,
   parseSort,
+  PERMISSIONS,
+  scopeFilter,
   toExclusiveUpperBound,
   toPageResult,
   UnauthenticatedError,
   type AuthedRequest,
+  type AuthenticatedUser,
+  type Permission,
 } from '@inavitas/shared';
 import type { Response } from 'express';
 import { db } from '../../db.ts';
+import { outages } from '../../db/schema.ts';
 import { canTransition, type OutageStatus } from '../../domain/state-machine.ts';
 import {
   enqueueOutageCancelledIfNeededTx,
@@ -35,8 +40,13 @@ import {
 import { CreateOutageBody, ListOutagesQuery, OutageMapQuery, PatchOutageBody } from '../schemas.ts';
 
 /** Liste ve harita sorgularının paylaştığı filtre dönüşümü. */
-function toFilters(query: ListOutagesQuery | OutageMapQuery): OutageFilters {
+function toFilters(query: ListOutagesQuery | OutageMapQuery, user: AuthenticatedUser): OutageFilters {
   return {
+    // 🚨 Kapsam bir filtre DEĞİL, bir süzgeçtir: kullanıcının seçtiği `unitPath` filtresinin
+    // yanında, ondan bağımsız olarak her sorguya eklenir. Liste ve harita ucu aynı
+    // dönüşümden geçtiği için ikisi de kapsanır — biri atlanırsa poligon sonucu ve küme
+    // rozetindeki sayı kapsam dışı kayıt döker.
+    scope: scopeFilter(user, outages.unitPath, PERMISSIONS.OUTAGE_READ),
     status: query.status,
     origin: query.origin,
     cbsId: query.cbsId,
@@ -57,20 +67,36 @@ function toFilters(query: ListOutagesQuery | OutageMapQuery): OutageFilters {
 }
 
 export async function list(req: AuthedRequest, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthenticatedError();
+
   const query = ListOutagesQuery.parse(req.query);
   const sort = parseSort(query.sort, SORTABLE_FIELDS, { field: 'createdAt', dir: 'desc' });
   const pagination = { page: query.page, pageSize: query.pageSize };
 
-  const { items, total } = await outageRepository.list(toFilters(query), pagination, sort);
+  const { items, total } = await outageRepository.list(toFilters(query, req.user), pagination, sort);
 
   res.json(toPageResult(items.map(toOutageDto), total, query.page, query.pageSize));
 }
 
-export async function getById(req: AuthedRequest, res: Response): Promise<void> {
-  const id = req.params.id as string;
+/**
+ * Kesintiyi kimliğiyle yükler ve kapsam kapısından geçirir.
+ *
+ * Liste süzgeci bir yetki kanıtı değildir: kimlik doğrudan istenebilir, alt kaynakları
+ * (`/impact`, `/cascade`, `/affected-customers`, `/history`) de tekil kimlikle çağrılır.
+ * Bu yüzden kapı, kaydı okuyan HER yolda burada tek noktadan geçer.
+ */
+async function loadInScope(req: AuthedRequest, id: string, permission: Permission) {
+  if (!req.user) throw new UnauthenticatedError();
+
   const row = await outageRepository.findById(id);
   if (!row) throw new NotFoundError('Kesinti', id);
 
+  assertInScope(req.user, permission, row.unitPath, id);
+  return row;
+}
+
+export async function getById(req: AuthedRequest, res: Response): Promise<void> {
+  const row = await loadInScope(req, req.params.id as string, PERMISSIONS.OUTAGE_READ);
   res.json(toOutageDto(row));
 }
 
@@ -103,10 +129,11 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   const component = await networkComponentRepository.findById(cbsId);
   if (!component) throw new ComponentNotFoundError(cbsId);
 
-  // Yüksek etkili kesinti (fider kesicisi ve üstü) ek izin ister. Harita üzerindeki etki
-  // önizlemesi kullanıcıya sayıyı gösterir ama karar burada verilir — önizleme atlanabilir
-  // ya da arada eskiyebilir; istemcinin gösterdiği sayıya güvenilmez.
-  assertHighImpactAllowed(req.user, cbsId, component.topologyLevel);
+  // Bölgesel yetki kapısı: eleman kullanıcının kapsamı dışındaysa kesinti açılamaz. Karar
+  // burada verilir — istemcinin listesi süzülmüş olabilir ama istek listeden geçmeden de
+  // atılabilir. Yazma yolunda **birincil** birim (`unit_path`) kullanılır: okuma `unit_paths`
+  // ile genişletiliyor ama bir mahalle sorumlusu komşu ilçeye değen hattı kesememeli.
+  assertInScope(req.user, PERMISSIONS.OUTAGE_WRITE, component.unitPath, cbsId);
 
   // Enerjisizlik ve mükerrerlik kapıları. Karar sunucudadır; istemci onu yalnız erkenden ve
   // anlaşılır biçimde gösterir. Sıra önemli: "kendi üzerinde kesinti var" daha spesifik bir
@@ -159,9 +186,7 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
   const id = req.params.id as string;
   const body = PatchOutageBody.parse(req.body);
-  const current = await outageRepository.findById(id);
-
-  if (!current) throw new NotFoundError('Kesinti', id);
+  const current = await loadInScope(req, id, PERMISSIONS.OUTAGE_WRITE);
 
   if (current.status === 'ARCHIVED' || current.status === 'CANCELLED') {
     throw new ConflictError(`${current.status} durumundaki kesinti kilitlidir, verisi değiştirilemez`, [
@@ -241,8 +266,7 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
 export async function getHistory(req: AuthedRequest, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const current = await outageRepository.findById(id);
-  if (!current) throw new NotFoundError('Kesinti', id);
+  await loadInScope(req, id, PERMISSIONS.OUTAGE_READ);
 
   const rows = await outageRepository.getHistory(id);
   res.json({ items: rows.map(toOutageHistoryDto) });
@@ -256,8 +280,7 @@ export async function getHistory(req: AuthedRequest, res: Response): Promise<voi
  */
 export async function getImpact(req: AuthedRequest, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const outage = await outageRepository.findById(id);
-  if (!outage) throw new NotFoundError('Kesinti', id);
+  const outage = await loadInScope(req, id, PERMISSIONS.OUTAGE_READ);
 
   const impact = await outageRepository.findLatestImpact(id);
 
@@ -270,8 +293,7 @@ export async function getImpact(req: AuthedRequest, res: Response): Promise<void
 /** `GET /outages/:id/cascade` — kesintinin üstü ve kapsadığı alt kesintiler. */
 export async function getCascade(req: AuthedRequest, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const outage = await outageRepository.findById(id);
-  if (!outage) throw new NotFoundError('Kesinti', id);
+  const outage = await loadInScope(req, id, PERMISSIONS.OUTAGE_READ);
 
   const relations = await outageRepository.findRelations(id);
 
@@ -285,8 +307,7 @@ export async function getCascade(req: AuthedRequest, res: Response): Promise<voi
 /** `GET /outages/:id/affected-customers` — sayfalı, **PII'sız** etkilenen abone listesi. */
 export async function getAffectedCustomers(req: AuthedRequest, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const outage = await outageRepository.findById(id);
-  if (!outage) throw new NotFoundError('Kesinti', id);
+  await loadInScope(req, id, PERMISSIONS.OUTAGE_READ);
 
   const pagination = PaginationQuery.parse(req.query);
   const { items, total } = await outageRepository.listAffectedCustomers(id, pagination);
@@ -302,8 +323,10 @@ export async function getAffectedCustomers(req: AuthedRequest, res: Response): P
  * kullanıcıyı filtre daraltmaya yönlendirir.
  */
 export async function listForMap(req: AuthedRequest, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthenticatedError();
+
   const query = OutageMapQuery.parse(req.query);
-  const items = await outageRepository.listForMap(toFilters(query), query.limit);
+  const items = await outageRepository.listForMap(toFilters(query, req.user), query.limit);
 
   res.json({ items: items.map(toOutageMapDto), truncated: items.length === query.limit });
 }

@@ -231,6 +231,7 @@ export interface ViewportFilter {
 export async function findIdsInViewport(
   bbox: Bbox,
   filter: ViewportFilter,
+  scope: SQL | undefined,
   limit: number = ENERGIZATION_ROW_LIMIT,
 ): Promise<{ ids: string[]; truncated: boolean }> {
   const typeMatches = filter.types.length > 0 ? inArray(components.type, filter.types) : sql`false`;
@@ -245,6 +246,7 @@ export async function findIdsInViewport(
       and(
         sql`(${typeMatches} OR ${breakerMatches})`,
         sql`${components.geom} && ST_MakeEnvelope(${bbox.minLon}, ${bbox.minLat}, ${bbox.maxLon}, ${bbox.maxLat}, 4326)`,
+        scope,
       ),
     )
     .limit(limit + 1);

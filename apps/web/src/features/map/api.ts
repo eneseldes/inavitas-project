@@ -49,6 +49,11 @@ export interface UnitLabel {
   centerLon: number | null;
 }
 
+/** Tek birimi yolu ile getirir — `/map?unit=<path>` derin bağı kamerayı buradan kurar. */
+export function fetchUnit(path: string): Promise<UnitLabel> {
+  return apiFetch(`/api/network/units/${path}`);
+}
+
 /**
  * İl/ilçe adlarını haritaya yazmak için merkez noktalarını getirir. Sayfa boyutu sunucuda
  * 100 ile sınırlı (MAX_PAGE_SIZE); bugün Ankara'da 1 il + 25 ilçe var ama veri seti

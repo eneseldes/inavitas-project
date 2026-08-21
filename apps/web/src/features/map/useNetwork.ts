@@ -5,6 +5,7 @@ import {
   fetchEnergization,
   fetchImpactPreview,
   fetchTrace,
+  fetchUnit,
   fetchUnitLabels,
   queryWithin,
   type AreaQueryBody,
@@ -13,6 +14,7 @@ import {
 
 export const NETWORK_COMPONENT_KEY = 'network-component';
 export const NETWORK_UNIT_LABELS_KEY = 'network-unit-labels';
+export const NETWORK_UNIT_KEY = 'network-unit';
 export const NETWORK_TRACE_KEY = 'network-trace';
 export const NETWORK_IMPACT_PREVIEW_KEY = 'network-impact-preview';
 export const NETWORK_AREA_QUERY_KEY = 'network-area-query';
@@ -61,6 +63,19 @@ export function useTrace(id: string | undefined, direction: TraceDirection | und
  * değil** — kesinti/enerjilenme SSE'si geldiğinde bu sorgu tazelenmelidir.
  * (`useTrace` `Infinity` kalabilir: topoloji hâlâ değişmiyor.)
  */
+/**
+ * `/map?unit=<path>` derin bağının hedefi. İdari birimler değişmeyen seed verisidir; sonuç
+ * oturum boyunca taze sayılır.
+ */
+export function useUnit(path: string | undefined) {
+  return useQuery({
+    queryKey: [NETWORK_UNIT_KEY, path],
+    queryFn: () => fetchUnit(path!),
+    enabled: path !== undefined,
+    staleTime: Infinity,
+  });
+}
+
 export function useImpactPreview(id: string | undefined) {
   return useQuery({
     queryKey: [NETWORK_IMPACT_PREVIEW_KEY, id],

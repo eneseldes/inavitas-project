@@ -71,6 +71,9 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'enum.role.ADMIN', 'Yönetici', 'System Administrator'],
   ['common', 'enum.role.OUTAGE_OPERATOR', 'Kesinti Operatörü', 'Outage Operator'],
   ['common', 'enum.role.WORK_ORDER_OPERATOR', 'Saha Personeli', 'Field Operator'],
+  ['common', 'enum.role.NETWORK_VIEWER', 'Şebeke İzleyici', 'Network Viewer'],
+  ['common', 'enum.role.FIELD_OPERATOR', 'Saha Operatörü', 'Field Operator'],
+  ['common', 'enum.role.DISPATCHER', 'Dağıtım Sorumlusu', 'Dispatcher'],
 
   // --- Ortak aksiyonlar ---
   ['common', 'action.save', 'Kaydet', 'Save'],
@@ -162,11 +165,30 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['common', 'filter.date.before', 'Öncesinde (<=)', 'Before (<=)'],
   ['common', 'filter.date.from', 'Başlangıç', 'From'],
   ['common', 'filter.date.to', 'Bitiş', 'To'],
+  [
+    'common',
+    'filter.date.rangeInvalid',
+    'Başlangıç tarihi bitişten sonra olamaz.',
+    'The start date cannot be later than the end date.',
+  ],
+  ['common', 'filter.number.min', 'En az', 'At least'],
+  ['common', 'filter.number.max', 'En çok', 'At most'],
+  [
+    'common',
+    'filter.number.rangeInvalid',
+    'En az değeri en çok değerinden büyük olamaz.',
+    'The minimum cannot be greater than the maximum.',
+  ],
+  ['common', 'filter.any', 'Tümü', 'All'],
+  // Kesinti↔iş emri bağı olan/olmayan kayıtlar — iki tabloda da aynı soru sorulur.
+  ['common', 'filter.relation.linked', 'Bağlı', 'Linked'],
+  ['common', 'filter.relation.unlinked', 'Bağlı değil', 'Not linked'],
 
   // --- Kullanıcı & Rol Yönetimi ---
-  ['user-management', 'page.title', 'Kullanıcı Yönetimi', 'User Management'],
+  ['user-management', 'page.title', 'Kullanıcı ve Birim Yönetimi', 'User & Unit Management'],
   ['user-management', 'segment.users', 'Kullanıcılar', 'Users'],
   ['user-management', 'segment.roles', 'Roller', 'Roles'],
+  ['user-management', 'segment.units', 'Birimler', 'Units'],
 
   ['user-management', 'column.email', 'E-posta', 'Email'],
   ['user-management', 'column.fullName', 'Ad Soyad', 'Full Name'],
@@ -184,8 +206,10 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'field.fullName', 'Ad Soyad', 'Full Name'],
   ['user-management', 'field.password', 'Parola', 'Password'],
   ['user-management', 'field.passwordHint', 'En az 8 karakter', 'At least 8 characters'],
-  ['user-management', 'field.roles', 'Roller', 'Roles'],
-  ['user-management', 'field.addRole', 'Yeni rol alanı ekle', 'Add new role row'],
+  ['user-management', 'field.roles', 'Yetkiler', 'Authorizations'],
+  ['user-management', 'field.addRole', 'Yeni yetki satırı ekle', 'Add new authorization row'],
+  ['user-management', 'field.unit', 'Birim', 'Unit'],
+  ['user-management', 'field.role', 'Rol', 'Role'],
   ['user-management', 'field.resetPassword', 'Parola Sıfırla', 'Reset Password'],
   ['user-management', 'field.resetPasswordHint', 'Boş bırakırsanız değişmez', 'Leave blank to keep unchanged'],
   ['user-management', 'field.resetPasswordDescription', 'kullanıcısı için yeni bir parola belirleyin.', 'set a new password for this user.'],
@@ -199,7 +223,8 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'validation.emailInvalid', 'Geçerli bir e-posta girin', 'Enter a valid email'],
   ['user-management', 'validation.fullNameRequired', 'Ad soyad zorunludur', 'Full name is required'],
   ['user-management', 'validation.passwordMin', 'Parola en az 8 karakter olmalı', 'Password must be at least 8 characters'],
-  ['user-management', 'validation.rolesRequired', 'En az bir rol seçilmeli', 'At least one role must be selected'],
+  ['user-management', 'validation.assignmentsRequired', 'En az bir birim ve rol seçilmeli', 'At least one unit and role must be selected'],
+  ['user-management', 'validation.assignmentDuplicate', 'Aynı rol aynı birimde iki kez eklenemez', 'The same role cannot be added twice for the same unit'],
 
   ['user-management', 'role.column.name', 'Rol Adı', 'Role Name'],
   ['user-management', 'role.column.permissions', 'İzin Sayısı', 'Permissions'],
@@ -221,11 +246,11 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'role.permissionNote', 'Yapılan değişiklikler, kullanıcıların bir sonraki oturum yenilemesinde (token süresi) etkili olur.', 'Changes will take effect for users on their next session refresh (token expiry).'],
   ['user-management', 'role.permissionsPanel.emptyState', 'İzinlerini düzenlemek için soldaki tablodan bir rol seçin.', 'Select a role from the table on the left to edit its permissions.'],
   ['user-management', 'role.permissionsTitle', '{name} İzinleri', '{name} Permissions'],
+  ['user-management', 'role.module.network', 'Şebeke Yönetimi', 'Network Management'],
   ['user-management', 'role.module.outage', 'Kesinti Yönetimi', 'Outage Management'],
   ['user-management', 'role.module.workorder', 'İş Emri Yönetimi', 'Work Order Management'],
-  ['user-management', 'role.module.user', 'Kullanıcı & Rol Yönetimi', 'User & Role Management'],
+  ['user-management', 'role.module.access', 'Kullanıcı & Rol Yönetimi', 'User & Role Management'],
   ['user-management', 'role.module.translation', 'Çeviri Yönetimi', 'Translation Management'],
-  ['user-management', 'role.module.generic', '{module} Modülü', '{module} Module'],
   ['user-management', 'role.toast.createSuccess', 'Rol oluşturuldu', 'Role created'],
   ['user-management', 'role.toast.updateSuccess', 'Rol güncellendi', 'Role updated'],
   ['user-management', 'role.toast.deleteSuccess', 'Rol silindi', 'Role deleted'],
@@ -237,12 +262,32 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['user-management', 'permission.workorder.read', 'İş emirlerini görme', 'View work orders'],
   ['user-management', 'permission.workorder.write', 'İş emri oluşturma ve durum güncelleme', 'Create work orders and update status'],
   ['user-management', 'permission.user.manage', 'Kullanıcı ve rol yönetimi', 'Manage users and roles'],
+  ['user-management', 'permission.scope.manage', 'Kullanıcılara bölgesel yetki kapsamı atama', 'Assign regional authorization scope to users'],
   ['user-management', 'permission.translation.read', 'Çeviri yönetimini görme', 'View translation management'],
   ['user-management', 'permission.translation.write', 'Çeviri ekleme ve düzenle', 'Add and edit translations'],
   ['user-management', 'permission.translation.publish', 'Çeviri yayınlama', 'Publish translations'],
   ['user-management', 'permission.network.read', 'Şebeke ve idari birim verilerini görme', 'View network and administrative unit data'],
+  ['user-management', 'permission.network.trace', 'Besleme zinciri ve etki izi sorgulama', 'Query the supply chain and impact trace'],
+  ['user-management', 'permission.network.switch', 'Anahtar işletme (manevra)', 'Operate switches (switching)'],
   ['user-management', 'permission.customer.read', 'Abone verilerini görme (PII hariç)', 'View customer data (excluding PII)'],
   ['user-management', 'permission.customer.read-pii', 'Abone tesisat/sözleşme numarasını görme', 'View customer wiring/contract numbers'],
+
+  // --- Birimler sekmesi ---
+  ['user-management', 'unit.column.name', 'Birim', 'Unit'],
+  ['user-management', 'unit.column.level', 'Seviye', 'Level'],
+  ['user-management', 'unit.column.path', 'Kod', 'Code'],
+  ['user-management', 'unit.column.children', 'Alt Birim', 'Sub-units'],
+  ['user-management', 'unit.column.users', 'Kullanıcı', 'Users'],
+  ['user-management', 'unit.level.PROVINCE', 'İl', 'Province'],
+  ['user-management', 'unit.level.DISTRICT', 'İlçe', 'District'],
+  ['user-management', 'unit.level.NEIGHBORHOOD', 'Mahalle', 'Neighborhood'],
+  ['user-management', 'unit.filter.namePlaceholder', 'Birim adı ara…', 'Search by unit name…'],
+  ['user-management', 'unit.table.empty', 'Birim kaydı yok', 'No units found'],
+  ['user-management', 'unit.action.showOnMap', 'Haritada göster', 'Show on map'],
+  ['user-management', 'unit.readOnlyNote', 'İdari birimler salt-okunurdur; ekleme, silme ve düzenleme yapılmaz.', 'Administrative units are read-only; they cannot be added, deleted or edited.'],
+  ['user-management', 'unit.picker.placeholder', 'Birim seç…', 'Select a unit…'],
+  ['user-management', 'unit.picker.searchPlaceholder', 'Birim ara…', 'Search units…'],
+  ['user-management', 'unit.picker.empty', 'Eşleşen birim yok', 'No matching units'],
 
   ['common', 'status.active', 'Aktif', 'Active'],
   ['common', 'status.inactive', 'Pasif', 'Inactive'],
@@ -446,6 +491,18 @@ const SEED_KEYS: [string, string, string, string][] = [
     'Bu şebeke elemanına ait süren bir iş emri zaten var.',
     'This network element already has an ongoing work order.',
   ],
+  [
+    'error',
+    'OUT_OF_SCOPE',
+    'Bu kayıt yetki kapsamınızın dışında.',
+    'This record is outside your authorization scope.',
+  ],
+  [
+    'error',
+    'SCOPE_STALE',
+    'Yetki kapsamınız değişti; oturum yenileniyor.',
+    'Your authorization scope has changed; the session is being refreshed.',
+  ],
 
   // --- Harita ekranı ---
   ['map', 'page.title', 'Harita', 'Map'],
@@ -519,11 +576,8 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'filter.startedAtTo', 'Başlangıç (en geç)', 'Started before'],
   ['map', 'filter.createdAtFrom', 'Oluşturulma (en erken)', 'Created after'],
   ['map', 'filter.createdAtTo', 'Oluşturulma (en geç)', 'Created before'],
-  ['map', 'filter.minAffectedCustomers', 'Etkilenen abone sayısı en az', 'Min. affected customer count'],
-  ['map', 'filter.minDuration', 'Kesinti süresi en az (dakika)', 'Min. outage duration (minutes)'],
   ['map', 'filter.maxDuration', 'En uzun süre (dk)', 'Max duration (min)'],
   ['map', 'filter.sinceDate', 'Şu tarihten itibaren', 'Since date'],
-  ['map', 'filter.outageSpecific.title', 'Kesintiye Özel', 'Outage-specific'],
   ['map', 'filter.dateSection.title', 'Kesinti ve İş Emri Tarihi', 'Outage & Work Order Date'],
   ['map', 'filter.hasWorkOrder', 'İş emri bağı', 'Work order link'],
   ['map', 'filter.hasOutage', 'Kesinti bağı', 'Outage link'],
@@ -629,19 +683,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'confirm.locationLabel', 'Konum', 'Location'],
   ['map', 'confirm.affectedAssetsTitle', 'Etkilenecek Varlıklar', 'Affected Assets'],
   ['map', 'confirm.affectedElementsLabel', 'Şebeke Elemanı Sayısı', 'Network Element Count'],
-  ['map', 'confirm.highImpactWarning', 'Yüksek etkili kesinti', 'High-impact outage'],
-  [
-    'map',
-    'confirm.highImpactForbidden',
-    'Yüksek etkili kesinti açmak için ek yetki gerekiyor; yöneticinizle görüşün.',
-    'Opening a high-impact outage requires additional authorization; contact your administrator.',
-  ],
-  [
-    'map',
-    'confirm.highImpactWorkOrderNote',
-    'Kesintili iş emri türleri (planlı/plansız) bu elemanda ek yetki ister; kesintisiz türler serbesttir.',
-    'Outage-causing work order types (planned/unplanned) need extra authorization on this element; non-outage types do not.',
-  ],
   ['map', 'confirm.previewFailed', 'Etki önizlemesi alınamadı.', 'Impact preview could not be loaded.'],
 
   // --- Harita araç şeridi ve panelleri ---
@@ -649,12 +690,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'tool.layers', 'Katmanlar', 'Layers'],
   ['map', 'tool.filters', 'Filtreler', 'Filters'],
   ['map', 'tool.area', 'Alan Seç', 'Select Area'],
-  [
-    'map',
-    'filter.layerOff',
-    'Bu katman kapalı; filtreler açıldığında uygulanır.',
-    'This layer is off; the filters apply once it is turned on.',
-  ],
 
   // --- Alan (poligon) seçimi ---
   ['map', 'area.startDrawing', 'Alan çiz', 'Draw area'],
@@ -710,9 +745,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'result.column.record', 'Kayıt', 'Record'],
   ['map', 'result.column.status', 'Durum', 'Status'],
   ['map', 'result.column.component', 'Eleman', 'Element'],
-
-  ['map', 'panel.detail.linkedOutages', 'Bu elemandaki kesintiler', 'Outages on this element'],
-  ['map', 'panel.detail.linkedWorkOrders', 'Bu elemandaki iş emirleri', 'Work orders on this element'],
 ];
 
 async function main(): Promise<void> {

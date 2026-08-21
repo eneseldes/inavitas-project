@@ -42,7 +42,8 @@ export function AppShell() {
   const closeSettings = () => setSettingsAnchor(null);
 
   const initial = user?.fullName?.charAt(0).toUpperCase() || 'E';
-  const rolesText = labels.roles(user?.roles);
+  // Kapsam bir filtre paneli değil; kullanıcının nerede yetkili olduğunu okuduğu yer burasıdır.
+  const rolesText = labels.assignments(user?.assignments);
 
   return (
     <div className={styles.shell}>

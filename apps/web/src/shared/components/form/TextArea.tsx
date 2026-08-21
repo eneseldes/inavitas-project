@@ -6,7 +6,18 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   ref?: Ref<HTMLTextAreaElement>;
 }
 
-/** Standart `.input` stilini taşıyan çıplak `<textarea>` sarmalayıcı. */
+/**
+ * Standart `.input` stilini taşıyan çıplak `<textarea>` sarmalayıcı. Tarayıcı önerisi
+ * `TextInput` ile aynı gerekçeyle kapalıdır.
+ */
 export function TextArea({ error, className, ref, rows = 3, ...rest }: TextAreaProps) {
-  return <textarea ref={ref} rows={rows} className={clsx('input', 'input--textarea', error && 'input--error', className)} {...rest} />;
+  return (
+    <textarea
+      ref={ref}
+      rows={rows}
+      className={clsx('input', 'input--textarea', error && 'input--error', className)}
+      autoComplete="off"
+      {...rest}
+    />
+  );
 }

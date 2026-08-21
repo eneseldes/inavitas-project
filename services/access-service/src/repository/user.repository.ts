@@ -1,10 +1,20 @@
 import { and, count, eq, exists, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '../db.ts';
 import { permissions, rolePermissions, roles, userRoles, users } from '../db/schema.ts';
+import * as unitRepository from './unit.repository.ts';
 import type { LockState } from '../domain/lockout.ts';
-import type { PageResult } from '@inavitas/shared';
+import { toScopeMap, type PageResult, type ScopeMap } from '@inavitas/shared';
 
-/** Roller ve izinler eklenmiş kullanıcı veri yapısı. */
+/** Rol ataması — rol ve kapsamı birlikte taşır; arayüz "Saha Operatörü @ Keçiören" der. */
+export interface AssignmentRow {
+  roleCode: string;
+  roleName: string;
+  isSystem: boolean;
+  unitPath: string;
+  unitName: string | null;
+}
+
+/** Roller, izinler ve kapsam eklenmiş kullanıcı veri yapısı. */
 export interface UserWithAccess {
   id: string;
   email: string;
@@ -14,8 +24,12 @@ export interface UserWithAccess {
   failedAttempts: number;
   lockedUntil: Date | null;
   lastLoginAt: Date | null;
+  scopeVersion: number;
   roles: string[];
   permissions: string[];
+  /** İzin → bölgeler. Rol atamalarının izinleri açılarak türetilir. */
+  scopes: ScopeMap;
+  assignments: AssignmentRow[];
 }
 
 /** Liste yanıtında dönen basit kullanıcı satırı. */
@@ -24,7 +38,8 @@ export interface UserListItem {
   email: string;
   fullName: string;
   isActive: boolean;
-  roles: string[];
+  /** "Saha Operatörü @ Keçiören" satırı için rol kodu ve birim adı birlikte döner. */
+  assignments: { roleCode: string; unitPath: string; unitName: string | null }[];
   lastLoginAt: Date | null;
 }
 
@@ -55,16 +70,20 @@ type UserRow = NonNullable<
   Awaited<ReturnType<typeof db.query.users.findFirst<{ with: typeof withAccess }>>>
 >;
 
-/** Veritabanı ilişki satırlarını düz roller ve benzersiz izin dizilerine dönüştürür. */
-function toUserWithAccess(row: UserRow): UserWithAccess {
-  const roleCodes = row.userRoles.map((ur) => ur.role.code);
-  const perms = new Set<string>();
-
-  for (const userRole of row.userRoles) {
-    for (const rp of userRole.role.rolePermissions) {
-      perms.add(rp.permission.code);
-    }
-  }
+/**
+ * Veritabanı ilişki satırlarını roller, izinler ve **izin bazlı kapsam haritasına** çevirir.
+ *
+ * Etkin (izin, bölge) kümesi burada türetilir: her rol ataması kendi izinlerine açılır ve
+ * her izin o satırın `unit_path`'ini miras alır. Aynı rol farklı bölgelerde birden çok kez
+ * verilmiş olabilir; kapsamlar izin başına birleştirilir.
+ */
+function toUserWithAccess(row: UserRow, names: Map<string, string>): UserWithAccess {
+  const scopes = toScopeMap(
+    row.userRoles.map((ur) => ({
+      permissions: ur.role.rolePermissions.map((rp) => rp.permission.code),
+      unitPath: ur.unitPath,
+    })),
+  );
 
   return {
     id: row.id,
@@ -75,21 +94,40 @@ function toUserWithAccess(row: UserRow): UserWithAccess {
     failedAttempts: row.failedAttempts,
     lockedUntil: row.lockedUntil,
     lastLoginAt: row.lastLoginAt,
-    roles: roleCodes,
-    permissions: [...perms],
+    scopeVersion: row.scopeVersion,
+    roles: [...new Set(row.userRoles.map((ur) => ur.role.code))],
+    // İzin listesi kapsam haritasının anahtar kümesidir; ikisi ayrı türetilirse biri
+    // diğerinden sapabilir ve izni olan ama kapsamı olmayan bir kullanıcı doğar.
+    permissions: Object.keys(scopes),
+    scopes,
+    assignments: row.userRoles.map((ur) => ({
+      roleCode: ur.role.code,
+      roleName: ur.role.name,
+      isSystem: ur.role.isSystem,
+      unitPath: ur.unitPath,
+      unitName: names.get(ur.unitPath) ?? null,
+    })),
   };
+}
+
+/**
+ * İlişki satırlarını okunabilir hâle getirir; atamaların birim adları `units_ro`'dan
+ * ayrı bir sorguyla gelir (read-model'dir, drizzle ilişkisi/foreign key'i yoktur).
+ */
+async function hydrate(row: UserRow | undefined): Promise<UserWithAccess | null> {
+  if (!row) return null;
+  const names = await unitRepository.namesByPath(row.userRoles.map((ur) => ur.unitPath));
+  return toUserWithAccess(row, names);
 }
 
 /** E-posta adresiyle kullanıcı arar. */
 export async function findByEmail(email: string): Promise<UserWithAccess | null> {
-  const row = await db.query.users.findFirst({ where: eq(users.email, email), with: withAccess });
-  return row ? toUserWithAccess(row) : null;
+  return hydrate(await db.query.users.findFirst({ where: eq(users.email, email), with: withAccess }));
 }
 
 /** Benzersiz ID ile kullanıcı arar. */
 export async function findById(id: string): Promise<UserWithAccess | null> {
-  const row = await db.query.users.findFirst({ where: eq(users.id, id), with: withAccess });
-  return row ? toUserWithAccess(row) : null;
+  return hydrate(await db.query.users.findFirst({ where: eq(users.id, id), with: withAccess }));
 }
 
 /** E-posta adresinin kullanımda olup olmadığını kontrol eder. */
@@ -168,12 +206,19 @@ export async function list(
     with: { userRoles: { with: { role: true } } },
   });
 
+  // Birim adları sayfanın tamamı için TEK sorguda çözülür; satır başına arama yapılmaz.
+  const names = await unitRepository.namesByPath(rows.flatMap((r) => r.userRoles.map((ur) => ur.unitPath)));
+
   const items: UserListItem[] = rows.map((r) => ({
     id: r.id,
     email: r.email,
     fullName: r.fullName,
     isActive: r.isActive,
-    roles: r.userRoles.map((ur) => ur.role.code),
+    assignments: r.userRoles.map((ur) => ({
+      roleCode: ur.role.code,
+      unitPath: ur.unitPath,
+      unitName: names.get(ur.unitPath) ?? null,
+    })),
     lastLoginAt: r.lastLoginAt,
   }));
 
@@ -186,11 +231,17 @@ export async function list(
   };
 }
 
-/** Yeni kullanıcı oluşturur ve rollerini atar (transaction). */
+/** Kaydedilecek bir rol ataması — kapsam rolün yanında taşınır. */
+export interface AssignmentInput {
+  roleId: string;
+  unitPath: string;
+}
+
+/** Yeni kullanıcı oluşturur ve rol atamalarını yazar (transaction). */
 export async function create(
   input: { email: string; fullName: string },
   passwordHash: string,
-  roleIds: string[],
+  assignments: AssignmentInput[],
 ): Promise<string> {
   return db.transaction(async (tx) => {
     const [user] = await tx
@@ -198,8 +249,8 @@ export async function create(
       .values({ email: input.email, fullName: input.fullName, passwordHash })
       .returning({ id: users.id });
 
-    if (roleIds.length > 0) {
-      await tx.insert(userRoles).values(roleIds.map((roleId) => ({ userId: user!.id, roleId })));
+    if (assignments.length > 0) {
+      await tx.insert(userRoles).values(assignments.map((a) => ({ userId: user!.id, ...a })));
     }
 
     return user!.id;
@@ -214,13 +265,27 @@ export async function updateProfile(
   await db.update(users).set(patch).where(eq(users.id, id));
 }
 
-/** Kullanıcının rol setini değiştirir (tamamını değiştirir). */
-export async function setRoles(userId: string, roleIds: string[]): Promise<void> {
-  await db.transaction(async (tx) => {
+/**
+ * Kullanıcının rol atamalarını tamamıyla değiştirir ve yeni kapsam sürümünü döner.
+ *
+ * Sürüm artışı atamalarla AYNI transaction'dadır: ayrı yazılsaydı arada geçen sürede eski
+ * kapsam hâlâ geçerli olurdu. Sürümün gateway'e duyurulması çağıranın işidir (bkz.
+ * `publishScopeVersion`) — gateway veritabanına bağlanmaz, bayat token'ı Redis'ten öğrenir.
+ */
+export async function setAssignments(userId: string, assignments: AssignmentInput[]): Promise<number> {
+  return db.transaction(async (tx) => {
     await tx.delete(userRoles).where(eq(userRoles.userId, userId));
-    if (roleIds.length > 0) {
-      await tx.insert(userRoles).values(roleIds.map((roleId) => ({ userId, roleId })));
+    if (assignments.length > 0) {
+      await tx.insert(userRoles).values(assignments.map((a) => ({ userId, ...a })));
     }
+
+    const [row] = await tx
+      .update(users)
+      .set({ scopeVersion: sql`${users.scopeVersion} + 1` })
+      .where(eq(users.id, userId))
+      .returning({ scopeVersion: users.scopeVersion });
+
+    return row!.scopeVersion;
   });
 }
 

@@ -1,4 +1,4 @@
-import type { AuthenticatedUser } from '@inavitas/shared';
+import type { AuthenticatedUser, ScopeMap } from '@inavitas/shared';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.ts';
 
@@ -8,6 +8,14 @@ export interface AccessTokenPayload {
   email: string;
   roles: string[];
   perms: string[];
+  /**
+   * Bölgesel kapsam. Küme küçükse token'ın içindedir (`scopes`); büyükse yerine bir Redis
+   * referansı taşınır (`scopeRef`) — bkz. domain/scope-store.ts SCOPE_INLINE_LIMIT.
+   */
+  scopes?: ScopeMap;
+  scopeRef?: string;
+  /** Kapsam kümesinin sürümü; gateway bayat token'ı bununla ayırt eder. */
+  scopeVersion: number;
 }
 
 /** Refresh token payload verisi (kullanıcı id ve benzersiz token id - jti). */
@@ -19,13 +27,18 @@ export interface RefreshTokenPayload {
 const ACCESS_TYPE = 'access';
 const REFRESH_TYPE = 'refresh';
 
+/** Token'a gömülecek kapsam bilgisi — satır içi küme ya da Redis referansı. */
+export type ScopeClaim = { scopes: ScopeMap } | { scopeRef: string };
+
 /** Kullanıcı için yeni bir Access Token imzalar. */
-export function signAccessToken(user: AuthenticatedUser): string {
+export function signAccessToken(user: AuthenticatedUser, scope: ScopeClaim, scopeVersion: number): string {
   const payload: AccessTokenPayload & { typ: string } = {
     sub: user.id,
     email: user.email,
     roles: user.roles,
     perms: user.permissions,
+    scopeVersion,
+    ...scope,
     typ: ACCESS_TYPE,
   };
 
@@ -67,12 +80,19 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
   return decoded;
 }
 
-/** Token payload verisini AuthenticatedUser nesnesine dönüştürür. */
-export function toAuthenticatedUser(payload: AccessTokenPayload): AuthenticatedUser {
+/**
+ * Token payload verisini AuthenticatedUser nesnesine dönüştürür.
+ *
+ * Referans modundaki token kapsamı taşımaz; çözümü çağıranın işidir (gateway Redis'ten
+ * okur). Burada boş haritaya düşmek bilinçli: kapsamı bilinmeyen bir istek "sınırsız"
+ * değil, "hiçbir bölge" demektir.
+ */
+export function toAuthenticatedUser(payload: AccessTokenPayload, scopes?: ScopeMap): AuthenticatedUser {
   return {
     id: payload.sub,
     email: payload.email,
     roles: payload.roles,
     permissions: payload.perms,
+    scopes: scopes ?? payload.scopes ?? {},
   };
 }

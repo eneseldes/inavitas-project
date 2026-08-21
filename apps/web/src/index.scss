@@ -206,6 +206,32 @@ button {
   width: 100%;
 }
 
+// Sayısal input'un artır/azalt okları hiçbir yerde gösterilmez: tabloların filtre
+// kutularında kullanıcı değeri yazarak giriyor, ok tek tek tıklamayla 1.000'lere
+// çıkmaya yaramıyor — yalnız yer kaplıyor ve fareyle kaydırınca değeri kazara
+// değiştiriyordu. `type="number"`ın doğrulaması ve mobil klavyesi olduğu gibi kalır.
+.input[type='number'] {
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+// Tarayıcının kendi "daha önce girilenler" önerisi kapalıdır (bkz. TextInput'taki
+// autoComplete varsayılanı); arama tipi input'ta ayrıca temizleme çarpısı da
+// gizlenir — alanın kendi temizleme davranışı bileşende.
+.input[type='search'] {
+  &::-webkit-search-decoration,
+  &::-webkit-search-cancel-button,
+  &::-webkit-search-results-button,
+  &::-webkit-search-results-decoration {
+    appearance: none;
+  }
+}
+
 .input--textarea {
   height: auto;
   padding-top: v.$space-2;

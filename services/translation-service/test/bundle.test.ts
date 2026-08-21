@@ -34,11 +34,25 @@ describe('buildBundle', () => {
   });
 
   it('yayınlanmış boş string değeri varsayılanın üzerine yazılır', () => {
+    // Boş string bir eksiklik değil, kasıtlı bir çeviri: bu anahtar Türkçede
+    // "ile yönetin", İngilizcede boştur. Boşu "çevrilmemiş" sayıp varsayılana düşmek
+    // İngilizce giriş ekranına Türkçe metin sızdırıyordu.
     const defaultMap = { 'auth.hero.titleAfter': 'ile yönetin' };
     const requestedMap = { 'auth.hero.titleAfter': '' };
 
     const result = buildBundle(defaultMap, requestedMap);
 
     expect(result).toEqual({ 'auth.hero.titleAfter': '' });
+  });
+
+  it('hiç çevrilmemiş anahtar varsayılandan gelir — ayrım BOŞLUK değil, YOKLUK', () => {
+    // "Hiç çevrilmedi" bilgisini `published_value IS NULL` taşır ve o satır repository'de
+    // elendiği için anahtar `requestedMap`'e HİÇ girmez. Fallback'i tetikleyen budur.
+    const defaultMap = { 'auth.hero.titleAfter': 'ile yönetin', 'app.title': 'Başlık' };
+    const requestedMap = { 'app.title': 'Title' };
+
+    const result = buildBundle(defaultMap, requestedMap);
+
+    expect(result).toEqual({ 'auth.hero.titleAfter': 'ile yönetin', 'app.title': 'Title' });
   });
 });

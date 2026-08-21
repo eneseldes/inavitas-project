@@ -312,16 +312,6 @@
   margin: v.$space-1 0 v.$space-2;
 }
 
-// Filtreler paneli üç ayrı alandan oluşur (Gerilim · Kesintiler · İş Emirleri) — bu ayrım
-// çoklu-seçim listelerindeki (bkz. `.group` yukarıda) çizgiden FARKLIDIR: o gürültüydü ve
-// kaldırıldı, ama üç ana alan birbirine karışmasın diye burada ince, silik bir üst çizgi
-// kalır. Yalnız Kesintiler/İş Emri sarmalayıcısına uygulanır — Gerilim ilk alan olduğundan
-// üstünde çizgiye gerek yok.
-.filterMainSection {
-  border-top: 1px solid v.$color-hairline;
-  padding-top: v.$space-3;
-}
-
 .zoomHint {
   margin: 0 0 0 1.375rem;
   font-size: 0.6875rem;
@@ -340,18 +330,6 @@
   gap: v.$space-2;
   font-size: v.$control-font-size;
   color: v.$color-ink;
-}
-
-/** Katman kapalıyken alt filtreler soluklaşır — filtre katmanın altındadır, yanında değil. */
-.subFilters {
-  display: flex;
-  flex-direction: column;
-  gap: v.$space-2;
-}
-
-.subFiltersDisabled {
-  opacity: 0.45;
-  pointer-events: none;
 }
 
 .inlineField {

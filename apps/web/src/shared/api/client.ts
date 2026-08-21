@@ -1,3 +1,4 @@
+import type { ApiErrorBody } from '../../types/api.ts';
 import { getCsrfToken } from './csrf.ts';
 import { ApiError, toApiError } from './errors.ts';
 
@@ -39,6 +40,21 @@ function rawFetch(path: string, options: RequestOptions): Promise<Response> {
   });
 }
 
+/**
+ * Kapsam bayatladığında (`SCOPE_STALE`) çalışan geri çağrı.
+ *
+ * Kapsam daralması bir "yeniden oturum" gibi ele alınır: token yenilenir ama önbellekte
+ * duran eski kayıtlar kendiliğinden düşmez ve kullanıcı kapsam dışı kesintileri haritada
+ * görmeye devam eder (SSE invalidate'i debounce'lu, harita kaynağı `setData` ile besleniyor).
+ * Bağlanan taraf React Query önbelleğini tamamen boşaltır.
+ */
+type ScopeStaleListener = () => void;
+let scopeStaleListener: ScopeStaleListener | undefined;
+
+export function setScopeStaleListener(listener: ScopeStaleListener): void {
+  scopeStaleListener = listener;
+}
+
 /** Eşzamanlı 401'lerde tek bir refresh isteği yapılmasını sağlar. */
 let refreshPromise: Promise<void> | null = null;
 
@@ -57,11 +73,20 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   let res = await rawFetch(path, options);
 
   if (res.status === 401 && !options.skipAuthRetry) {
+    // Gövde burada okunur ama gerçek istek birazdan tekrarlanıyor; `clone()` olmadan
+    // yanıt akışı tüketilmiş olurdu.
+    const isScopeStale = await res
+      .clone()
+      .json()
+      .then((body: unknown) => (body as ApiErrorBody | null)?.error?.code === 'SCOPE_STALE')
+      .catch(() => false);
+
     try {
       refreshPromise ??= refreshAccessToken().finally(() => {
         refreshPromise = null;
       });
       await refreshPromise;
+      if (isScopeStale) scopeStaleListener?.();
       res = await rawFetch(path, options);
     } catch {
       if (options.redirectOnAuthFailure !== false && window.location.pathname !== '/login') {

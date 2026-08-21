@@ -3,9 +3,20 @@ import { FiEdit2, FiKey, FiTrash2 } from 'react-icons/fi';
 import type { ColumnMeta } from '../../../shared/components/DataGrid.tsx';
 import type { DateFilterValue } from '../../../shared/components/ColumnFilter.tsx';
 import type { TranslateFn } from '../../i18n/I18nProvider.tsx';
-import type { UserListItem } from '../../../types/user-management.ts';
+import type { AssignmentSummary, UserListItem } from '../../../types/user-management.ts';
 
 const dateFormatter = new Intl.DateTimeFormat('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
+
+/** Kolona sığan atama sayısı; kalanı "+N" rozetiyle özetlenir. */
+const VISIBLE_ASSIGNMENTS = 2;
+
+/** "Saha Operatörü @ Keçiören" — birim adı read-model'de yoksa ham yol yazılır. */
+function formatAssignment(
+  assignment: AssignmentSummary,
+  roleNameByCode: Record<string, string>,
+): string {
+  return `${roleNameByCode[assignment.roleCode] ?? assignment.roleCode} @ ${assignment.unitName ?? assignment.unitPath}`;
+}
 
 export function buildUserColumns(
   t: TranslateFn,
@@ -49,11 +60,21 @@ export function buildUserColumns(
     {
       id: 'roles',
       header: t('user-management.column.roles', undefined, 'Roller'),
-      accessorFn: (row) => row.roles,
+      accessorFn: (row) => row.assignments,
+      // Yetki artık "ne yapabilir" değil "nerede ne yapabilir" — kolon kapsamı da gösterir.
       cell: (ctx) => {
-        const codes = ctx.getValue<string[]>();
-        if (codes.length === 0) return <span className="text-muted">—</span>;
-        return <span>{codes.map((code) => roleNameByCode[code] ?? code).join(', ')}</span>;
+        const assignments = ctx.getValue<AssignmentSummary[]>();
+        if (assignments.length === 0) return <span className="text-muted">—</span>;
+
+        const shown = assignments.slice(0, VISIBLE_ASSIGNMENTS);
+        const rest = assignments.length - shown.length;
+
+        return (
+          <span title={assignments.map((a) => formatAssignment(a, roleNameByCode)).join(', ')}>
+            {shown.map((a) => formatAssignment(a, roleNameByCode)).join(', ')}
+            {rest > 0 && <span className="badge badge--gray">+{rest}</span>}
+          </span>
+        );
       },
       meta: {
         filter: {

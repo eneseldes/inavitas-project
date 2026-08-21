@@ -2,17 +2,21 @@ import type { NextFunction, Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ALL_PERMISSIONS,
-  assertHighImpactAllowed,
-  HIGH_IMPACT_TOPOLOGY_LEVEL,
+  assertInScope,
+  isPathInScope,
+  minimalScopes,
+  PERMISSION_MODULES,
   PERMISSIONS,
+  permissionModule,
   ROLE_PERMISSIONS,
   ROLES,
   requireAnyPermission,
   requirePermission,
+  toScopeMap,
   userFromHeaders,
   type AuthedRequest,
 } from '../src/auth.ts';
-import { ForbiddenError, HighImpactForbiddenError, UnauthenticatedError } from '../src/errors.ts';
+import { ForbiddenError, OutOfScopeError, UnauthenticatedError } from '../src/errors.ts';
 
 function runMiddleware(
   middleware: ReturnType<typeof requirePermission>,
@@ -26,7 +30,7 @@ function runMiddleware(
 describe('requirePermission', () => {
   it('izin varsa hatasız geçirir', () => {
     const err = runMiddleware(requirePermission(PERMISSIONS.OUTAGE_WRITE), {
-      user: { id: 'u1', email: 'a@b.c', roles: ['ADMIN'], permissions: ['outage:write'] },
+      user: { id: 'u1', email: 'a@b.c', roles: ['ADMIN'], permissions: ['outage:write'], scopes: {} },
     });
 
     expect(err).toBeUndefined();
@@ -42,7 +46,7 @@ describe('requirePermission', () => {
 
   it('kimlik var ama izin yoksa 403 verir', () => {
     const err = runMiddleware(requirePermission(PERMISSIONS.USER_MANAGE), {
-      user: { id: 'u1', email: 'a@b.c', roles: ['OUTAGE_OPERATOR'], permissions: ['outage:read'] },
+      user: { id: 'u1', email: 'a@b.c', roles: ['OUTAGE_OPERATOR'], permissions: ['outage:read'], scopes: {} },
     });
 
     expect(err).toBeInstanceOf(ForbiddenError);
@@ -52,7 +56,7 @@ describe('requirePermission', () => {
   it('izin adı benzeri başka bir izinle karışmaz', () => {
     // 'outage:read' sahibi 'outage:write' yapamamalı.
     const err = runMiddleware(requirePermission(PERMISSIONS.OUTAGE_WRITE), {
-      user: { id: 'u1', email: 'a@b.c', roles: [], permissions: ['outage:read'] },
+      user: { id: 'u1', email: 'a@b.c', roles: [], permissions: ['outage:read'], scopes: {} },
     });
 
     expect(err).toBeInstanceOf(ForbiddenError);
@@ -63,7 +67,7 @@ describe('requireAnyPermission', () => {
   it('izinlerden biri yeterlidir', () => {
     const err = runMiddleware(
       requireAnyPermission(PERMISSIONS.OUTAGE_READ, PERMISSIONS.WORKORDER_READ),
-      { user: { id: 'u1', email: 'a@b.c', roles: [], permissions: ['workorder:read'] } },
+      { user: { id: 'u1', email: 'a@b.c', roles: [], permissions: ['workorder:read'], scopes: {} } },
     );
 
     expect(err).toBeUndefined();
@@ -72,31 +76,46 @@ describe('requireAnyPermission', () => {
   it('hiçbiri yoksa 403 verir', () => {
     const err = runMiddleware(
       requireAnyPermission(PERMISSIONS.OUTAGE_READ, PERMISSIONS.WORKORDER_READ),
-      { user: { id: 'u1', email: 'a@b.c', roles: [], permissions: ['user:manage'] } },
+      { user: { id: 'u1', email: 'a@b.c', roles: [], permissions: ['user:manage'], scopes: {} } },
     );
 
     expect(err).toBeInstanceOf(ForbiddenError);
   });
 });
 
+describe('PERMISSION_MODULES', () => {
+  it('her izin tam olarak bir modüle aittir', () => {
+    const flat = Object.values(PERMISSION_MODULES).flat();
+    expect(flat).toEqual([...new Set(flat)]);
+    expect([...ALL_PERMISSIONS].sort()).toEqual([...new Set(Object.values(PERMISSIONS))].sort());
+  });
+
+  it('abone izinleri ayrı bir modül değil, Şebeke Yönetimi içindedir', () => {
+    expect(permissionModule(PERMISSIONS.CUSTOMER_READ)).toBe('network');
+    expect(permissionModule(PERMISSIONS.CUSTOMER_READ_PII)).toBe('network');
+  });
+
+  it('yüksek etkili kesinti izni hiçbir modülde yok', () => {
+    expect(ALL_PERMISSIONS).not.toContain('outage:write-high-impact');
+    expect(PERMISSION_MODULES.outage).toEqual(['outage:read', 'outage:write']);
+  });
+});
+
 describe('ROLE_PERMISSIONS', () => {
   it('rol ve izin tanımları beklenen matrisle eşleşir', () => {
-    expect(ROLE_PERMISSIONS[ROLES.ADMIN]).toEqual([
-      'outage:read',
-      'outage:write',
-      'outage:write-high-impact',
-      'workorder:read',
-      'workorder:write',
-      'user:manage',
-      'translation:read',
-      'translation:write',
-      'translation:publish',
-      'network:read',
-      'customer:read',
-      'customer:read-pii',
-    ]);
+    expect(ROLE_PERMISSIONS[ROLES.ADMIN]).toEqual(ALL_PERMISSIONS);
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).toEqual(['outage:read', 'outage:write']);
     expect(ROLE_PERMISSIONS[ROLES.WORK_ORDER_OPERATOR]).toEqual(['workorder:read', 'workorder:write']);
+  });
+
+  it('saha rollerini ayıran şey etkinin büyüklüğü değil, kapsamdır', () => {
+    // Üçü de aynı `outage:write` iznini taşır; farkı atamadaki `unit_path` yaratır.
+    for (const role of [ROLES.FIELD_OPERATOR, ROLES.DISPATCHER] as const) {
+      expect(ROLE_PERMISSIONS[role]).toContain(PERMISSIONS.OUTAGE_WRITE);
+    }
+    expect(ROLE_PERMISSIONS[ROLES.NETWORK_VIEWER]).not.toContain(PERMISSIONS.OUTAGE_WRITE);
+    expect(ROLE_PERMISSIONS[ROLES.FIELD_OPERATOR]).not.toContain(PERMISSIONS.CUSTOMER_READ_PII);
+    expect(ROLE_PERMISSIONS[ROLES.DISPATCHER]).toContain(PERMISSIONS.CUSTOMER_READ_PII);
   });
 
   it('operatör rolleri karşı alanın iznine sahip değil', () => {
@@ -106,19 +125,18 @@ describe('ROLE_PERMISSIONS', () => {
     expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.USER_MANAGE);
   });
 
-  it('yüksek etkili kesinti izni operatörde yok — ek izindir', () => {
-    // `outage:write` bir trafo kesicisini açmaya yeter; fider kesicisi ve üstü için
-    // ayrıca `outage:write-high-impact` gerekir (bkz. assertHighImpactAllowed).
-    expect(ROLE_PERMISSIONS[ROLES.OUTAGE_OPERATOR]).not.toContain(PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT);
-    expect(ROLE_PERMISSIONS[ROLES.ADMIN]).toContain(PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT);
-  });
-
-  it('yalnızca ADMIN kullanıcı yönetebilir', () => {
+  it('yalnızca ADMIN kullanıcı ve kapsam yönetebilir', () => {
     const canManage = Object.entries(ROLE_PERMISSIONS)
       .filter(([, perms]) => perms.includes(PERMISSIONS.USER_MANAGE))
       .map(([role]) => role);
 
     expect(canManage).toEqual([ROLES.ADMIN]);
+
+    const canScope = Object.entries(ROLE_PERMISSIONS)
+      .filter(([, perms]) => perms.includes(PERMISSIONS.SCOPE_MANAGE))
+      .map(([role]) => role);
+
+    expect(canScope).toEqual([ROLES.ADMIN]);
   });
 
   it('tanımlı her izin en az bir role bağlı — sahipsiz izin kalmasın', () => {
@@ -127,30 +145,50 @@ describe('ROLE_PERMISSIONS', () => {
   });
 });
 
-describe('assertHighImpactAllowed', () => {
-  const userWith = (...permissions: string[]) => ({ id: 'u1', email: 'a@b.c', roles: [], permissions });
-
-  it('eşiğin altındaki eleman ek izin istemez', () => {
-    // Trafo kesicisi seviye 8'dedir — `outage:write` tek başına yeter.
-    expect(() => assertHighImpactAllowed(userWith(PERMISSIONS.OUTAGE_WRITE), '104000', 8)).not.toThrow();
+describe('kapsam yardımcıları', () => {
+  const userWith = (scopes: Record<string, string[]>) => ({
+    id: 'u1',
+    email: 'a@b.c',
+    roles: [],
+    permissions: Object.keys(scopes),
+    scopes,
   });
 
-  it('eşikteki eleman ek izin olmadan reddedilir', () => {
-    // Fider kesicisi seviye 2'dedir — tek açmayla 707 abone kararır.
-    expect(() => assertHighImpactAllowed(userWith(PERMISSIONS.OUTAGE_WRITE), '100196', 2)).toThrow(
-      HighImpactForbiddenError,
-    );
+  it('alt ağaç kapsama girer, kardeş girmez', () => {
+    expect(isPathInScope('TR.06.020.0137', ['TR.06.020'])).toBe(true);
+    expect(isPathInScope('TR.06.020', ['TR.06.020'])).toBe(true);
+    expect(isPathInScope('TR.06.012.0137', ['TR.06.020'])).toBe(false);
   });
 
-  it('sınır değeri dahildir — eşiğin kendisi de yüksek etkilidir', () => {
-    expect(() =>
-      assertHighImpactAllowed(userWith(PERMISSIONS.OUTAGE_WRITE), '100196', HIGH_IMPACT_TOPOLOGY_LEVEL),
-    ).toThrow(HighImpactForbiddenError);
+  it('ön ek benzerliği kapsam sayılmaz', () => {
+    // `TR.06.0201` `TR.06.020`'nin altı DEĞİLDİR; düz `startsWith` bunu kaçırırdı.
+    expect(isPathInScope('TR.06.0201', ['TR.06.020'])).toBe(false);
   });
 
-  it('ek izinle eşikteki eleman geçer', () => {
-    const user = userWith(PERMISSIONS.OUTAGE_WRITE, PERMISSIONS.OUTAGE_WRITE_HIGH_IMPACT);
-    expect(() => assertHighImpactAllowed(user, '100000', 0)).not.toThrow();
+  it('atası listede olan yol elenir', () => {
+    expect(minimalScopes(['TR.06.020', 'TR.06', 'TR.06.012', 'TR.06'])).toEqual(['TR.06']);
+    expect(minimalScopes(['TR.06.020', 'TR.06.012'])).toEqual(['TR.06.012', 'TR.06.020']);
+  });
+
+  it('rol atamaları izin bazlı kapsam haritasına açılır', () => {
+    const scopes = toScopeMap([
+      { permissions: ['outage:read', 'outage:write'], unitPath: 'TR.06.020' },
+      { permissions: ['outage:read'], unitPath: 'TR.06.012' },
+    ]);
+
+    expect(scopes['outage:read']).toEqual(['TR.06.012', 'TR.06.020']);
+    expect(scopes['outage:write']).toEqual(['TR.06.020']);
+  });
+
+  it('kapsam dışı birim yazma yolunda reddedilir', () => {
+    const user = userWith({ 'outage:write': ['TR.06.020'] });
+
+    expect(() => assertInScope(user, PERMISSIONS.OUTAGE_WRITE, 'TR.06.020.0137', '100196')).not.toThrow();
+    expect(() => assertInScope(user, PERMISSIONS.OUTAGE_WRITE, 'TR.06.012.0137', '100196')).toThrow(OutOfScopeError);
+  });
+
+  it('izni olmayan kullanıcının kapsamı boştur', () => {
+    expect(() => assertInScope(userWith({}), PERMISSIONS.OUTAGE_WRITE, 'TR.06', '100196')).toThrow(OutOfScopeError);
   });
 });
 
@@ -165,6 +203,7 @@ describe('userFromHeaders', () => {
         'x-user-email': 'admin@inavitas.com',
         'x-user-roles': 'ADMIN',
         'x-user-permissions': 'outage:read, user:manage',
+        'x-user-scopes': '{"outage:read":["TR.06"]}',
       }),
     );
 
@@ -173,6 +212,7 @@ describe('userFromHeaders', () => {
       email: 'admin@inavitas.com',
       roles: ['ADMIN'],
       permissions: ['outage:read', 'user:manage'],
+      scopes: { 'outage:read': ['TR.06'] },
     });
   });
 
@@ -186,5 +226,13 @@ describe('userFromHeaders', () => {
     );
 
     expect(user?.permissions).toEqual([]);
+  });
+
+  it('bozuk kapsam header\'ı "sınırsız" değil, "hiçbir bölge" demektir', () => {
+    const user = userFromHeaders(
+      req({ 'x-user-id': 'u1', 'x-user-email': 'a@b.c', 'x-user-scopes': '{bozuk' }),
+    );
+
+    expect(user?.scopes).toEqual({});
   });
 });

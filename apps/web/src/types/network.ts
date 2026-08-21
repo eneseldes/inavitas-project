@@ -113,7 +113,6 @@ export interface ChildOutage {
 export interface ImpactPreview {
   componentId: string;
   topologyLevel: number;
-  highImpact: boolean;
   affectedElementCount: number;
   affectedCustomerCount: number;
   overflowed: boolean;

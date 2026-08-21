@@ -183,6 +183,13 @@ export function useMapState() {
   );
   const selectedId = params.get('selected') ?? undefined;
   const focusId = params.get('focus') ?? undefined;
+  /**
+   * Birimler sekmesindeki "Haritada göster" bağı (`/map?unit=TR.06.012`). Kameranın
+   * kaynağı olarak URL'deki `lng`/`lat`/`zoom` ve `localStorage`'taki son görünümden
+   * ÖNCE gelir — yoksa kullanıcı bağa basar, harita en son baktığı yerde açılır ve bağ
+   * hiçbir şey yapmamış görünür (bkz. `view` altta).
+   */
+  const unitPath = params.get('unit') ?? undefined;
 
   const lngRaw = params.get('lng');
   const latRaw = params.get('lat');
@@ -299,6 +306,8 @@ export function useMapState() {
     [patch],
   );
   const setSelectedId = useCallback((id: string | undefined) => patch({ selected: id }), [patch]);
+  /** Derin bağ tüketildi — kamera birime oturduktan sonra parametre URL'den düşer. */
+  const clearUnit = useCallback(() => patch({ unit: undefined }), [patch]);
   const clearFocus = useCallback(() => patch({ focus: undefined }), [patch]);
   // `setSelectedId` + `clearFocus`'u ayrı ayrı çağırmak, react-router'ın `setSearchParams`'ı
   // her çağrıda AYNI (o render'daki) `prev`'i taban aldığı için ikincisinin birincisini
@@ -343,5 +352,7 @@ export function useMapState() {
     focusId,
     clearFocus,
     resolveFocus,
+    unitPath,
+    clearUnit,
   };
 }

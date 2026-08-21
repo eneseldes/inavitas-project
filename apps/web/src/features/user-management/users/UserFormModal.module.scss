@@ -21,14 +21,22 @@
   margin-bottom: v.$space-2;
 }
 
-.roleRow {
-  display: flex;
+// Birim ve rol yan yana: yetki artık "ne yapabilir" ile "nerede" sorusunu birlikte cevaplıyor.
+.assignmentHead,
+.assignmentRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
   align-items: center;
   gap: 8px;
 }
 
+.assignmentHead {
+  font-size: v.$control-font-size;
+  font-weight: 500;
+  color: v.$color-ink-soft;
+}
+
 .roleSelect {
-  flex: 1;
   min-width: 0;
 }
 

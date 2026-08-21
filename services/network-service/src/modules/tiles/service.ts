@@ -20,11 +20,15 @@
  * - Binanın altından yalnızca GEÇEN hat kesilmez, yarı saydam poligonun altında solar.
  */
 
-import type { AuthenticatedUser } from '@inavitas/shared';
+import {
+  PERMISSIONS,
+  scopeFilterAnyUnit,
+  scopeFilterUnitTree,
+  type AuthenticatedUser,
+} from '@inavitas/shared';
 import { and, inArray, sql, type SQL } from 'drizzle-orm';
 import { db } from '../../db.ts';
 import { components, units } from '../../db/schema.ts';
-import { scopeFilter } from '../../http/scope-filter.ts';
 import { resolveZoomLod } from './zoom-lod.ts';
 
 const TILE_EXTENT = 4096;
@@ -39,6 +43,11 @@ function withScope(base: SQL, scope: SQL | undefined): SQL {
   return scope ? and(base, scope)! : base;
 }
 
+/** Eleman kapsamı: bir OG hattı birden çok mahalleye değebilir (bkz. `unit_paths`). */
+function componentScope(user: AuthenticatedUser): SQL | undefined {
+  return scopeFilterAnyUnit(user, components.unitPath, components.unitPaths, PERMISSIONS.NETWORK_READ);
+}
+
 /** `z/x/y` karesi için MVT (Mapbox Vector Tile) bayt dizisini üretir. */
 export async function renderTile({ z, x, y }: TileCoord, user: AuthenticatedUser): Promise<Buffer> {
   const lod = resolveZoomLod(z);
@@ -48,18 +57,18 @@ export async function renderTile({ z, x, y }: TileCoord, user: AuthenticatedUser
   const noneMatches = sql`false`;
   const unitCondition = withScope(
     lod.unitLevels.length > 0 ? inArray(units.level, lod.unitLevels) : noneMatches,
-    scopeFilter(user, units.path),
+    scopeFilterUnitTree(user, units.path, PERMISSIONS.NETWORK_READ),
   );
   // Tip listesi zoom'dan gelir (bkz. zoom-lod.ts TYPE_MIN_ZOOM). Kofra kesicisi `type` değil
   // `breaker_role` ile ayrıldığı için ayrıca eklenir; diğer kesici rolleri bu katmana hiç girmez.
   const componentCondition = withScope(
     sql`(${lod.componentTypes.length > 0 ? inArray(components.type, lod.componentTypes) : noneMatches}
          OR (${lod.includeServiceEntry} AND ${components.breakerRole} = 'SERVICE_ENTRY'))`,
-    scopeFilter(user, components.unitPath),
+    componentScope(user),
   );
   // Bina izi CTE'leri `component_features`'tan ayrı sorgulandığı için kapsam filtresini
   // kendileri taşımalı — aksi halde kapsam dışı bir TM'in poligonu tile'a sızardı.
-  const buildingScope = scopeFilter(user, components.unitPath) ?? sql`true`;
+  const buildingScope = componentScope(user) ?? sql`true`;
 
   const result = await db.execute(sql`
     WITH bounds AS (

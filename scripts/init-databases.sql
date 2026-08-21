@@ -47,6 +47,9 @@ GRANT CONNECT ON DATABASE network_db     TO network_app;
 \c access_db
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS citext;
+-- Rol atamasının bölgesel kapsamı (`user_roles.unit_path`) `network_db`'deki ile aynı
+-- ltree tipidir; kapsam kontrolü tek indeks taramasıyla cevaplanır.
+CREATE EXTENSION IF NOT EXISTS ltree;
 GRANT USAGE ON SCHEMA public TO access_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE access_migrator IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO access_app;

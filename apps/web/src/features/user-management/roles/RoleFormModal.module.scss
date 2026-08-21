@@ -1,53 +1,17 @@
 @use '../../../styles/variables' as v;
 
-.permMatrix {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 8px;
-}
-
-.permGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.permGroupTitle {
-  font-size: 0.75rem;
+.permissionsHeading {
+  display: block;
+  font-size: 0.9375rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: v.$color-ink-soft;
-  padding-bottom: 4px;
-  border-bottom: 1px solid v.$color-hairline;
-}
-
-.permOption {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 0.875rem;
   color: v.$color-ink;
-
-  input[type='checkbox'] {
-    accent-color: v.$color-brand-500;
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-    cursor: pointer;
-  }
+  margin-bottom: v.$space-2;
 }
 
-.permCode {
-  font-family: 'SF Mono', 'Courier New', monospace;
-  font-size: 0.8rem;
-  color: v.$color-brand-500;
-  min-width: 160px;
-}
-
-.permDesc {
-  font-size: 0.8rem;
-  color: v.$color-ink-soft;
+.permissionsList {
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: v.$space-2;
+  border: 1px solid v.$color-hairline;
+  border-radius: v.$radius-md;
 }

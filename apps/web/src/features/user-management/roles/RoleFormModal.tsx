@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ApiError } from '../../../shared/api/errors.ts';
@@ -7,7 +8,9 @@ import { useToast } from '../../../shared/components/Toast.tsx';
 import { TextField } from '../../../shared/components/form';
 import { useTranslation } from '../../i18n/I18nProvider.tsx';
 import type { RoleListItem } from '../../../types/user-management.ts';
-import { useCreateRole, usePatchRole } from './useRoles.ts';
+import { PermissionModuleList } from './PermissionModuleList.tsx';
+import { useCreateRole, usePatchRole, usePermissions } from './useRoles.ts';
+import styles from './RoleFormModal.module.scss';
 
 interface RoleFormModalProps {
   role?: RoleListItem;
@@ -27,7 +30,12 @@ export function RoleFormModal({ role, onClose }: RoleFormModalProps) {
 
   const createRole = useCreateRole();
   const patchRole = usePatchRole();
-  const schema = useRoleFormSchema(t('user-management.role.validation.nameRequired', undefined, 'Rol adı zorunludur'));
+  const { data: permsData } = usePermissions();
+  const schema = useRoleFormSchema(t('user-management.role.validation.nameRequired'));
+
+  // Yeni rol izinleri burada seçilir — panelin gruplu listesiyle AYNI bileşen kullanılır,
+  // ikinci bir izin listesi yazılmaz. Düzenleme modunda izinler paneldedir.
+  const [checkedPerms, setCheckedPerms] = useState<Set<string>>(new Set());
 
   const {
     register,
@@ -44,10 +52,10 @@ export function RoleFormModal({ role, onClose }: RoleFormModalProps) {
     try {
       if (isEdit) {
         await patchRole.mutateAsync({ id: role.id, name: values.name });
-        show('success', t('user-management.role.toast.updateSuccess', undefined, 'Rol güncellendi'));
+        show('success', t('user-management.role.toast.updateSuccess'));
       } else {
-        await createRole.mutateAsync({ name: values.name, permissionCodes: [] });
-        show('success', t('user-management.role.toast.createSuccess', undefined, 'Rol oluşturuldu'));
+        await createRole.mutateAsync({ name: values.name, permissionCodes: Array.from(checkedPerms) });
+        show('success', t('user-management.role.toast.createSuccess'));
       }
       onClose();
     } catch (err) {
@@ -57,7 +65,7 @@ export function RoleFormModal({ role, onClose }: RoleFormModalProps) {
 
   return (
     <Modal
-      title={isEdit ? t('user-management.role.dialog.edit.title', undefined, 'Rol Düzenle') : t('user-management.role.dialog.create.title', undefined, 'Yeni Rol')}
+      title={isEdit ? t('user-management.role.dialog.edit.title') : t('user-management.role.dialog.create.title')}
       onClose={onClose}
       size="md"
     >
@@ -65,22 +73,35 @@ export function RoleFormModal({ role, onClose }: RoleFormModalProps) {
         {errors.root && <div className="form-error-banner">{errors.root.message}</div>}
 
         <TextField
-          label={t('user-management.role.field.name', undefined, 'Rol Adı')}
+          label={t('user-management.role.field.name')}
           disabled={role?.isSystem}
           error={errors.name?.message}
           {...register('name')}
         />
 
+        {!isEdit && (
+          <div className="field">
+            <span className={styles.permissionsHeading}>{t('user-management.role.field.permissions')}</span>
+            <div className={styles.permissionsList}>
+              <PermissionModuleList
+                permissions={permsData?.items ?? []}
+                checked={checkedPerms}
+                onChange={setCheckedPerms}
+              />
+            </div>
+          </div>
+        )}
+
         <div className="form-actions">
           <button type="button" onClick={onClose} className="btn btn--ghost">
-            {t('common.action.cancel', undefined, 'İptal')}
+            {t('common.action.cancel')}
           </button>
           <button type="submit" disabled={isSubmitting || role?.isSystem || (isEdit && !isDirty)} className="btn btn--primary">
             {isSubmitting
-              ? t('common.action.saving', undefined, 'Kaydediliyor…')
+              ? t('common.action.saving')
               : isEdit
-              ? t('common.action.save', undefined, 'Kaydet')
-              : t('common.action.create', undefined, 'Oluştur')}
+                ? t('common.action.save')
+                : t('common.action.create')}
           </button>
         </div>
       </form>

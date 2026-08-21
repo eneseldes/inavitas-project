@@ -14,6 +14,10 @@ export const ERROR_CODES = {
   OUTAGE_ALREADY_ACTIVE: 409,
   /** Bu elemanda süren (DONE/CANCELLED olmayan) bir iş emri zaten var. */
   WORK_ORDER_ALREADY_ACTIVE: 409,
+  /** Hedef eleman kullanıcının bölgesel yetki kapsamı dışında. */
+  OUT_OF_SCOPE: 403,
+  /** Token'daki kapsam kümesi bayat — yenilenmesi gerekiyor. */
+  SCOPE_STALE: 401,
   RATE_LIMITED: 429,
   INTERNAL: 500,
 } as const;
@@ -119,17 +123,28 @@ export class ComponentNotFoundError extends AppError {
 }
 
 /**
- * Yüksek etkili bir kesinti (topoloji seviyesi ≤ {@link HIGH_IMPACT_TOPOLOGY_LEVEL}) ek izin
- * olmadan açılmaya çalışıldığında fırlatılır. Bir fider kesicisini açmak binlerce aboneyi
- * karartır; bu yüzden `outage:write` yetmez, ayrıca `outage:write-high-impact` aranır.
+ * Hedef eleman kullanıcının bölgesel yetki kapsamı dışındayken fırlatılır.
+ *
+ * Okuma yollarında kapsam bir **süzgeçtir** (kayıt hiç görünmez); yazma yollarında bir
+ * **kapıdır** — istemci listeden geçmeden de istek atabileceği için karar kayıt anında
+ * yeniden verilir.
  */
-export class HighImpactForbiddenError extends AppError {
-  constructor(cbsId: string, topologyLevel: number) {
-    super(
-      'FORBIDDEN',
-      `Yüksek etkili kesinti için ek izin gerekiyor (${cbsId}, topoloji seviyesi ${topologyLevel})`,
-      { details: [{ field: 'cbsId', issue: 'HIGH_IMPACT_FORBIDDEN' }] },
-    );
+export class OutOfScopeError extends AppError {
+  constructor(resourceId: string, unitPath: string) {
+    super('OUT_OF_SCOPE', `Bu kayıt yetki kapsamınızın dışında: ${resourceId} (${unitPath})`, {
+      details: [{ field: 'cbsId', issue: 'OUT_OF_SCOPE' }],
+    });
+  }
+}
+
+/**
+ * Token'daki kapsam kümesi, kullanıcının güncel kapsamından eski olduğunda fırlatılır.
+ * İstemci bunu bir oturum yenileme işareti olarak okur: token tazelenir ve önbellek
+ * tamamen boşaltılır — daraltılmış kapsamda eski kayıtlar önbellekte asılı kalmasın.
+ */
+export class ScopeStaleError extends AppError {
+  constructor() {
+    super('SCOPE_STALE', 'Yetki kapsamınız değişti, oturum yenilenmeli');
   }
 }
 

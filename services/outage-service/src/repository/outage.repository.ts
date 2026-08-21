@@ -72,6 +72,8 @@ export interface OutageFilters {
   durationMaxMinutes?: number;
   origin?: ('USER' | 'SYSTEM')[];
   hasWorkOrder?: boolean;
+  /** Bölgesel yetki süzgeci — kullanıcının seçtiği filtre değil, sunucunun koyduğu sınır. */
+  scope?: SQL;
 }
 
 export interface CreateOutageInput {
@@ -154,6 +156,7 @@ function buildConditions(filters: OutageFilters): SQL[] {
   }
   if (filters.hasWorkOrder === true) conditions.push(isNotNull(outages.workOrderId));
   if (filters.hasWorkOrder === false) conditions.push(isNull(outages.workOrderId));
+  if (filters.scope) conditions.push(filters.scope);
 
   return conditions;
 }

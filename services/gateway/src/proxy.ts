@@ -1,4 +1,4 @@
-import type { AuthedRequest } from '@inavitas/shared';
+import { SCOPES_HEADER_NAME, type AuthedRequest } from '@inavitas/shared';
 import type { RequestHandler } from 'express';
 import { createProxyMiddleware, type Options } from 'http-proxy-middleware';
 
@@ -35,6 +35,9 @@ export function buildProxy(
           proxyReq.setHeader('x-user-email', authedReq.user.email);
           proxyReq.setHeader('x-user-roles', authedReq.user.roles.join(','));
           proxyReq.setHeader('x-user-permissions', authedReq.user.permissions.join(','));
+          // Bölgesel kapsam JSON olarak geçer: izin başına bir yol listesi taşıyor, düz
+          // virgüllü metin bu yapıyı anlatamaz.
+          proxyReq.setHeader(SCOPES_HEADER_NAME, JSON.stringify(authedReq.user.scopes));
         }
       },
     },

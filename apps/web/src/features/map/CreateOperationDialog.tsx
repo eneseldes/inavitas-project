@@ -1,14 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiAlertTriangle } from 'react-icons/fi';
-import { clsx } from 'clsx';
 import { z } from 'zod';
 import { Modal } from '../../shared/components/Modal.tsx';
 import { useToast } from '../../shared/components/Toast.tsx';
 import { SelectField, TextField } from '../../shared/components/form';
 import { toDateTimeLocalInput } from '../../shared/datetime.ts';
-import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
 import { useLabels } from '../i18n/useLabels.ts';
 import { useCreateOutage } from '../outages/useOutages.ts';
@@ -52,31 +49,21 @@ const workOrderSchema = z.object({ type: z.enum(WORK_ORDER_TYPES) });
  * ikisi de aynı bilgiyi (eleman, etki) tekrar göstermeden aynı anda yapılabilecek iki
  * ayrı tıklamaya bölünmüştü.
  *
- * Buradaki etki sayısı bir bilgilendirmedir, bir yetki kararı değildir. Kaydın kendisi
- * sunucuda read-model'den okunan topoloji seviyesiyle yeniden doğrulanır.
+ * Onay adımı bir izin kapısı DEĞİLDİR: uyarı artık sayının kendisidir — "1.934 eleman ·
+ * 707 abone" satırı kırmızı bir şeritten daha fazlasını söyler. Yetki kararı sunucuda,
+ * elemanın idari birimi üzerinden verilir.
  */
 export function CreateOperationDialog({ component, kind, onClose }: CreateOperationDialogProps) {
   const { t } = useTranslation();
   const [cascadePending, setCascadePending] = useState(false);
   const cascadeConfirmedRef = useRef(false);
   const labels = useLabels();
-  const { hasPermission } = useAuth();
   const { data: preview, isLoading: isPreviewLoading, isError: isPreviewError } = useImpactPreview(component.id);
   const guards = useOperationGuards(component.id);
   const { show } = useToast();
   const createOutage = useCreateOutage();
   const createWorkOrder = useCreateWorkOrder();
 
-  const isHighImpact = preview?.highImpact ?? false;
-  /**
-   * Yüksek etkili kesinti ek izin ister; yoksa gönderim engellenir.
-   *
-   * İş emrinde burada engellenmez: ek izin yalnız **kesintiye yol açan** türlerde
-   * (`PLANNED_OUTAGE_WORK_ORDER` / `UNPLANNED_OUTAGE_WORK_ORDER`) aranıyor ve tür
-   * aşağıda seçiliyor — burada kesip atmak, aynı direkte aydınlatma iş emri açmayı da
-   * yasaklardı. Uyarı yine gösterilir, kararı sunucu türle birlikte verir.
-   */
-  const isBlocked = kind === 'outage' && isHighImpact && !hasPermission('outage:write-high-impact');
   // Sunucudaki 409 kapıları burada erkenden gösterilir; karar yine sunucuda verilir.
   const isGateBlocked = kind === 'outage' ? guards.outageBlocked : guards.workOrderBlocked;
   const title = kind === 'outage' ? t('map.confirm.outageTitle') : t('map.confirm.workOrderTitle');
@@ -148,13 +135,6 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
       <form onSubmit={kind === 'outage' ? onSubmitOutage : onSubmitWorkOrder} noValidate>
         {rootError && <div className="form-error-banner">{rootError.message}</div>}
 
-        {isHighImpact && (
-          <p className={styles.highImpactBanner}>
-            <FiAlertTriangle /> {t('map.confirm.highImpactWarning')}
-          </p>
-        )}
-        {isHighImpact && kind === 'workOrder' && <p className={styles.blocked}>{t('map.confirm.highImpactWorkOrderNote')}</p>}
-
         <div className={styles.info}>
           <DetailSection
             title={kind === 'outage' ? t('map.confirm.outageInfoTitle') : t('map.confirm.workOrderInfoTitle')}
@@ -221,7 +201,6 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
           </SelectField>
         )}
 
-        {isBlocked && <p className={styles.blocked}>{t('map.confirm.highImpactForbidden')}</p>}
         {isGateBlocked && <p className={styles.blocked}>{t(gateBlockMessageKey(kind, guards))}</p>}
 
         <div className="form-actions">
@@ -230,8 +209,8 @@ export function CreateOperationDialog({ component, kind, onClose }: CreateOperat
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || isPreviewLoading || isBlocked || isGateBlocked}
-            className={clsx('btn', isHighImpact ? 'btn--danger' : 'btn--primary')}
+            disabled={isSubmitting || isPreviewLoading || isGateBlocked}
+            className="btn btn--primary"
           >
             {isSubmitting
               ? t('common.action.creating')

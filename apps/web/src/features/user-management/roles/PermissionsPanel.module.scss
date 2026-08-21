@@ -43,16 +43,27 @@
   margin: 0;
 }
 
+// Sistem rolü rozeti — ortak `.badge--gray` sınıfının satır içi hizalanmış hali.
+.systemBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .systemBanner {
   display: flex;
   align-items: center;
   gap: 8px;
   background: v.$color-warn-surface;
-  color: #ca8a04;
+  color: v.$color-warn-ink;
   border-bottom: 1px solid v.$color-warn-border;
   padding: 8px 14px;
   font-size: 0.8rem;
   font-weight: 500;
+}
+
+.bannerIcon {
+  flex-shrink: 0;
 }
 
 .body {

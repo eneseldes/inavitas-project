@@ -1,17 +1,22 @@
 import {
-  assertHighImpactAllowed,
+  assertInScope,
   ComponentNotFoundError,
   ConflictError,
   NotFoundError,
   parseSort,
+  PERMISSIONS,
+  scopeFilter,
   toExclusiveUpperBound,
   toPageResult,
   UnauthenticatedError,
   WorkOrderAlreadyActiveError,
   type AuthedRequest,
+  type AuthenticatedUser,
+  type Permission,
 } from '@inavitas/shared';
 import type { Response } from 'express';
 import { db } from '../../db.ts';
+import { workOrders } from '../../db/schema.ts';
 import { canTransition } from '../../domain/state-machine.ts';
 import {
   enqueueWorkOrderCancelledIfNeededTx,
@@ -26,8 +31,11 @@ import { toWorkOrderDto, toWorkOrderHistoryDto, toWorkOrderMapDto } from '../dto
 import { CreateWorkOrderBody, ListWorkOrdersQuery, PatchWorkOrderBody, WorkOrderMapQuery } from '../schemas.ts';
 
 /** Liste ve harita sorgularının paylaştığı filtre dönüşümü. */
-function toFilters(query: ListWorkOrdersQuery | WorkOrderMapQuery): WorkOrderFilters {
+function toFilters(query: ListWorkOrdersQuery | WorkOrderMapQuery, user: AuthenticatedUser): WorkOrderFilters {
   return {
+    // 🚨 Kapsam bir filtre DEĞİL, bir süzgeçtir; kullanıcının seçtiği `unitPath` filtresinden
+    // bağımsız olarak her sorguya eklenir. Liste ve harita ucu aynı dönüşümden geçer.
+    scope: scopeFilter(user, workOrders.unitPath, PERMISSIONS.WORKORDER_READ),
     status: query.status,
     origin: query.origin,
     type: query.type,
@@ -40,20 +48,35 @@ function toFilters(query: ListWorkOrdersQuery | WorkOrderMapQuery): WorkOrderFil
 }
 
 export async function list(req: AuthedRequest, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthenticatedError();
+
   const query = ListWorkOrdersQuery.parse(req.query);
   const sort = parseSort(query.sort, SORTABLE_FIELDS, { field: 'createdAt', dir: 'desc' });
   const pagination = { page: query.page, pageSize: query.pageSize };
 
-  const { items, total } = await workOrderRepository.list(toFilters(query), pagination, sort);
+  const { items, total } = await workOrderRepository.list(toFilters(query, req.user), pagination, sort);
 
   res.json(toPageResult(items.map(toWorkOrderDto), total, query.page, query.pageSize));
 }
 
-export async function getById(req: AuthedRequest, res: Response): Promise<void> {
-  const id = req.params.id as string;
+/**
+ * İş emrini kimliğiyle yükler ve kapsam kapısından geçirir.
+ *
+ * Liste süzgeci bir yetki kanıtı değildir: kimlik doğrudan istenebilir, geçmiş ucu da
+ * tekil kimlikle çağrılır. Kapı bu yüzden kaydı okuyan HER yolda tek noktadan geçer.
+ */
+async function loadInScope(req: AuthedRequest, id: string, permission: Permission) {
+  if (!req.user) throw new UnauthenticatedError();
+
   const row = await workOrderRepository.findById(id);
   if (!row) throw new NotFoundError('İş emri', id);
 
+  assertInScope(req.user, permission, row.unitPath, id);
+  return row;
+}
+
+export async function getById(req: AuthedRequest, res: Response): Promise<void> {
+  const row = await loadInScope(req, req.params.id as string, PERMISSIONS.WORKORDER_READ);
   res.json(toWorkOrderDto(row));
 }
 
@@ -68,10 +91,11 @@ export async function create(req: AuthedRequest, res: Response): Promise<void> {
   const component = await networkComponentRepository.findById(cbsId);
   if (!component) throw new ComponentNotFoundError(cbsId);
 
-  // Her iş emri, outage-service consumer'ında tipten bağımsız otomatik bir kesinti kaydı
-  // doğurur (bkz. outage-service/kafka/consumers.ts handleWorkOrderCreated); bu yüzden ek izin
-  // tüm türlerde aranır, yalnız "kesinti türü" olanlarda değil.
-  assertHighImpactAllowed(user, cbsId, component.topologyLevel);
+  // Bölgesel yetki kapısı. İş emrinden doğan sistem kesintisi consumer'da yaratılıyor ama
+  // iş emriyle AYNI `cbsId` üzerinde doğuyor — yani kapsam kontrolü burada bir kez yapılınca
+  // o kesinti de kapsanmış oluyor. Consumer'a ileride ikinci bir kesinti kaynağı eklenirse
+  // bu kural orada da tekrarlanmalı.
+  assertInScope(user, PERMISSIONS.WORKORDER_WRITE, component.unitPath, cbsId);
 
   // Mükerrerlik kapısı: aynı elemanda süren bir iş emri varken ikincisi açılamaz.
   //
@@ -117,9 +141,7 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
   const id = req.params.id as string;
   const body = PatchWorkOrderBody.parse(req.body);
-  const current = await workOrderRepository.findById(id);
-
-  if (!current) throw new NotFoundError('İş emri', id);
+  const current = await loadInScope(req, id, PERMISSIONS.WORKORDER_WRITE);
 
   if (body.status !== current.status && !canTransition(current.status, body.status)) {
     throw new ConflictError(`${current.status} durumundan ${body.status} durumuna geçilemez`, [
@@ -172,8 +194,7 @@ export async function patch(req: AuthedRequest, res: Response): Promise<void> {
 
 export async function getHistory(req: AuthedRequest, res: Response): Promise<void> {
   const id = req.params.id as string;
-  const current = await workOrderRepository.findById(id);
-  if (!current) throw new NotFoundError('İş emri', id);
+  await loadInScope(req, id, PERMISSIONS.WORKORDER_READ);
 
   const rows = await workOrderRepository.getHistory(id);
   res.json({ items: rows.map(toWorkOrderHistoryDto) });
@@ -187,8 +208,10 @@ export async function getHistory(req: AuthedRequest, res: Response): Promise<voi
  * sınır vardır; sınıra dayanılırsa `truncated` bayrağı döner.
  */
 export async function listForMap(req: AuthedRequest, res: Response): Promise<void> {
+  if (!req.user) throw new UnauthenticatedError();
+
   const query = WorkOrderMapQuery.parse(req.query);
-  const items = await workOrderRepository.listForMap(toFilters(query), query.limit);
+  const items = await workOrderRepository.listForMap(toFilters(query, req.user), query.limit);
 
   res.json({ items: items.map(toWorkOrderMapDto), truncated: items.length === query.limit });
 }

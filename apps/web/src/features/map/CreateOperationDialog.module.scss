@@ -1,8 +1,8 @@
 @use '../../styles/variables' as v;
 
-// Yüksek etkili kesinti (topoloji seviyesi ≤ 3) bir uyarı satırıyla vurgulanır — modalin
-// tamamını grimsi bir kutuya sarmak yerine (eskisi gibi) yalnız bu satır dikkat çeker.
-.highImpactBanner {
+// Geri alınamaz bir işlemin uyarı satırı (kaskad onayı, kesinti iptali) — modalin tamamını
+// grimsi bir kutuya sarmak yerine yalnız bu satır dikkat çeker.
+.warningBanner {
   display: flex;
   align-items: center;
   gap: v.$space-2;

@@ -4,7 +4,6 @@
 
 import { IMPACT_ID_LIMIT } from '@inavitas/contracts';
 import { NotFoundError } from '@inavitas/shared';
-import { HIGH_IMPACT_TOPOLOGY_LEVEL } from '../../domain/vocabulary.ts';
 import { NodeFlag } from '../../graph/csr.ts';
 import { getGraph } from '../../graph/loader.ts';
 import { traceDownstream, traceUpstream } from '../../graph/traverse.ts';
@@ -145,7 +144,6 @@ export interface ChildOutage {
 
 export interface ImpactPreview extends DownstreamImpact {
   topologyLevel: number;
-  highImpact: boolean;
   /** Elemanın **şu anki** enerjilenme durumu — kolondan değil, runtime'dan. */
   isEnergized: boolean;
   /** Elemanı karartan kesinti; enerjiliyse `null`. */
@@ -172,7 +170,6 @@ export async function computeImpactPreview(componentId: string): Promise<ImpactP
   return {
     ...impact,
     topologyLevel: component.topologyLevel,
-    highImpact: component.topologyLevel <= HIGH_IMPACT_TOPOLOGY_LEVEL,
     isEnergized: energizationService.isEnergized(componentId),
     deEnergizedBy: energizationService.deEnergizedBy(componentId),
     childOutages: childOutages.slice(0, CHILD_OUTAGE_PREVIEW_LIMIT),

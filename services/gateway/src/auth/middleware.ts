@@ -1,8 +1,29 @@
-import { AUTH_COOKIE_NAMES, CSRF_HEADER_NAME, UnauthenticatedError, type AuthedRequest } from '@inavitas/shared';
+import {
+  AUTH_COOKIE_NAMES,
+  CSRF_HEADER_NAME,
+  ScopeStaleError,
+  SCOPES_HEADER_NAME,
+  scopeKeys,
+  UnauthenticatedError,
+  type AuthedRequest,
+  type ScopeMap,
+} from '@inavitas/shared';
 import type { NextFunction, Request, Response } from 'express';
+import { redis } from '../redis.ts';
 import { verifyAccessToken } from './verify-token.ts';
 
-const SPOOFABLE_HEADERS = ['x-user-id', 'x-user-email', 'x-user-roles', 'x-user-permissions'];
+/**
+ * 🚨 `x-user-scopes` bu listede olmak ZORUNDA. Atlanırsa header dışarıdan enjekte edilir
+ * ve tüm bölgesel yetki modeli delinir — süzme kararını alt servisler bu header'a bakarak
+ * veriyor.
+ */
+const SPOOFABLE_HEADERS = [
+  'x-user-id',
+  'x-user-email',
+  'x-user-roles',
+  'x-user-permissions',
+  SCOPES_HEADER_NAME,
+];
 
 /** Dışarıdan gelen sahte `X-User-*` header'larını temizler. */
 export function stripSpoofedHeaders() {
@@ -10,6 +31,30 @@ export function stripSpoofedHeaders() {
     for (const header of SPOOFABLE_HEADERS) delete req.headers[header];
     next();
   };
+}
+
+/**
+ * Token'daki kapsam kümesini çözer ve bayatlığını denetler.
+ *
+ * Sürüm kaydı Redis'tedir çünkü gateway veritabanına bağlanmaz. Kayıt hiç yoksa kapsam o
+ * kullanıcı için henüz hiç değişmemiştir (ya da TTL dolmuştur) — token kabul edilir; aksi
+ * halde Redis'in boşalması herkesi dışarı atardı.
+ */
+async function resolveScopes(payload: {
+  sub: string;
+  scopes?: ScopeMap;
+  scopeRef?: string;
+  scopeVersion?: number;
+}): Promise<ScopeMap> {
+  const current = await redis.get(scopeKeys.version(payload.sub));
+  if (current !== null && Number(current) !== payload.scopeVersion) throw new ScopeStaleError();
+
+  if (!payload.scopeRef) return payload.scopes ?? {};
+
+  const raw = await redis.get(scopeKeys.reference(payload.scopeRef));
+  // Referans düşmüşse kapsam bilinmiyor demektir; "sınırsız" değil, bayat sayılır.
+  if (raw === null) throw new ScopeStaleError();
+  return JSON.parse(raw) as ScopeMap;
 }
 
 /** `access_token` çerezini doğrular ve `req.user`'ı doldurur. */
@@ -22,13 +67,26 @@ export function requireAuth() {
       return;
     }
 
+    let payload: ReturnType<typeof verifyAccessToken>;
     try {
-      const payload = verifyAccessToken(token);
-      req.user = { id: payload.sub, email: payload.email, roles: payload.roles, permissions: payload.perms };
-      next();
+      payload = verifyAccessToken(token);
     } catch {
       next(new UnauthenticatedError('Token geçersiz veya süresi dolmuş'));
+      return;
     }
+
+    resolveScopes(payload)
+      .then((scopes) => {
+        req.user = {
+          id: payload.sub,
+          email: payload.email,
+          roles: payload.roles,
+          permissions: payload.perms,
+          scopes,
+        };
+        next();
+      })
+      .catch(next);
   };
 }
 

@@ -1,0 +1,134 @@
+@use '../../../styles/variables' as v;
+@use '../../../styles/mixins' as m;
+
+.picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.trigger {
+  @include m.clickable;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-2;
+  width: 100%;
+  text-align: start;
+}
+
+.value {
+  @include m.truncate;
+}
+
+.placeholder {
+  color: v.$color-placeholder;
+}
+
+.triggerIcon {
+  flex-shrink: 0;
+  color: v.$color-ink-soft;
+}
+
+.popover {
+  @include m.card;
+  position: absolute;
+  z-index: v.$z-popover;
+  top: calc(100% + #{v.$space-1});
+  inset-inline-start: 0;
+  width: 100%;
+  min-width: 16rem;
+  padding: v.$space-2;
+  box-shadow: v.$shadow-lg;
+}
+
+.searchBox {
+  @include m.control-base;
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  width: 100%;
+  color: v.$color-ink-soft;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: v.$color-ink;
+  font: inherit;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.list {
+  margin-top: v.$space-2;
+  max-height: 15rem;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: v.$space-1;
+}
+
+.chevron {
+  @include m.clickable;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: v.$color-ink-soft;
+  transition: transform v.$transition-fast;
+
+  &:disabled {
+    // Yaprakta ok yok ama yeri korunur; aksi halde girinti seviye atlar.
+    opacity: 0;
+    cursor: default;
+  }
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.option {
+  @include m.clickable;
+  @include m.truncate;
+  flex: 1;
+  min-width: 0;
+  padding: v.$space-1 v.$space-2;
+  text-align: start;
+  border: none;
+  border-radius: v.$radius-sm;
+  background: transparent;
+  color: v.$color-ink;
+  font-size: v.$control-font-size;
+
+  &:hover {
+    background: v.$color-row-hover;
+  }
+}
+
+.optionSelected {
+  background: v.$color-brand-soft-bg;
+  color: v.$color-brand-soft-ink;
+  font-weight: 600;
+}
+
+.empty {
+  margin: 0;
+  padding: v.$space-4;
+  text-align: center;
+  color: v.$color-ink-soft;
+  font-size: v.$control-font-size;
+}

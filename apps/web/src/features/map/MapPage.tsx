@@ -14,7 +14,7 @@ import { MapZoomControl } from './MapZoomControl.tsx';
 import { OperationDetailPanel } from './OperationDetailPanel.tsx';
 import { useAreaResults, useAreaSelectionState } from './useAreaSelection.ts';
 import { useMapState } from './useMapState.ts';
-import { useComponent, useEnergization, useTrace } from './useNetwork.ts';
+import { useComponent, useEnergization, useTrace, useUnit } from './useNetwork.ts';
 import { useEnergizationStream } from './useEnergizationStream.ts';
 import type { Bbox } from '../../types/network.ts';
 import type { TraceDirection } from './api.ts';
@@ -29,6 +29,16 @@ const FOCUS_ZOOM = 17;
 
 /** Listeden bir kayda gidilirken kullanılan en küçük zoom; işaretçiler burada teker teker açılır. */
 const RECORD_ZOOM = 15;
+
+/**
+ * Birimler sekmesinden gelen derin bağın (`/map?unit=…`) zoom'u — seviyeye göre, ilçe
+ * sınırları ekrana sığacak kadar.
+ */
+const UNIT_ZOOM: Record<'PROVINCE' | 'DISTRICT' | 'NEIGHBORHOOD', number> = {
+  PROVINCE: 9,
+  DISTRICT: 11.5,
+  NEIGHBORHOOD: 14,
+};
 
 /** `/map` — harita tam alanı kaplar, paneller üstüne biner. */
 export function MapPage() {
@@ -57,12 +67,15 @@ export function MapPage() {
     setSelectedId,
     focusId,
     resolveFocus,
+    unitPath,
+    clearUnit,
   } = useMapState();
   const [activeTool, setActiveTool] = useState<MapTool | undefined>(undefined);
   const [mapZoomApi, setMapZoomApi] = useState<MapZoomApi | undefined>(undefined);
   const navigate = useNavigate();
   const { data: focusComponent } = useComponent(focusId);
   const { data: selectedComponent } = useComponent(selectedId);
+  const { data: focusUnit } = useUnit(unitPath);
 
   // İz, aksiyon ve kamera hedefi URL'e yazılmaz: üçü de geçici görünüm durumudur.
   const [traceDirection, setTraceDirection] = useState<TraceDirection | undefined>(undefined);
@@ -125,6 +138,20 @@ export function MapPage() {
     includeOutages: showOutages,
     includeWorkOrders: showWorkOrders,
   });
+
+  /**
+   * Birim derin bağı kamerayı her şeyden ÖNCE kurar: URL'de `lng`/`lat`/`zoom` olmasa da
+   * `localStorage`'taki son görünüm devreye girer, o yüzden bağ ayrıca uygulanmazsa harita
+   * en son bakılan yerde açılır ve bağ hiçbir şey yapmamış görünür. Uygulandıktan sonra
+   * parametre düşer — sonraki pan/zoom'da kamera geri sıçramamalı.
+   */
+  useEffect(() => {
+    if (!focusUnit || focusUnit.centerLat === null || focusUnit.centerLon === null) return;
+    setFlyTo({ lng: focusUnit.centerLon, lat: focusUnit.centerLat, zoom: UNIT_ZOOM[focusUnit.level] });
+    clearUnit();
+    // Yalnız dışarıdan gelen `unit` yolu değişince tetiklenir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusUnit]);
 
   useEffect(() => {
     if (!focusComponent) return;
@@ -357,12 +384,10 @@ export function MapPage() {
         {activeTool === 'filters' && (
           <FiltersPanel
             onClose={() => setActiveTool(undefined)}
-            showOutages={showOutages}
             outageFilters={outageFilters}
             onOutageFiltersChange={patchOutageFilters}
             workOrderFilters={workOrderFilters}
             onWorkOrderFiltersChange={patchWorkOrderFilters}
-            outageTruncated={outageData?.truncated ?? false}
             workOrderTruncated={workOrderData?.truncated ?? false}
           />
         )}

@@ -1,11 +1,13 @@
 import { apiFetch } from '../../shared/api/client.ts';
 import type { PageResult } from '../../types/api.ts';
 import type {
+  Assignment,
   CreateRoleInput,
   CreateUserInput,
   PermissionItem,
   RoleDetail,
   RoleListItem,
+  UnitNode,
   UpdateRoleInput,
   UpdateUserInput,
   UserDetail,
@@ -57,8 +59,8 @@ export function patchUser(id: string, body: UpdateUserInput): Promise<void> {
   return apiFetch(`/api/users/${id}`, { method: 'PATCH', body });
 }
 
-export function setUserRoles(id: string, roleCodes: string[]): Promise<void> {
-  return apiFetch(`/api/users/${id}/roles`, { method: 'PUT', body: { roleCodes } });
+export function setUserAssignments(id: string, assignments: Assignment[]): Promise<void> {
+  return apiFetch(`/api/users/${id}/roles`, { method: 'PUT', body: { assignments } });
 }
 
 export function resetPassword(id: string, password: string): Promise<void> {
@@ -95,4 +97,24 @@ export function deleteRole(id: string): Promise<void> {
 
 export function fetchPermissions(): Promise<{ items: PermissionItem[] }> {
   return apiFetch('/api/permissions');
+}
+
+// --- Birimler ---
+
+export interface UnitTreeQuery {
+  /** Bir birimin doğrudan çocukları; verilmezse ağacın kökleri döner. */
+  parent?: string;
+  /** Ad araması — dolduğunda `parent` yok sayılır, eşleşmeler atalarıyla birlikte döner. */
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export function fetchUnitTree(query: UnitTreeQuery): Promise<PageResult<UnitNode>> {
+  const params = new URLSearchParams();
+  if (query.parent) params.set('parent', query.parent);
+  if (query.q) params.set('q', query.q);
+  if (query.page) params.set('page', String(query.page));
+  if (query.pageSize) params.set('pageSize', String(query.pageSize));
+  return apiFetch(`/api/units/tree?${params.toString()}`);
 }

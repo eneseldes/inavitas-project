@@ -37,7 +37,7 @@ export function CancelOutageDialog({ outageId, onClose }: CancelOutageDialogProp
 
   return (
     <Modal title={t('map.action.cancelOutageConfirmTitle')} onClose={onClose}>
-      <p className={styles.highImpactBanner}>
+      <p className={styles.warningBanner}>
         <FiAlertTriangle /> {t('map.action.cancelOutageConfirmBody')}
       </p>
 

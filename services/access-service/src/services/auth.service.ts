@@ -2,18 +2,21 @@ import {
   AppError,
   UnauthenticatedError,
   type AuthenticatedUser,
+  type ScopeMap,
 } from '@inavitas/shared';
 import { randomUUID } from 'node:crypto';
 import { isLocked, lockRemainingSeconds, registerFailure, resetLock } from '../domain/lockout.ts';
 import { verifyPassword, wastePasswordCompareTime } from '../domain/password.ts';
 import { refreshTokenStore } from '../domain/refresh-store.ts';
+import { publishScopeVersion, SCOPE_INLINE_LIMIT, scopeSize, storeScopes } from '../domain/scope-store.ts';
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  type ScopeClaim,
 } from '../domain/tokens.ts';
 import * as userRepository from '../repository/user.repository.ts';
-import type { UserWithAccess } from '../repository/user.repository.ts';
+import type { AssignmentRow, UserWithAccess } from '../repository/user.repository.ts';
 
 const INVALID_CREDENTIALS = 'E-posta veya parola hatalı';
 
@@ -32,6 +35,9 @@ export interface PublicUser {
   fullName: string;
   roles: string[];
   permissions: string[];
+  /** Etkin (izin, bölge) kümesi — arayüz "nerede yetkiliyim" sorusunu bundan cevaplar. */
+  scopes: ScopeMap;
+  assignments: AssignmentRow[];
 }
 
 function toPublicUser(user: UserWithAccess): PublicUser {
@@ -41,6 +47,8 @@ function toPublicUser(user: UserWithAccess): PublicUser {
     fullName: user.fullName,
     roles: user.roles,
     permissions: user.permissions,
+    scopes: user.scopes,
+    assignments: user.assignments,
   };
 }
 
@@ -50,7 +58,21 @@ function toAuthenticatedUser(user: UserWithAccess): AuthenticatedUser {
     email: user.email,
     roles: user.roles,
     permissions: user.permissions,
+    scopes: user.scopes,
   };
+}
+
+/**
+ * Kapsam kümesini token'a hazırlar ve güncel sürümü gateway'in okuyabileceği yere yayınlar.
+ *
+ * Küme eşiği aşarsa token'a gömülmez (bkz. SCOPE_INLINE_LIMIT): JWT bir çerezde taşınıyor,
+ * onlarca mahalleye tek tek yetkilendirilmiş bir kullanıcı çerez sınırını zorlardı.
+ */
+async function issueScopeClaim(user: UserWithAccess): Promise<ScopeClaim> {
+  await publishScopeVersion(user.id, user.scopeVersion);
+
+  if (scopeSize(user.scopes) <= SCOPE_INLINE_LIMIT) return { scopes: user.scopes };
+  return { scopeRef: await storeScopes(user.scopes) };
 }
 
 /** Kullanıcı için yeni bir Refresh Token oluşturur ve depoya kaydeder. */
@@ -104,7 +126,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   await userRepository.touchLastLogin(user.id, now);
 
   return {
-    accessToken: signAccessToken(toAuthenticatedUser(user)),
+    accessToken: signAccessToken(toAuthenticatedUser(user), await issueScopeClaim(user), user.scopeVersion),
     refreshToken: await issueRefreshToken(user.id),
     user: toPublicUser(user),
   };
@@ -137,7 +159,7 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
   }
 
   return {
-    accessToken: signAccessToken(toAuthenticatedUser(user)),
+    accessToken: signAccessToken(toAuthenticatedUser(user), await issueScopeClaim(user), user.scopeVersion),
     refreshToken: await issueRefreshToken(user.id),
   };
 }

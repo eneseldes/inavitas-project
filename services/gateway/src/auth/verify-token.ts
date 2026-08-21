@@ -1,3 +1,4 @@
+import type { ScopeMap } from '@inavitas/shared';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.ts';
 
@@ -7,6 +8,10 @@ export interface AccessTokenPayload {
   email: string;
   roles: string[];
   perms: string[];
+  /** Küçük kapsam kümesi token'ın içindedir; büyük olan Redis'te durur (`scopeRef`). */
+  scopes?: ScopeMap;
+  scopeRef?: string;
+  scopeVersion?: number;
   typ?: string;
 }
 

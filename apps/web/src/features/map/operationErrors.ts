@@ -1,7 +1,7 @@
 import { ApiError } from '../../shared/api/errors.ts';
 
 /**
- * Sunucudaki kapılardan dönen 409 kodları → çeviri anahtarları.
+ * Sunucudaki kapılardan dönen hata kodları → çeviri anahtarları.
  *
  * Genel `outage.toast.createError` yerine spesifik mesaj gösterilir: kullanıcı "oluşturulamadı"
  * değil, **neden** oluşturulamadığını okumalı.
@@ -10,6 +10,7 @@ const BLOCK_MESSAGE_KEY: Record<string, string> = {
   COMPONENT_DE_ENERGIZED: 'error.COMPONENT_DE_ENERGIZED',
   OUTAGE_ALREADY_ACTIVE: 'error.OUTAGE_ALREADY_ACTIVE',
   WORK_ORDER_ALREADY_ACTIVE: 'error.WORK_ORDER_ALREADY_ACTIVE',
+  OUT_OF_SCOPE: 'error.OUT_OF_SCOPE',
 };
 
 /** Kayıt oluşturma hatasını gösterilecek çeviri anahtarına çevirir. */

@@ -215,6 +215,20 @@ export function buildOutageColumns(
           />
         );
       },
+      meta: {
+        // Kimliğin kendisi aranmaz (kullanıcı UUID ezberlemiyor); anlamlı olan soru
+        // "bu kesintiye iş emri bağlı mı" ve sunucu bunu `hasWorkOrder` ile zaten
+        // cevaplıyordu — filtre yalnızca arayüzde eksikti.
+        filter: {
+          key: 'hasWorkOrder',
+          type: 'select',
+          options: [
+            { value: 'true', label: t('common.filter.relation.linked') },
+            { value: 'false', label: t('common.filter.relation.unlinked') },
+          ],
+          toQuery: (v) => ({ hasWorkOrder: v === '' ? undefined : v === 'true' }),
+        },
+      } satisfies ColumnMeta,
     },
   ];
 }

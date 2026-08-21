@@ -1,0 +1,137 @@
+@use '../../../styles/variables' as v;
+@use '../../../styles/mixins' as m;
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: v.$space-3;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$space-4;
+}
+
+.searchBox {
+  @include m.control-base;
+  display: inline-flex;
+  align-items: center;
+  gap: v.$space-2;
+  width: 18rem;
+  color: v.$color-ink-soft;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: v.$color-ink;
+  font: inherit;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.note {
+  margin: 0;
+  font-size: v.$control-font-size;
+  color: v.$color-ink-soft;
+}
+
+.table {
+  @include m.card;
+  overflow: hidden;
+  // Uzun birim ağacı sayfayı büyütmez, kendi gövdesinde kayar (AppShell 100svh).
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+// Ağaç bir <table> değil: satırlar iç içe geçmiş bir listeden geliyor ve girinti
+// hücrenin içinde. Kolon hizası bu yüzden tek bir grid şablonundan gelir.
+.row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) 6rem 11rem 6rem 6rem 3rem;
+  align-items: center;
+  gap: v.$space-3;
+  padding: v.$space-2 v.$space-4;
+  font-size: v.$control-font-size;
+  border-bottom: 1px solid v.$color-hairline;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.headRow {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: v.$color-surface-alt;
+  font-weight: 600;
+  color: v.$color-ink-soft;
+}
+
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: v.$space-2;
+  min-width: 0;
+}
+
+.name {
+  @include m.truncate;
+  font-weight: 500;
+  color: v.$color-ink;
+}
+
+.chevron {
+  @include m.clickable;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: v.$color-ink-soft;
+  transition: transform v.$transition-fast;
+
+  &:disabled {
+    // Yaprak satırda ok yok ama yeri korunur; aksi halde girinti seviye atlar.
+    opacity: 0;
+    cursor: default;
+  }
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.levelIcon {
+  flex-shrink: 0;
+  color: v.$color-ink-soft;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty {
+  margin: 0;
+  padding: v.$space-8 v.$space-4;
+  text-align: center;
+  color: v.$color-ink-soft;
+  font-size: v.$control-font-size;
+}

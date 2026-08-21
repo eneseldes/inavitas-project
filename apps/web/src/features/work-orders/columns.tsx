@@ -148,6 +148,18 @@ export function buildWorkOrderColumns(
           />
         );
       },
+      meta: {
+        // bkz. kesinti tablosundaki `hasWorkOrder` — aynı soru, ters yön.
+        filter: {
+          key: 'hasOutage',
+          type: 'select',
+          options: [
+            { value: 'true', label: t('common.filter.relation.linked') },
+            { value: 'false', label: t('common.filter.relation.unlinked') },
+          ],
+          toQuery: (v) => ({ hasOutage: v === '' ? undefined : v === 'true' }),
+        },
+      } satisfies ColumnMeta,
     },
   ];
 }

@@ -33,7 +33,7 @@ export function CascadeConfirmDialog({
 
   return (
     <Modal title={t('map.cascade.title')} onClose={onCancel}>
-      <p className={styles.highImpactBanner}>
+      <p className={styles.warningBanner}>
         <FiAlertTriangle /> {t('map.cascade.body', { count: childOutageCount.toLocaleString('tr-TR') })}
       </p>
 

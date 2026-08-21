@@ -85,14 +85,16 @@ export function buildRouter(): Router {
     requirePermission(PERMISSIONS.CUSTOMER_READ),
     asyncHandler<AuthedRequest>(customersController.getByComponent),
   );
+  // İz ve etki önizlemesi ayrı bir izne bağlıdır: şebekeyi görmek ile "bunu kesersem kim
+  // kararır" sorusunu sormak aynı yetki değildir.
   networkRouter.get(
     '/components/:id/trace',
-    requirePermission(PERMISSIONS.NETWORK_READ),
+    requirePermission(PERMISSIONS.NETWORK_TRACE),
     asyncHandler<AuthedRequest>(impactController.trace),
   );
   networkRouter.get(
     '/components/:id/impact-preview',
-    requirePermission(PERMISSIONS.NETWORK_READ),
+    requirePermission(PERMISSIONS.NETWORK_TRACE),
     asyncHandler<AuthedRequest>(impactController.impactPreview),
   );
 

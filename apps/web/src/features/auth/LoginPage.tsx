@@ -98,17 +98,20 @@ export function LoginPage() {
             <img src="/inv-logo.svg" alt="inavitas" className={styles.brandLogo} />
           </div>
 
-          <form onSubmit={onSubmit} noValidate className={styles.form}>
+          <form onSubmit={onSubmit} noValidate autoComplete="off" className={styles.form}>
             {formError && (
               <div role="alert" className="form-error-banner">
                 {formError}
               </div>
             )}
 
+            {/*
+              `autoComplete` bilerek verilmiyor: `TextInput` varsayılanı `off` ve tarayıcının
+              geçmişten doldurduğu öneri kutusu istenmiyor.
+            */}
             <TextField
               label={t('auth.action.emailLabel')}
               type="email"
-              autoComplete="username"
               leadingIcon={<FiMail />}
               error={errors.email?.message}
               {...register('email')}
@@ -116,7 +119,6 @@ export function LoginPage() {
 
             <PasswordField
               label={t('auth.action.passwordLabel')}
-              autoComplete="current-password"
               leadingIcon={<FiLock />}
               error={errors.password?.message}
               {...register('password')}

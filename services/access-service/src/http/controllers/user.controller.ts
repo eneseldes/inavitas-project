@@ -7,7 +7,7 @@ import {
   CreateUserBody,
   ListUsersQuery,
   ResetPasswordBody,
-  SetUserRolesBody,
+  SetUserAssignmentsBody,
   UpdateUserBody,
 } from '../schemas.ts';
 import { authenticate } from '../authenticate.ts';
@@ -16,6 +16,8 @@ export function buildUserRouter(): Router {
   const router = Router();
 
   const auth = [authenticate(), requirePermission(PERMISSIONS.USER_MANAGE)];
+  // Kapsam atamak ayrı bir izindir: kullanıcı yönetebilen herkes bölge yetkisi dağıtamaz.
+  const scopeAuth = [...auth, requirePermission(PERMISSIONS.SCOPE_MANAGE)];
 
   /** Sayfalı kullanıcı listesi */
   router.get(
@@ -60,10 +62,10 @@ export function buildUserRouter(): Router {
   /** Yeni kullanıcı oluştur */
   router.post(
     '/',
-    ...auth,
+    ...scopeAuth,
     asyncHandler(async (req: AuthedRequest, res: Response) => {
       const body = CreateUserBody.parse(req.body);
-      const id = await userService.createUser(body);
+      const id = await userService.createUser(req.user!, body);
       res.status(201).json({ id });
     }),
   );
@@ -80,14 +82,14 @@ export function buildUserRouter(): Router {
     }),
   );
 
-  /** Kullanıcı rol setini değiştir */
+  /** Kullanıcı rol atamalarını (rol + kapsam) değiştir */
   router.put(
     '/:id/roles',
-    ...auth,
+    ...scopeAuth,
     asyncHandler(async (req: AuthedRequest, res: Response) => {
       const id = req.params.id as string;
-      const { roleCodes } = SetUserRolesBody.parse(req.body);
-      await userService.setUserRoles(id, roleCodes);
+      const { assignments } = SetUserAssignmentsBody.parse(req.body);
+      await userService.setUserAssignments(req.user!, id, assignments);
       res.status(204).send();
     }),
   );

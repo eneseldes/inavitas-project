@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import {
   FiAlertTriangle,
   FiArrowDownCircle,
   FiArrowUpCircle,
-  FiLink,
   FiTool,
   FiX,
   FiXCircle,
@@ -11,11 +10,8 @@ import {
 } from 'react-icons/fi';
 import { clsx } from 'clsx';
 import { RecordLink } from '../../shared/components/RecordLink.tsx';
-import { StatusBadge } from '../../shared/components/StatusBadge.tsx';
 import { useAuth } from '../auth/useAuth.tsx';
 import { useTranslation } from '../i18n/I18nProvider.tsx';
-import { useOutages } from '../outages/useOutages.ts';
-import { useWorkOrders } from '../work-orders/useWorkOrders.ts';
 import type { DownstreamImpact, UpstreamChain } from '../../types/network.ts';
 import type { TraceDirection } from './api.ts';
 import { DetailRow, DetailSection, unitAncestorName } from './MapDetailRows.tsx';
@@ -42,9 +38,6 @@ interface DetailPanelProps {
   onSelectOperation: (kind: 'outage' | 'workOrder', id: string) => void;
 }
 
-/** Elemana bağlı kayıtların panelde gösterilen sayısı — panel bir liste ekranı değildir. */
-const LINKED_RECORD_LIMIT = 5;
-
 function formatAttribute(value: unknown): string | undefined {
   if (typeof value === 'number') return String(value);
   if (typeof value === 'string' && value.length > 0) return value;
@@ -68,29 +61,6 @@ export function DetailPanel({
   const { data: component, isLoading } = useComponent(selectedId);
   const guards = useOperationGuards(selectedId);
   const [cancelTarget, setCancelTarget] = useState<string | undefined>(undefined);
-
-  // Elemana bağlı kesinti/iş emri kayıtları — "haritada tıkla → sol panel → id → detay
-  // sayfası" yolunun harita ucu. Sorgu yalnız bir eleman seçiliyken atılır.
-  const outageQuery = useMemo(
-    () => ({
-      page: 1,
-      pageSize: LINKED_RECORD_LIMIT,
-      sort: { field: 'createdAt', dir: 'desc' as const },
-      filters: { cbsId: selectedId },
-    }),
-    [selectedId],
-  );
-  const workOrderQuery = useMemo(
-    () => ({
-      page: 1,
-      pageSize: LINKED_RECORD_LIMIT,
-      sort: { field: 'createdAt', dir: 'desc' as const },
-      filters: { cbsId: selectedId },
-    }),
-    [selectedId],
-  );
-  const { data: outages } = useOutages(outageQuery, selectedId !== undefined && hasPermission('outage:read'));
-  const { data: workOrders } = useWorkOrders(workOrderQuery, selectedId !== undefined && hasPermission('workorder:read'));
 
   // Panel yalnız bir eleman seçiliyken vardır: boş bir "haritada bir eleman seçin" kutusu
   // haritanın beşte birini sürekli kaplıyordu.
@@ -229,44 +199,6 @@ export function DetailPanel({
 
             {cancelTarget && (
               <CancelOutageDialog outageId={cancelTarget} onClose={() => setCancelTarget(undefined)} />
-            )}
-
-            {(outages?.items.length ?? 0) > 0 && (
-              <DetailSection title={t('map.panel.detail.linkedOutages')}>
-                {outages!.items.map((outage) => (
-                  <button
-                    key={outage.id}
-                    type="button"
-                    className={styles.linkedRow}
-                    onClick={() => onSelectOperation('outage', outage.id)}
-                  >
-                    <span className={clsx(styles.linkedId, 'font-mono')}>
-                      <FiLink />
-                      {outage.id.slice(0, 8)}
-                    </span>
-                    <StatusBadge status={outage.status} />
-                  </button>
-                ))}
-              </DetailSection>
-            )}
-
-            {(workOrders?.items.length ?? 0) > 0 && (
-              <DetailSection title={t('map.panel.detail.linkedWorkOrders')}>
-                {workOrders!.items.map((workOrder) => (
-                  <button
-                    key={workOrder.id}
-                    type="button"
-                    className={styles.linkedRow}
-                    onClick={() => onSelectOperation('workOrder', workOrder.id)}
-                  >
-                    <span className={clsx(styles.linkedId, 'font-mono')}>
-                      <FiLink />
-                      {workOrder.id.slice(0, 8)}
-                    </span>
-                    <StatusBadge status={workOrder.status} />
-                  </button>
-                ))}
-              </DetailSection>
             )}
           </>
         )}

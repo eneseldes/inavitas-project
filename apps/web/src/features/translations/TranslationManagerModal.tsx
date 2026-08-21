@@ -270,6 +270,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
           <input
             type="text"
             className="input"
+            autoComplete="off"
             placeholder={t('settings.translations.searchPlaceholder')}
             value={search}
             onChange={(e) => {
@@ -424,6 +425,7 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
                         <div className={styles.cellWrap}>
                           <input
                             type="text"
+                            autoComplete="off"
                             className={clsx(styles.cellInput, isDirty && styles.dirty)}
                             defaultValue={trans?.draftValue ?? ''}
                             placeholder={t('settings.translations.cellPlaceholder', undefined, 'Çevirinizi buraya yazın…')}
@@ -565,13 +567,13 @@ export function TranslationManagerModal({ onClose }: { onClose: () => void }) {
 
             <div className="field">
               <label className="field__label">{t('settings.translations.columnKey')}</label>
-              <input className="input" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} required />
+              <input className="input" autoComplete="off" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} required />
               <span className="field__hint">{t('settings.translations.keyNameHint')}</span>
             </div>
 
             <div className="field">
               <label className="field__label">{t('settings.translations.descriptionLabel')}</label>
-              <input className="input" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
+              <input className="input" autoComplete="off" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
             </div>
 
             <div className="form-actions">

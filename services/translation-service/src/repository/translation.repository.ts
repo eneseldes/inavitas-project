@@ -1,4 +1,4 @@
-import { eq, and, isNotNull, ne, sql } from 'drizzle-orm';
+import { eq, and, isNotNull, sql } from 'drizzle-orm';
 import { db, type Tx } from '../db.ts';
 import {
   bundleVersions,
@@ -41,14 +41,15 @@ export async function getPublishedBundleRows(
       and(
         eq(translationNamespaces.name, namespaceName),
         eq(translations.localeCode, localeCode),
+        // "Çevrilmemiş"in tek işareti NULL'dır; boş string YAYINLANMIŞ bir değerdir
+        // (bkz. buildBundle) ve elenmez.
         isNotNull(translations.publishedValue),
-        ne(translations.publishedValue, ''),
       ),
     );
 
   const dict: Dictionary = {};
   for (const r of rows) {
-    if (r.publishedValue !== null && r.publishedValue.trim() !== '') {
+    if (r.publishedValue !== null) {
       dict[r.keyName] = r.publishedValue;
     }
   }
@@ -88,14 +89,14 @@ export async function getPublishedBundleRowsAll(localeCode: string, tx?: Tx): Pr
     .where(
       and(
         eq(translations.localeCode, localeCode),
+        // bkz. getPublishedBundleRows — boş string elenmez, NULL elenir.
         isNotNull(translations.publishedValue),
-        ne(translations.publishedValue, ''),
       ),
     );
 
   const dict: Dictionary = {};
   for (const r of rows) {
-    if (r.publishedValue !== null && r.publishedValue.trim() !== '') {
+    if (r.publishedValue !== null) {
       dict[r.keyName] = r.publishedValue;
     }
   }
