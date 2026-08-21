@@ -12,7 +12,6 @@ export const COMPONENT_TYPES = [
   'FEEDER',
   'MV_LINE',
   'MV_BRANCH',
-  'MV_TIE_LINE',
   'DM',
   'TRANSFORMER',
   'LV_BUS',
@@ -33,7 +32,7 @@ export const COMPONENT_CATEGORIES = [
 ] as const;
 export type ComponentCategory = (typeof COMPONENT_CATEGORIES)[number];
 
-export const BREAKER_ROLES = ['TM_FEEDER', 'DM_ENTRY', 'TRANSFORMER', 'TIE', 'SERVICE_ENTRY'] as const;
+export const BREAKER_ROLES = ['TM_FEEDER', 'DM_ENTRY', 'TRANSFORMER', 'SERVICE_ENTRY'] as const;
 export type BreakerRole = (typeof BREAKER_ROLES)[number];
 
 export const VOLTAGE_LEVELS = ['HV', 'MV', 'LV', 'MV_LV'] as const;

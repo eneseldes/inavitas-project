@@ -34,7 +34,6 @@ export const TYPE_MIN_ZOOM: Record<string, number> = {
   HV_LINK: 8,
   DM: 9.75,
   MV_LINE: 9.75,
-  MV_TIE_LINE: 9.75,
   MV_BRANCH: 12,
   TRANSFORMER: 12,
   LV_JUNCTION: 15,

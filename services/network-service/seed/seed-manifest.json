@@ -1,7 +1,8 @@
 {
-  "version": "3.0",
-  "build_time": "2026-08-18T09:04:14Z",
-  "script_version": "build_seed_gpkg.py v1.0",
+  "version": "3.2",
+  "build_time": "2026-08-21T00:00:00Z",
+  "script_version": "build_seed_gpkg.py v1.0 + manual tie-line strip + manual rings-layer drop",
+  "patch_note": "v3.0 → v3.1: removed all MV_TIE_LINE components (700), TIE-role breakers (350) and their 1,400 is_closed=false topology_edges via direct SQL DELETE against the built gpkg (components/topology_edges layers). No other data touched. Manevra/switching was already fully removed from the codebase; these normally-open backup lines had no write path left to ever close them, so they were dropped outright rather than kept as inert data. v3.1 → v3.2: dropped the 'rings' layer (108 rows) from the gpkg entirely via `DROP TABLE rings` (GDAL/GPKG driver, registry-clean). It was never loaded by 02-insert.ts (no network.rings table exists since Faz 10) and 03-validate.ts special-cased skipping it — both the data and that skip-case are now gone. source_file_hashes below describe the original v3.0 upstream CSVs (unchanged on disk) — the gpkg itself was hand-patched after the v3.0 build rather than rebuilt from those sources, so it no longer regenerates bit-for-bit from a plain script run against them.",
   "nearest_unit_path_ratio": 0.000116,
   "customer_kofra_path_mismatch_count": 0,
   "source_file_hashes": {
@@ -14,11 +15,10 @@
   },
   "row_counts": {
     "admin_units": 1463,
-    "components": 593307,
-    "topology_edges": 823721,
+    "components": 592257,
+    "topology_edges": 822321,
     "customers": 230000,
     "customer_pii": 230000,
-    "rings": 108,
     "seed_manifest": 1
   }
 }

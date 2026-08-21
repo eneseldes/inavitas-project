@@ -122,7 +122,7 @@ function widthByType(scale: number): ExpressionSpecification {
   return [
     '*',
     scale,
-    ['match', ['get', 'type'], 'HV_LINE', 3.2, 'HV_LINK', 3.2, 'MV_LINE', 2.6, 'MV_TIE_LINE', 2, 'MV_BRANCH', 1.6, 'SERVICE_DROP', 1, 1.2] as ExpressionSpecification,
+    ['match', ['get', 'type'], 'HV_LINE', 3.2, 'HV_LINK', 3.2, 'MV_LINE', 2.6, 'MV_BRANCH', 1.6, 'SERVICE_DROP', 1, 1.2] as ExpressionSpecification,
   ];
 }
 

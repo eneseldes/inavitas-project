@@ -427,7 +427,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['network', 'enum.componentType.FEEDER', 'Fider', 'Feeder'],
   ['network', 'enum.componentType.MV_LINE', 'MV Ana Hat', 'MV Main Line'],
   ['network', 'enum.componentType.MV_BRANCH', 'MV Kolu', 'MV Branch'],
-  ['network', 'enum.componentType.MV_TIE_LINE', 'MV Bağlantı Hattı', 'MV Tie Line'],
   ['network', 'enum.componentType.DM', 'Dağıtım Merkezi', 'Distribution Center (DM)'],
   ['network', 'enum.componentType.TRANSFORMER', 'Dağıtım Trafosu', 'Distribution Transformer'],
   ['network', 'enum.componentType.LV_BUS', 'LV Panosu', 'LV Panel'],
@@ -447,7 +446,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['network', 'enum.breakerRole.TM_FEEDER', 'Fider Kesicisi', 'Feeder Breaker'],
   ['network', 'enum.breakerRole.DM_ENTRY', 'DM Giriş Kesicisi', 'DM Entry Breaker'],
   ['network', 'enum.breakerRole.TRANSFORMER', 'Trafo Kesicisi', 'Transformer Breaker'],
-  ['network', 'enum.breakerRole.TIE', 'Bağlantı (Tie) Kesicisi', 'Tie Breaker'],
   // Kofranın KENDİSİ kesicidir (bkz. network-service tiles/service.ts `unit_breakers`);
   // ayrı bir "kesicisi" yoktur. Etiket bu yüzden birimin adıdır: eleman detayında
   // "Kesici · Kofra Kesicisi" diye okunuyordu.
@@ -534,7 +532,7 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'legend.section.lines', 'Hatlar', 'Lines'],
   ['map', 'legend.section.units', 'Elemanlar', 'Components'],
   ['map', 'legend.line.hv', '154/400 kV HV hattı', '154/400 kV HV line'],
-  ['map', 'legend.line.mvMain', '34,5 kV MV ana hat + yedek', '34.5 kV MV main line + tie'],
+  ['map', 'legend.line.mvMain', '34,5 kV MV ana hat', '34.5 kV MV main line'],
   ['map', 'legend.line.mvBranch', '34,5 kV MV dağıtım kolu', '34.5 kV MV branch'],
   ['map', 'legend.line.lv', '0,4 kV LV hattı', '0.4 kV LV line'],
   ['map', 'legend.unit.tm', 'TM — Trafo Merkezi', 'TM — Substation'],
@@ -655,8 +653,6 @@ const SEED_KEYS: [string, string, string, string][] = [
   ['map', 'cascade.more', 've {count} kesinti daha', 'and {count} more outages'],
 
   // --- Enerjisizlik katmanı ---
-  ['map', 'layer.deEnergized', 'Enerjisiz Bölgeler', 'De-energized Areas'],
-  ['map', 'legend.deEnergized', 'Enerjisiz', 'De-energized'],
   ['map', 'panel.detail.field.deEnergizedBy', 'Karartan kesinti', 'De-energized by'],
 
   [

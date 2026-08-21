@@ -96,7 +96,6 @@ const L = {
   mvBranch: 'line-mv-branch',
   mvMainCase: 'line-mv-main-case',
   mvMain: 'line-mv-main',
-  mvTie: 'line-mv-tie',
   hvCase: 'line-hv-case',
   hv: 'line-hv',
   bldHalo: 'bld-halo',
@@ -115,7 +114,7 @@ const L = {
 /** Bir efsane satırı açılıp kapandığında görünürlüğü değişen MapLibre katmanları. */
 export const LEGEND_LAYER_IDS: Record<LegendId, string[]> = {
   HV_LINE: [L.hvCase, L.hv],
-  MV_MAIN: [L.mvMainCase, L.mvMain, L.mvTie],
+  MV_MAIN: [L.mvMainCase, L.mvMain],
   MV_BRANCH: [L.mvBranch],
   LV_LINE: [L.lvLine],
   TM: [L.tm],
@@ -199,7 +198,6 @@ function lineLayerSpecs(): LineLayerSpec[] {
     { id: L.mvBranch, types: ['MV_BRANCH'], color: token('--c-map-line-mv-branch'), width: 1.6, opacity: 0.92, minzoom: LEGEND_MIN_ZOOM.MV_BRANCH },
     { id: L.mvMainCase, types: ['MV_LINE'], color: token('--c-map-line-case'), width: 4.4, opacity: 0.6, minzoom: LEGEND_MIN_ZOOM.MV_MAIN, isCase: true },
     { id: L.mvMain, types: ['MV_LINE'], color: token('--c-map-line-mv'), width: 2.6, opacity: 0.95, minzoom: LEGEND_MIN_ZOOM.MV_MAIN },
-    { id: L.mvTie, types: ['MV_TIE_LINE'], color: token('--c-map-line-tie'), width: 2, opacity: 0.95, minzoom: LEGEND_MIN_ZOOM.MV_MAIN, dash: [9, 6] },
     // HV kılıfı kendi token'ını kullanır: iç renk siyah olduğu için ortak `--c-map-line-case`
     // (koyu temada neredeyse siyah) ile hat tamamen kaybolurdu.
     { id: L.hvCase, types: ['HV_LINE', 'HV_LINK'], color: token('--c-map-line-hv-case'), width: 5.4, opacity: 0.7, minzoom: LEGEND_MIN_ZOOM.HV_LINE, isCase: true },

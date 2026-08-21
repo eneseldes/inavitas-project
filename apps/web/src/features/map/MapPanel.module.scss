@@ -150,18 +150,6 @@
   font-weight: 600;
 }
 
-// Kapatılamayan katmanın efsane satırı: `.checkLabel` ile aynı hizada durur ama işaret
-// kutusu olmadığı için onun yerini dolduran bir boşluk taşır ve tıklanabilir görünmez.
-.legendOnlyRow {
-  cursor: default;
-  // 0,5rem taban dolgu + 16px işaret kutusu + 8px aralık — kutulu satırlarla aynı hizada.
-  padding-left: 2rem;
-
-  &:hover {
-    background: transparent;
-  }
-}
-
 // Haritadaki işaretçinin (kesinti/iş emri rozeti) küçültülmüş birebir kopyası — renk
 // CSS değişkeninden gelir, tema değişince ayrıca yeniden üretilmesi gerekmez.
 .markerBadge {
@@ -262,17 +250,6 @@
   // Siyah çekirdek + açık kontur — haritadaki HV hattının aynısı (bkz. networkLayers.ts).
   background: var(--c-map-line-hv);
   box-shadow: 0 0 0 1px var(--c-map-line-hv-case);
-}
-// Enerjisizlik örneği haritadaki vurgu katmanı gibi kesikli çizilir.
-.swatchDeEnergized {
-  width: 1.125rem;
-  height: 0.1875rem;
-  border-radius: 1px;
-  background: repeating-linear-gradient(
-    to right,
-    var(--c-map-deenergized) 0 0.25rem,
-    transparent 0.25rem 0.4rem
-  );
 }
 .swatchMvMain {
   background: var(--c-map-line-mv);

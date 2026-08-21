@@ -26,8 +26,8 @@ export async function validateSeed(
   const manifest: SeedManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
   log(`[03-validate] Manifest sürümü: ${manifest.version}, Build: ${manifest.build_time}`);
 
-  if (manifest.version !== '3.0') {
-    throw new Error(`Geçersiz manifest sürümü: ${manifest.version}. Beklenen sürüm: 3.0`);
+  if (manifest.version !== '3.2') {
+    throw new Error(`Geçersiz manifest sürümü: ${manifest.version}. Beklenen sürüm: 3.2`);
   }
 
   log('[03-validate] Veritabanı satır sayıları doğrulanıyor...');
@@ -52,10 +52,6 @@ export async function validateSeed(
   let hasError = false;
   for (const [table, expected] of Object.entries(manifest.row_counts)) {
     if (table === 'seed_manifest') continue;
-    // `rings` katmanı gpkg'de duruyor ama BİLEREK yüklenmiyor: manevra projeden çıkarıldı
-    // (Faz 10), ring tanımlarını okuyan tek şey oydu. Manifest v3.0 dondurulmuş veri setinin
-    // imzasıdır ve elle düzenlenmez — "bu katmanı yüklemiyoruz" bilgisinin yeri burasıdır.
-    if (table === 'rings') continue;
     const actual = counts[table];
     if (actual !== expected) {
       log(`[03-validate] HATA: Tablo '${table}' - Beklenen: ${expected}, Gerçekleşen: ${actual}`);

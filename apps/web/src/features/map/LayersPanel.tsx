@@ -194,20 +194,6 @@ export function LayersPanel({
 
       <HeatmapGroup activeHeatmap={activeHeatmap} onActiveHeatmapChange={onActiveHeatmapChange} />
 
-      {/* Enerjisiz bölgelerin açma/kapama kutusu YOK — kapatılabilir bir katman değil.
-          "Hangi hat kesik" haritanın ana bilgisidir; kullanıcının ayrıca açması gereken bir
-          şey olamaz. Satır yalnız efsane olarak durur: kesikli kırmızı çizginin ne anlama
-          geldiğini başka hiçbir yerde yazmıyoruz. Kesinti yokken sunucu zaten boş küme
-          döner (bkz. energization.controller.ts) — kapatmanın performans gerekçesi de yoktu. */}
-      <section className={styles.group}>
-        <div className={styles.groupHeader}>
-          <span className={clsx(styles.checkLabel, styles.simpleRow, styles.legendOnlyRow)}>
-            <span className={clsx(styles.swatch, styles.swatchDeEnergized)} aria-hidden />
-            {t('map.layer.deEnergized')}
-          </span>
-        </div>
-      </section>
-
       {/* Kendi grup gövdesi olmayan tekil katmanlar — her biri tek satır. */}
       <section className={styles.group}>
         <div className={styles.groupHeader}>
